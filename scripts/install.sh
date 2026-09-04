@@ -77,6 +77,8 @@ clone_source() {
 detect_pm() {
   if need_cmd pacman; then
     echo pacman
+  elif need_cmd zypper; then
+    echo zypper
   elif need_cmd dnf; then
     echo dnf
   elif need_cmd apt-get; then
@@ -113,6 +115,17 @@ install_packages() {
       try_packages pacman -S --needed --noconfirm \
         evolution-ews sushi hunspell hunspell-en_us
       ;;
+    zypper)
+      # openSUSE Tumbleweed / Leap 16+: webkitgtk4-devel provides webkitgtk-6.0.pc
+      sudo_run zypper --non-interactive install --no-recommends \
+        git meson ninja vala blueprint-compiler pkgconf-pkg-config gcc \
+        gtk4-devel libadwaita-devel gdk-pixbuf-devel \
+        evolution-data-server-devel gnome-online-accounts-devel \
+        webkitgtk4-devel libgsound-devel libical-devel \
+        gettext-tools AppStream desktop-file-utils
+      try_packages zypper --non-interactive install --no-recommends \
+        evolution-ews sushi hunspell hunspell-en
+      ;;
     dnf)
       # Fedora splits libraries from headers: *-devel is required to compile.
       sudo_run dnf install -y \
@@ -124,11 +137,13 @@ install_packages() {
       ;;
     apt)
       sudo_run apt-get update
+      # Debian/Ubuntu package names: libecal2.0-dev (not libecal-2.0-dev);
+      # libical-dev ships the libical-glib.pc Meson looks for.
       sudo_run apt-get install -y \
         git meson ninja-build valac blueprint-compiler pkg-config gcc \
         libgtk-4-dev libadwaita-1-dev libgdk-pixbuf-2.0-dev \
         libcamel1.2-dev libedataserver1.2-dev libedataserverui4-dev \
-        libebook1.2-dev libecal-2.0-dev libical-glib-dev \
+        libebook1.2-dev libecal2.0-dev libical-dev \
         libgoa-1.0-dev libwebkitgtk-6.0-dev libgsound-dev \
         gettext appstream desktop-file-utils
       try_packages apt-get install -y evolution-ews gnome-sushi hunspell hunspell-en-us
