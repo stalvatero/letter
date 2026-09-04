@@ -116,12 +116,13 @@ install_packages() {
         evolution-ews sushi hunspell hunspell-en_us
       ;;
     zypper)
-      # openSUSE Tumbleweed / Leap 16+: webkitgtk4-devel provides webkitgtk-6.0.pc
+      # openSUSE Tumbleweed / Leap 16+: webkitgtk4-devel provides webkitgtk-6.0.pc;
+      # headers live in gsound-devel (not libgsound-devel).
       sudo_run zypper --non-interactive install --no-recommends \
         git meson ninja vala blueprint-compiler pkgconf-pkg-config gcc \
         gtk4-devel libadwaita-devel gdk-pixbuf-devel \
         evolution-data-server-devel gnome-online-accounts-devel \
-        webkitgtk4-devel libgsound-devel libical-devel \
+        webkitgtk4-devel gsound-devel libical-devel \
         gettext-tools AppStream desktop-file-utils
       try_packages zypper --non-interactive install --no-recommends \
         evolution-ews sushi hunspell hunspell-en
