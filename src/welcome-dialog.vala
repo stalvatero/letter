@@ -2,6 +2,7 @@ public class Mail.WelcomeDialog : Adw.Dialog {
     private Adw.Carousel carousel;
     private Gtk.Button back_button;
     private Gtk.Button next_button;
+    private Gtk.Button accounts_button;
     private uint page_index;
 
     public WelcomeDialog () {
@@ -37,11 +38,13 @@ public class Mail.WelcomeDialog : Adw.Dialog {
         );
         var accounts = new Gtk.Button.with_label (_("Online Accounts")) {
             halign = Gtk.Align.CENTER,
+            focusable = false,
         };
         accounts.add_css_class ("pill");
         accounts.clicked.connect (() => Utils.open_online_accounts ());
         needs.child = accounts;
         this.carousel.append (needs);
+        this.accounts_button = accounts;
         this.carousel.page_changed.connect ((index) => {
             this.page_index = index;
             update_chrome ();
@@ -90,6 +93,18 @@ public class Mail.WelcomeDialog : Adw.Dialog {
         this.child = view;
         this.title = _("Welcome");
 
+        /* Carousel can scroll to a focusable child on the last page when the
+         * dialog maps — pin the first page after the first layout. */
+        map.connect (() => {
+            Idle.add (() => {
+                if (this.carousel.n_pages > 0)
+                    this.carousel.scroll_to (this.carousel.get_nth_page (0), false);
+                this.page_index = 0;
+                update_chrome ();
+                return Source.REMOVE;
+            });
+        });
+
         update_chrome ();
     }
 
@@ -112,6 +127,7 @@ public class Mail.WelcomeDialog : Adw.Dialog {
         var last = index + 1 >= this.carousel.n_pages;
         this.back_button.sensitive = index > 0;
         this.next_button.label = last ? _("Get Started") : _("Next");
+        this.accounts_button.focusable = last;
     }
 
     private void go_back () {

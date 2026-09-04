@@ -216,6 +216,18 @@ msgstr "Caricamento cartelle"
 msgid "Connecting to “%s”…"
 msgstr "Connessione a «%s»…"
 
+msgid "Preparing mail for “%s”…"
+msgstr "Preparazione della posta per «%s»…"
+
+msgid "Waiting for folders from “%s”…"
+msgstr "In attesa delle cartelle di «%s»…"
+
+msgid "Mail Account Not Ready"
+msgstr "Account di posta non pronto"
+
+msgid "Evolution Data Server has not published this account yet. Try again in a moment."
+msgstr "Evolution Data Server non ha ancora pubblicato questo account. Riprova tra un momento."
+
 msgid "Evolution Data Server Unavailable"
 msgstr "Evolution Data Server non disponibile"
 

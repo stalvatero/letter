@@ -1920,11 +1920,12 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.folder_cancellable?.cancel ();
         this.folder_cancellable = new Cancellable ();
         var cancellable = this.folder_cancellable;
+        var current = account;
 
-        if (account.kind == AccountKind.LOCAL)
+        if (current.kind == AccountKind.LOCAL)
             return;
 
-        if (!account.has_mail && account.source_uid == null) {
+        if (!current.has_mail && current.source_uid == null) {
             show_folder_status (
                 _("Offline"),
                 _("Enable the mail service in Online Accounts settings")
@@ -1941,10 +1942,10 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
         }
 
-        var cached = cached_folder_tree (account);
+        var cached = cached_folder_tree (current);
         if (cached != null && cached.length > 0) {
             this.folder_tree_needs_refresh = true;
-            present_folder_tree (account, cached, true, cancellable);
+            present_folder_tree (current, cached, true, cancellable);
             return;
         }
 
@@ -1956,24 +1957,43 @@ public class Mail.Window : Adw.ApplicationWindow {
             _("Messages from the selected folder will appear here.")
         );
 
+        /* Brand-new Online Accounts entries need a moment before EDS publishes
+         * the Camel mail source and folder list. */
+        if (current.has_mail && (current.source_uid == null || current.source_uid.length == 0)) {
+            this.no_folders_page.description = Markup.escape_text (
+                _("Preparing mail for “%s”…").printf (current.display_name)
+            );
+            show_folder_loading ();
+            current = yield wait_for_mail_source (current, cancellable);
+            if (cancellable.is_cancelled () || !is_current_account (current))
+                return;
+            if (current.source_uid == null || current.source_uid.length == 0) {
+                show_folder_status (
+                    _("Mail Account Not Ready"),
+                    _("Evolution Data Server has not published this account yet. Try again in a moment.")
+                );
+                return;
+            }
+        }
+
         try {
-            var local = yield this.mail_session.list_folders (account, cancellable, false);
-            if (cancellable.is_cancelled () || !is_current_account (account))
+            var local = yield this.mail_session.list_folders (current, cancellable, false);
+            if (cancellable.is_cancelled () || !is_current_account (current))
                 return;
             if (local.length > 0) {
                 this.folder_tree_needs_refresh = true;
-                present_folder_tree (account, local, true, cancellable);
+                present_folder_tree (current, local, true, cancellable);
                 return;
             }
         } catch (Error e) {
             debug ("Local folder tree: %s", e.message);
-            if (cancellable.is_cancelled () || !is_current_account (account))
+            if (cancellable.is_cancelled () || !is_current_account (current))
                 return;
         }
 
         this.no_folders_page.title = _("Loading Folders");
         this.no_folders_page.description = Markup.escape_text (
-            _("Connecting to “%s”…").printf (account.display_name)
+            _("Connecting to “%s”…").printf (current.display_name)
         );
         show_folder_loading ();
         show_conversation_placeholder (
@@ -1982,8 +2002,8 @@ public class Mail.Window : Adw.ApplicationWindow {
         );
 
         try {
-            var folders = yield this.mail_session.list_folders (account, cancellable, true);
-            if (cancellable.is_cancelled () || !is_current_account (account))
+            var folders = yield list_folders_with_retry (current, cancellable);
+            if (cancellable.is_cancelled () || !is_current_account (current))
                 return;
 
             if (folders.length == 0) {
@@ -1994,13 +2014,13 @@ public class Mail.Window : Adw.ApplicationWindow {
                 return;
             }
 
-            present_folder_tree (account, folders, true, cancellable);
+            present_folder_tree (current, folders, true, cancellable);
             this.last_full_align = Utils.sync_tick ();
         } catch (Error e) {
-            if (cancellable.is_cancelled () || !is_current_account (account))
+            if (cancellable.is_cancelled () || !is_current_account (current))
                 return;
 
-            if (!account.has_mail) {
+            if (!current.has_mail) {
                 show_folder_status (
                     _("Offline"),
                     _("Enable the mail service in Online Accounts settings")
@@ -2014,6 +2034,82 @@ public class Mail.Window : Adw.ApplicationWindow {
                 timeout = 5,
             });
         }
+    }
+
+    private async Account wait_for_mail_source (Account account, Cancellable? cancellable) {
+        for (int attempt = 0; attempt < 45; attempt++) {
+            if (cancellable != null && cancellable.is_cancelled ())
+                return account;
+
+            var live = live_account (account);
+            if (live != null) {
+                account = live;
+                if (this.selected_account != null && accounts_are_same (this.selected_account, account))
+                    this.selected_account = account;
+                if (account.source_uid != null && account.source_uid.length > 0)
+                    return account;
+            }
+
+            Timeout.add_seconds (1, () => {
+                wait_for_mail_source.callback ();
+                return Source.REMOVE;
+            });
+            yield;
+        }
+        return account;
+    }
+
+    private async GenericArray<Folder> list_folders_with_retry (
+        Account account,
+        Cancellable? cancellable
+    ) throws Error {
+        Error? last_error = null;
+        for (int attempt = 0; attempt < 12; attempt++) {
+            if (cancellable != null && cancellable.is_cancelled ())
+                throw new IOError.CANCELLED ("Cancelled");
+
+            var live = live_account (account);
+            if (live != null)
+                account = live;
+
+            try {
+                var folders = yield this.mail_session.list_folders (account, cancellable, true);
+                if (folders.length > 0)
+                    return folders;
+            } catch (Error e) {
+                last_error = e;
+                if (e is IOError.CANCELLED)
+                    throw e;
+            }
+
+            this.no_folders_page.title = _("Loading Folders");
+            this.no_folders_page.description = Markup.escape_text (
+                _("Waiting for folders from “%s”…").printf (account.display_name)
+            );
+            show_folder_loading ();
+
+            Timeout.add_seconds (2, () => {
+                list_folders_with_retry.callback ();
+                return Source.REMOVE;
+            });
+            yield;
+        }
+
+        if (last_error != null)
+            throw last_error;
+        return new GenericArray<Folder> ();
+    }
+
+    private Account? live_account (Account account) {
+        var app = get_application () as Application;
+        if (app == null)
+            return null;
+        for (uint i = 0; i < app.accounts.items.get_n_items (); i++) {
+            var item = app.accounts.items.get_item (i) as Account;
+            if (item != null && accounts_are_same (item, account))
+                return item;
+        }
+        return null;
     }
 
     private static string folder_tree_key (Account account) {

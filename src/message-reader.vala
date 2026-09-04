@@ -55,15 +55,14 @@ public class Mail.MessageReader : Gtk.Box {
             valign = Gtk.Align.START,
         };
         this.subject_label.add_css_class ("title-2");
+        header.append (this.subject_label);
 
         this.header_actions = new MessageActionBar ();
         this.header_actions.add_css_class ("in-reader");
-        this.header_actions.valign = Gtk.Align.START;
+        this.header_actions.halign = Gtk.Align.START;
+        this.header_actions.hexpand = true;
         this.header_actions.visible = false;
-        var title_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8);
-        title_row.append (this.subject_label);
-        title_row.append (this.header_actions);
-        header.append (title_row);
+        header.append (this.header_actions);
 
         var meta = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12);
         this.from_label = new Gtk.Label ("") {
