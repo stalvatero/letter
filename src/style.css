@@ -120,6 +120,12 @@
   min-height: 36px;
 }
 
+.message-reader .reader-action-row {
+  padding: 4px 12px;
+  background: color-mix(in srgb, var(--view-fg-color) 6%, var(--view-bg-color));
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 35%, transparent);
+}
+
 .message-action-bar.list-action-bar {
   padding: 4px 8px 2px;
   background: color-mix(in srgb, var(--view-fg-color) 4%, var(--view-bg-color));

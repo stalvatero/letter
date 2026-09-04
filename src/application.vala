@@ -208,6 +208,9 @@ public class Mail.Application : Adw.Application {
 
         if (this.setup_window == null) {
             this.setup_window = new SetupWindow (this);
+            this.setup_window.tour_finished.connect (() => {
+                this.settings.set_boolean ("welcome-shown", true);
+            });
             this.setup_window.close_request.connect (() => {
                 this.setup_window = null;
                 return false;

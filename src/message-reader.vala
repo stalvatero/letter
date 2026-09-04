@@ -39,10 +39,7 @@ public class Mail.MessageReader : Gtk.Box {
         this.settings = new Settings (Config.APP_ID);
 
         var header = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
-            margin_start = 20,
-            margin_end = 20,
-            margin_top = 16,
-            margin_bottom = 12,
+            hexpand = true,
         };
 
         this.header_actions = new MessageActionBar ();
@@ -50,7 +47,20 @@ public class Mail.MessageReader : Gtk.Box {
         this.header_actions.halign = Gtk.Align.END;
         this.header_actions.hexpand = true;
         this.header_actions.visible = false;
-        header.append (this.header_actions);
+
+        var actions_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) {
+            hexpand = true,
+        };
+        actions_row.add_css_class ("reader-action-row");
+        actions_row.append (this.header_actions);
+        header.append (actions_row);
+
+        var meta_block = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
+            margin_start = 20,
+            margin_end = 20,
+            margin_top = 10,
+            margin_bottom = 12,
+        };
 
         this.subject_label = new Gtk.Label ("") {
             xalign = 0,
@@ -62,7 +72,7 @@ public class Mail.MessageReader : Gtk.Box {
             valign = Gtk.Align.START,
         };
         this.subject_label.add_css_class ("title-2");
-        header.append (this.subject_label);
+        meta_block.append (this.subject_label);
 
         var meta = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12);
         this.from_label = new Gtk.Label ("") {
@@ -83,12 +93,12 @@ public class Mail.MessageReader : Gtk.Box {
         this.date_label.add_css_class ("dim-label");
         this.date_label.add_css_class ("numeric");
         meta.append (this.date_label);
-        header.append (meta);
+        meta_block.append (meta);
 
         this.to_row = new RecipientRow (_("To:"));
-        header.append (this.to_row);
+        meta_block.append (this.to_row);
         this.cc_row = new RecipientRow (_("Cc:"));
-        header.append (this.cc_row);
+        meta_block.append (this.cc_row);
 
         this.attachments_box = new Adw.WrapBox () {
             visible = false,
@@ -100,7 +110,8 @@ public class Mail.MessageReader : Gtk.Box {
             wrap_policy = Adw.WrapPolicy.NATURAL,
         };
         this.attachments_box.add_css_class ("attachments");
-        header.append (this.attachments_box);
+        meta_block.append (this.attachments_box);
+        header.append (meta_block);
 
         this.trust_banner = new Adw.Banner (_("Remote images are blocked until you trust this sender.")) {
             button_label = _("Trust Sender"),
