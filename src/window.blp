@@ -5,8 +5,9 @@ template $MailWindow: Adw.ApplicationWindow {
   title: _("Letter");
   default-width: 1100;
   default-height: 750;
-  width-request: 360;
-  height-request: 400;
+  /* Keep the three-pane shell usable on ~1280×720 and similar laptop sizes. */
+  width-request: 800;
+  height-request: 520;
 
   ShortcutController {
     Shortcut {
@@ -252,7 +253,7 @@ template $MailWindow: Adw.ApplicationWindow {
                   icon-name: "mail-message-new-symbolic";
                 }
 
-                Label {
+                Label compose_label {
                   label: _("New");
                 }
               }
@@ -281,8 +282,8 @@ template $MailWindow: Adw.ApplicationWindow {
             [start]
             $MailSearchField message_search {
               placeholder-text: _("Search");
-              width-request: 220;
-              hexpand: false;
+              width-request: 160;
+              hexpand: true;
               valign: fill;
             }
 
@@ -333,6 +334,8 @@ template $MailWindow: Adw.ApplicationWindow {
             };
 
             end-child: Adw.Bin reader_bin {
+              width-request: 280;
+
               child: Adw.StatusPage reader_page {
                 icon-name: "mail-unread-symbolic";
                 title: _("Select a Message");
@@ -351,10 +354,12 @@ template $MailWindow: Adw.ApplicationWindow {
   };
 
   Adw.Breakpoint {
-    condition ("max-width: 1000sp")
+    condition ("max-width: 1100sp")
 
     setters {
       folder_split.collapsed: true;
+      compose_label.visible: false;
+      message_search.width-request: 120;
     }
   }
 }

@@ -10,6 +10,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     private const int FOLDER_PANE_MAX = 520;
     private const int MESSAGE_PANE_MIN = 260;
     private const int MESSAGE_PANE_MAX = 560;
+    private const int WINDOW_MIN_WIDTH = 800;
+    private const int WINDOW_MIN_HEIGHT = 520;
 
     [GtkChild]
     private unowned Adw.ToastOverlay toast_overlay;
@@ -199,9 +201,13 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.title = Utils.app_display_name ();
         this.conversation_title.title = Utils.app_display_name ();
 
-        default_width = this.settings.get_int ("window-width");
-        default_height = this.settings.get_int ("window-height");
+        default_width = this.settings.get_int ("window-width")
+            .clamp (WINDOW_MIN_WIDTH, 4000);
+        default_height = this.settings.get_int ("window-height")
+            .clamp (WINDOW_MIN_HEIGHT, 4000);
         maximized = this.settings.get_boolean ("window-maximized");
+        width_request = WINDOW_MIN_WIDTH;
+        height_request = WINDOW_MIN_HEIGHT;
         this.folder_split.show_sidebar = true;
         this.sidebar_button.active = this.settings.get_boolean ("show-folder-sidebar");
         this.sidebar_button.toggled.connect (() => {
@@ -6415,8 +6421,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void persist_window_state () {
-        this.settings.set_int ("window-width", get_width ());
-        this.settings.set_int ("window-height", get_height ());
+        this.settings.set_int ("window-width", get_width ().clamp (WINDOW_MIN_WIDTH, 4000));
+        this.settings.set_int ("window-height", get_height ().clamp (WINDOW_MIN_HEIGHT, 4000));
         this.settings.set_boolean ("window-maximized", maximized);
         this.settings.set_boolean ("show-folder-sidebar", this.sidebar_button.active);
         this.settings.set_int ("folder-pane-width", this.content_split.position.clamp (FOLDER_PANE_MIN, FOLDER_PANE_MAX));
