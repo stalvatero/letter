@@ -8,7 +8,7 @@ public class Mail.WelcomeDialog : Adw.Dialog {
     public WelcomeDialog () {
         Object (
             content_width: 520,
-            content_height: 560,
+            content_height: 580,
             follows_content_size: false
         );
 
@@ -78,23 +78,17 @@ public class Mail.WelcomeDialog : Adw.Dialog {
         footer.append (dots);
         footer.append (this.next_button);
 
-        var page = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
-            hexpand = true,
-            vexpand = true,
-        };
-        page.append (this.carousel);
-        page.append (footer);
-
         var header = new Adw.HeaderBar ();
+        /* Bottom bar stays visible — a vexpand carousel used to push the
+         * footer off-screen so the dialog looked like a single page. */
         var view = new Adw.ToolbarView () {
-            content = page,
+            content = this.carousel,
         };
         view.add_top_bar (header);
+        view.add_bottom_bar (footer);
         this.child = view;
         this.title = _("Welcome");
 
-        /* Carousel can scroll to a focusable child on the last page when the
-         * dialog maps — pin the first page after the first layout. */
         map.connect (() => {
             Idle.add (() => {
                 if (this.carousel.n_pages > 0)
