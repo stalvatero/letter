@@ -1,0 +1,14 @@
+/_build/
+/build/
+.flatpak-builder/
+*.flatpak
+/repo/
+*~
+*.swp
+*.ui~
+meson-logs/
+.cache/
+
+# Local debug artefacts
+*.core
+*.log
