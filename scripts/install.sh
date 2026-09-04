@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Install Letter from source for GNOME 50+.
 # Run from a clone, or let the script clone the public repository.
+#
+# This path compiles Letter on your machine. Package managers will pull
+# compilers and -devel/-dev headers (normal for any from-source build).
+# A Flatpak or distro package, when available, is the lighter choice for
+# everyday users who do not want a build toolchain.
 set -euo pipefail
 
 REPO_URL="${LETTER_REPO_URL:-https://github.com/stalvatero/letter.git}"
@@ -85,8 +90,18 @@ try_packages() {
   sudo_run "$@" || say "Skipping optional packages that are not available on this system."
 }
 
+explain_build_deps() {
+  say
+  say "Letter is built from source on this machine."
+  say "That needs a compiler and development headers (-devel / -dev packages)."
+  say "GNOME itself is already there; these extras are only for compiling Letter."
+  say "Optional packages (Microsoft 365 helper, Sushi preview, spell check) come next if available."
+  say
+}
+
 install_packages() {
   local pm="$1"
+  explain_build_deps
   say "Installing build packages with $pm…"
   case "$pm" in
     pacman)
@@ -99,6 +114,7 @@ install_packages() {
         evolution-ews sushi hunspell hunspell-en_us
       ;;
     dnf)
+      # Fedora splits libraries from headers: *-devel is required to compile.
       sudo_run dnf install -y \
         git meson ninja-build vala blueprint-compiler pkgconf-pkg-config gcc \
         gtk4-devel libadwaita-devel gdk-pixbuf2-devel \

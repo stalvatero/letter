@@ -243,9 +243,7 @@ public class Mail.CalendarStore : Object {
         if (vevent == null)
             return reply;
 
-        vevent.set_dtstamp (new ICal.Time.from_timet_with_zone (
-            (time_t) new DateTime.now_utc ().to_unix (),
-            false,
+        vevent.set_dtstamp (new ICal.Time.current_with_zone (
             ICal.Timezone.get_utc_timezone ()
         ));
         apply_partstat (vevent, attendee_email, partstat);
