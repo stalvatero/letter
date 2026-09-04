@@ -126,11 +126,10 @@ public class Mail.MailSession : Camel.Session {
                 cancellable, out out_access_token, out out_expires_in
             );
         } catch (Error e) {
-            if (e is E.OAuth2ServiceError.TOKEN_EXPIRED
-                || e is E.OAuth2ServiceError.REFRESH_FAILED
-                || e is E.OAuth2ServiceError.SECRET_NOT_FOUND) {
+            /* E.OAuth2ServiceError is only in the Vala bindings since EDS 3.60.
+             * Ubuntu and other distros may still ship 3.56 — match the quark. */
+            if (e.domain.to_string () == "e-oauth2-service-error-quark")
                 throw new Camel.ServiceError.CANT_AUTHENTICATE (e.message);
-            }
 
             throw e;
         }
