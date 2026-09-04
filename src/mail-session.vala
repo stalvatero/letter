@@ -602,19 +602,20 @@ public class Mail.MailSession : Camel.Session {
             || folder.kind == FolderKind.DRAFTS
             || folder.kind == FolderKind.OUTBOX;
         var messages = new GenericArray<Message> ();
-        GenericArray<weak string>? found = null;
-
+        GenericArray<string> uids;
         yield enter_camel (false);
         try {
-            camel_folder.search_sync (header_search_expression (query, false), out found, null);
+            uids = folder_search_uids (
+                camel_folder,
+                header_search_expression (query, false)
+            );
         } catch (Error e) {
             debug ("Indexed search %s: %s", folder.name, e.message);
-            found = null;
+            uids = new GenericArray<string> ();
         } finally {
             leave_camel (false);
         }
 
-        var uids = copy_search_uids (found);
         if (uids.length == 0)
             return messages;
 
@@ -692,13 +693,66 @@ public class Mail.MailSession : Camel.Session {
         );
     }
 
-    private static GenericArray<string> copy_search_uids (GenericArray<weak string>? found) {
+    /* Camel 3.58+: dup_uids / search_sync / weak transferred UIDs.
+     * Camel ≤3.56: get_uids+free_uids / search_by_expression+search_free / owned UIDs. */
+    private static GenericArray<string> folder_list_uids (Camel.Folder camel_folder) {
+        var uids = new GenericArray<string> ();
+#if HAVE_CAMEL_3_58
+        var raw = camel_folder.dup_uids ();
+        for (uint i = 0; i < raw.length; i++)
+            uids.add (raw[i]);
+#else
+        unowned GenericArray<string> raw = camel_folder.get_uids ();
+        for (uint i = 0; i < raw.length; i++)
+            uids.add (raw[i]);
+        camel_folder.free_uids (raw);
+#endif
+        return uids;
+    }
+
+    private static GenericArray<string> folder_search_uids (
+        Camel.Folder camel_folder,
+        string expression
+    ) throws Error {
+#if HAVE_CAMEL_3_58
+        GenericArray<weak string>? found = null;
+        camel_folder.search_sync (expression, out found, null);
         var uids = new GenericArray<string> ();
         if (found == null)
             return uids;
         for (uint i = 0; i < found.length; i++)
             uids.add (found[i]);
         return uids;
+#else
+        var found = camel_folder.search_by_expression (expression, null);
+        var uids = new GenericArray<string> ();
+        for (uint i = 0; i < found.length; i++)
+            uids.add (found[i]);
+        camel_folder.search_free (found);
+        return uids;
+#endif
+    }
+
+    /* Matches camel_search_util_hash_message_id / FolderSearch.util_hash_message_id
+     * (first 8 bytes of MD5), so conversation threading stays compatible. */
+    private static uint64 hash_message_id (string message_id, bool needs_decode) {
+        string text = message_id;
+        if (needs_decode) {
+            var decoded = Camel.header_msgid_decode (message_id);
+            if (decoded != null && decoded.length > 0)
+                text = decoded;
+        }
+        if (text.length == 0)
+            return 0;
+
+        var checksum = new Checksum (ChecksumType.MD5);
+        checksum.update (text.data, text.length);
+        uint8[] digest = new uint8[16];
+        size_t digest_len = digest.length;
+        checksum.get_digest (digest, ref digest_len);
+        uint64 hash = 0;
+        Memory.copy (&hash, digest, sizeof (uint64));
+        return hash;
     }
 
     public static bool folder_is_heavy (Folder folder) {
@@ -919,7 +973,7 @@ public class Mail.MailSession : Camel.Session {
     }
 
     private static void apply_camel_counts (Folder folder, Camel.Folder camel_folder) {
-        var uids = camel_folder.dup_uids ();
+        var uids = folder_list_uids (camel_folder);
         int total = (int) uids.length;
         int unread = 0;
         for (uint i = 0; i < uids.length; i++) {
@@ -940,7 +994,7 @@ public class Mail.MailSession : Camel.Session {
         var outgoing = folder.kind == FolderKind.SENT
             || folder.kind == FolderKind.DRAFTS
             || folder.kind == FolderKind.OUTBOX;
-        var uids = camel_folder.dup_uids ();
+        var uids = folder_list_uids (camel_folder);
         var messages = new GenericArray<Message> ();
         for (uint i = 0; i < uids.length; i++) {
             if (cancellable != null && cancellable.is_cancelled ())
@@ -971,7 +1025,7 @@ public class Mail.MailSession : Camel.Session {
         Folder folder,
         GenericArray<Message> previous
     ) {
-        var uids = camel_folder.dup_uids ();
+        var uids = folder_list_uids (camel_folder);
         var have = new HashTable<string, Message> (str_hash, str_equal);
         for (uint i = 0; i < previous.length; i++)
             have.set (previous[i].uid, previous[i]);
@@ -1212,7 +1266,7 @@ public class Mail.MailSession : Camel.Session {
             folder_full_name = folder.full_name,
             outgoing = true,
             msgid_hash = msgid != null && msgid.length > 0
-                ? Camel.search_util_hash_message_id (msgid, true)
+                ? hash_message_id (msgid, true)
                 : 0,
             msgid_refs = hashes_from_id_headers (
                 medium.get_header ("In-Reply-To"),
@@ -1394,7 +1448,7 @@ public class Mail.MailSession : Camel.Session {
         var id = unfold_header (raw);
         if (id.length == 0)
             return;
-        var hash = Camel.search_util_hash_message_id (id, true);
+        var hash = hash_message_id (id, true);
         append_msgid_hash (list, seen, hash);
     }
 
@@ -1504,7 +1558,7 @@ public class Mail.MailSession : Camel.Session {
         var outgoing = folder.kind == FolderKind.SENT
             || folder.kind == FolderKind.DRAFTS
             || folder.kind == FolderKind.OUTBOX;
-        var uids = watch.camel_folder.dup_uids ();
+        var uids = folder_list_uids (watch.camel_folder);
         uint added = 0;
         for (uint i = 0; i < uids.length; i++) {
             if (have.contains (uids[i]))
@@ -1858,7 +1912,11 @@ public class Mail.MailSession : Camel.Session {
         yield capture_local_body (account, from, uid, source_folder);
         var uids = new GenericArray<string> ();
         uids.add (uid);
+#if HAVE_CAMEL_3_58
         GenericArray<weak string>? transferred = null;
+#else
+        GenericArray<string>? transferred = null;
+#endif
         yield enter_camel (true);
         try {
             yield source_folder.transfer_messages_to (uids, dest_folder, true, Priority.DEFAULT, cancellable, out transferred);
@@ -1879,7 +1937,11 @@ public class Mail.MailSession : Camel.Session {
         var dest_folder = yield open_camel_folder (account, destination, cancellable);
         var uids = new GenericArray<string> ();
         uids.add (uid);
+#if HAVE_CAMEL_3_58
         GenericArray<weak string>? transferred = null;
+#else
+        GenericArray<string>? transferred = null;
+#endif
         yield enter_camel (true);
         try {
             yield source_folder.transfer_messages_to (uids, dest_folder, false, Priority.DEFAULT, cancellable, out transferred);
@@ -1976,7 +2038,7 @@ public class Mail.MailSession : Camel.Session {
             return;
 
         var camel_folder = yield open_camel_folder (account, folder, null);
-        var raw = camel_folder.dup_uids ();
+        var raw = folder_list_uids (camel_folder);
         if (raw.length == 0) {
             folder.unread = 0;
             folder.total = 0;
@@ -2005,7 +2067,7 @@ public class Mail.MailSession : Camel.Session {
 
     public async void set_folder_seen (Account account, Folder folder, bool seen) throws Error {
         var camel_folder = yield open_camel_folder (account, folder, null);
-        var raw = camel_folder.dup_uids ();
+        var raw = folder_list_uids (camel_folder);
         if (raw.length == 0)
             return;
 
@@ -2283,7 +2345,11 @@ public class Mail.MailSession : Camel.Session {
             for (uint i = 0; i < batch.length; i++)
                 yield capture_local_body (job.account, job.from, batch[i], source_folder);
 
+#if HAVE_CAMEL_3_58
             GenericArray<weak string>? transferred = null;
+#else
+            GenericArray<string>? transferred = null;
+#endif
             try {
                 yield enter_camel (false);
                 try {
@@ -3157,8 +3223,14 @@ public class Mail.MailSession : Camel.Session {
 
         mail_folder = match;
         string? appended = null;
-        var info = Camel.MessageInfo.@new (folder.get_folder_summary ());
-        info.set_flags (Camel.MessageFlags.SEEN, Camel.MessageFlags.SEEN);
+        /* MessageInfo.@new is missing from some distro VAPIs (e.g. Ubuntu
+         * EDS 3.56); FolderSummary.info_new_from_message is widely available. */
+        Camel.MessageInfo? info = null;
+        var summary = folder.get_folder_summary ();
+        if (summary != null) {
+            info = summary.info_new_from_message (mime);
+            info.set_flags (Camel.MessageFlags.SEEN, Camel.MessageFlags.SEEN);
+        }
         yield enter_camel (true);
         try {
             yield folder.append_message (mime, info, Priority.DEFAULT, cancellable, out appended);
