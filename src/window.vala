@@ -3,7 +3,6 @@ public class Mail.Window : Adw.ApplicationWindow {
     static construct {
         typeof (SearchField).ensure ();
     }
-    private const int ACCOUNT_RAIL_WIDTH = 56;
     private const int ACCOUNT_PANE_MIN = 220;
     private const int ACCOUNT_PANE_MAX = 320;
     private const int FOLDER_PANE_MIN = 200;
@@ -207,12 +206,18 @@ public class Mail.Window : Adw.ApplicationWindow {
         maximized = this.settings.get_boolean ("window-maximized");
         width_request = WINDOW_MIN_WIDTH;
         height_request = WINDOW_MIN_HEIGHT;
-        this.folder_split.show_sidebar = true;
         this.sidebar_button.active = this.settings.get_boolean ("show-folder-sidebar");
         this.sidebar_button.toggled.connect (() => {
             apply_account_sidebar (this.sidebar_button.active);
         });
+        this.folder_split.notify["show-sidebar"].connect (() => {
+            if (this.sidebar_button.active != this.folder_split.show_sidebar)
+                this.sidebar_button.active = this.folder_split.show_sidebar;
+        });
+        this.folder_split.notify["collapsed"].connect (on_folder_split_collapsed);
         apply_account_sidebar (this.sidebar_button.active);
+        if (this.folder_split.collapsed)
+            on_folder_split_collapsed ();
         this.content_split.position = this.settings.get_int ("folder-pane-width")
             .clamp (FOLDER_PANE_MIN, FOLDER_PANE_MAX);
         this.content_split.notify["position"].connect (on_folder_pane_resized);
@@ -1881,21 +1886,24 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void apply_account_sidebar (bool expanded) {
-        this.account_pane.visible = expanded;
         this.account_rail.visible = true;
-        this.folder_split.show_sidebar = true;
-        if (expanded) {
-            this.folder_split.min_sidebar_width = ACCOUNT_RAIL_WIDTH + ACCOUNT_PANE_MIN;
-            this.folder_split.max_sidebar_width = ACCOUNT_RAIL_WIDTH + ACCOUNT_PANE_MAX;
-            this.folder_split.sidebar_width_fraction = 0.28f;
-        } else {
-            this.folder_split.min_sidebar_width = ACCOUNT_RAIL_WIDTH;
-            this.folder_split.max_sidebar_width = ACCOUNT_RAIL_WIDTH;
-            this.folder_split.sidebar_width_fraction = 0.01f;
-        }
+        this.account_pane.visible = true;
+        this.folder_split.show_sidebar = expanded;
+        this.folder_split.min_sidebar_width = ACCOUNT_PANE_MIN;
+        this.folder_split.max_sidebar_width = ACCOUNT_PANE_MAX;
+        this.folder_split.sidebar_width_fraction = 0.22f;
         this.sidebar_button.tooltip_text = expanded
             ? _("Hide account list")
             : _("Show account list");
+    }
+
+    private void on_folder_split_collapsed () {
+        if (!this.folder_split.collapsed)
+            return;
+        /* On narrow widths the account pane becomes an overlay. Keep the rail
+         * pinned; do not leave the account list covering the mailbox. */
+        if (this.sidebar_button.active)
+            this.sidebar_button.active = false;
     }
 
     private void set_conversation_heading (string title, string? subtitle) {

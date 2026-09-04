@@ -57,56 +57,60 @@ template $MailWindow: Adw.ApplicationWindow {
   }
 
   content: Adw.ToastOverlay toast_overlay {
-    child: Adw.OverlaySplitView folder_split {
-      pin-sidebar: true;
-      show-sidebar: true;
-      min-sidebar-width: 220;
-      max-sidebar-width: 320;
-      sidebar-width-fraction: 0.22;
+    child: Gtk.Box shell {
+      orientation: horizontal;
+      hexpand: true;
+      vexpand: true;
 
-      sidebar: Gtk.Box account_shell {
-        orientation: horizontal;
+      /* Keep the account rail outside OverlaySplitView so it stays visible
+       * when the account pane floats or is dismissed on narrow widths. */
+      Gtk.Box account_rail {
+        orientation: vertical;
         hexpand: false;
         vexpand: true;
+        width-request: 56;
 
-        Gtk.Box account_rail {
-          orientation: vertical;
-          hexpand: false;
-          vexpand: true;
-          width-request: 56;
+        styles [
+          "account-rail",
+        ]
+
+        Button account_rail_add {
+          icon-name: "list-add-symbolic";
+          tooltip-text: _("Add Account");
+          action-name: "app.online-accounts";
+          hexpand: true;
+          valign: fill;
 
           styles [
-            "account-rail",
+            "flat",
+            "account-rail-add",
           ]
-
-          Button account_rail_add {
-            icon-name: "list-add-symbolic";
-            tooltip-text: _("Add Account");
-            action-name: "app.online-accounts";
-            hexpand: true;
-            valign: fill;
-
-            styles [
-              "flat",
-              "account-rail-add",
-            ]
-          }
-
-          Gtk.Box account_rail_list {
-            orientation: vertical;
-            spacing: 0;
-            hexpand: true;
-            vexpand: true;
-            halign: fill;
-            valign: start;
-
-            styles [
-              "account-rail-list",
-            ]
-          }
         }
 
-        Adw.ToolbarView account_pane {
+        Gtk.Box account_rail_list {
+          orientation: vertical;
+          spacing: 0;
+          hexpand: true;
+          vexpand: true;
+          halign: fill;
+          valign: start;
+
+          styles [
+            "account-rail-list",
+          ]
+        }
+      }
+
+      Adw.OverlaySplitView folder_split {
+        pin-sidebar: true;
+        show-sidebar: true;
+        min-sidebar-width: 220;
+        max-sidebar-width: 320;
+        sidebar-width-fraction: 0.22;
+        hexpand: true;
+        vexpand: true;
+
+        sidebar: Adw.ToolbarView account_pane {
           hexpand: true;
           vexpand: true;
 
@@ -161,14 +165,13 @@ template $MailWindow: Adw.ApplicationWindow {
               use-markup: false;
             }
           }
-        }
-      };
+        };
 
-      content: Gtk.Paned content_split {
-        wide-handle: true;
-        position: 280;
-        resize-start-child: false;
-        shrink-start-child: false;
+        content: Gtk.Paned content_split {
+          wide-handle: true;
+          position: 280;
+          resize-start-child: false;
+          shrink-start-child: false;
 
         start-child: Adw.ToolbarView {
           width-request: 200;
@@ -350,7 +353,8 @@ template $MailWindow: Adw.ApplicationWindow {
           };
         };
       };
-    };
+    }
+  };
   };
 
   Adw.Breakpoint {
