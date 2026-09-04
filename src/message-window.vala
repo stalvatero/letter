@@ -93,15 +93,17 @@ public class Mail.MessageWindow : Adw.ApplicationWindow {
 
     private void sync_actions () {
         var outgoing = this.message.outgoing;
+        var draft = this.folder.kind == FolderKind.DRAFTS
+            || (this.message.uid != null && this.message.uid.has_prefix ("local-draft-"));
         var archived = this.folder.is_archive_mailbox;
         var can_important = this.account.kind == AccountKind.GOOGLE
             && !outgoing
             && !this.message.is_placeholder
             && find_kind (FolderKind.IMPORTANT) != null;
-        set_action_enabled ("reply", !outgoing);
-        set_action_enabled ("reply-all", true);
-        set_action_enabled ("forward", true);
-        set_action_enabled ("send-again", outgoing && !this.message.is_placeholder);
+        set_action_enabled ("reply", !outgoing && !draft);
+        set_action_enabled ("reply-all", !draft);
+        set_action_enabled ("forward", !draft);
+        set_action_enabled ("send-again", (outgoing && !this.message.is_placeholder) || draft);
         set_action_enabled ("move", true);
         set_action_enabled ("archive", !outgoing && !archived);
         set_action_enabled ("delete", true);
@@ -111,7 +113,7 @@ public class Mail.MessageWindow : Adw.ApplicationWindow {
         set_action_enabled ("mark-important", can_important);
         set_action_enabled ("print", true);
         this.actions.set_seen (this.message.seen, !outgoing);
-        this.actions.set_outgoing (outgoing);
+        this.actions.set_outgoing (outgoing, draft);
         this.actions.set_bookmarked (this.message.flagged);
         this.actions.set_important (can_important, this.message.important);
     }
@@ -271,6 +273,19 @@ public class Mail.MessageWindow : Adw.ApplicationWindow {
     }
 
     private void on_send_again () {
+        if (this.folder.kind == FolderKind.DRAFTS
+            || (this.message.uid != null && this.message.uid.has_prefix ("local-draft-"))) {
+            present_compose (
+                null,
+                null,
+                this.mail.subject == _("(No subject)") ? "" : this.mail.subject,
+                false,
+                null,
+                false,
+                true
+            );
+            return;
+        }
         if (!this.message.outgoing || this.message.is_placeholder)
             return;
 
@@ -284,23 +299,32 @@ public class Mail.MessageWindow : Adw.ApplicationWindow {
         present_compose (to, cc, subject, false, bcc, true);
     }
 
-    private void present_compose (string? to, string? cc, string subject, bool forward, string? bcc = null, bool resend = false) {
+    private void present_compose (string? to, string? cc, string subject, bool forward, string? bcc = null, bool resend = false, bool edit_draft = false) {
         var app = get_application ();
         if (app == null)
             return;
+
+        string? draft_to = to;
+        string? draft_cc = cc;
+        string? draft_bcc = bcc;
+        if (edit_draft) {
+            Utils.resend_addresses (this.mail, out draft_to, out draft_cc, out draft_bcc);
+        }
 
         var compose = new ComposeWindow (
             app,
             this.session,
             this.store,
             this.account,
-            to,
-            cc,
+            draft_to,
+            draft_cc,
             subject,
             this.mail,
             forward,
-            bcc,
-            resend
+            draft_bcc,
+            resend,
+            edit_draft ? this.message : null,
+            edit_draft ? this.folder : null
         );
         compose.present ();
     }

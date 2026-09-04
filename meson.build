@@ -45,6 +45,19 @@ goa_dep = dependency('goa-1.0', version: '>= 3.50')
 webkit_dep = dependency('webkitgtk-6.0', version: '>= 2.44')
 gsound_dep = dependency('gsound', version: '>= 1.0')
 
+# Camel 3.58 renamed get_uids→dup_uids, search_by_expression→search_sync,
+# and FolderSearch.util_hash_message_id→search_util_hash_message_id. Ubuntu
+# Resolute ships 3.56; Arch is newer. Detect at configure time for Vala #if.
+cc = meson.get_compiler('c')
+have_camel_3_58 = cc.has_function(
+  'camel_folder_dup_uids',
+  prefix: '#include <camel/camel.h>',
+  dependencies: camel_dep,
+)
+if have_camel_3_58
+  add_project_arguments('--define=HAVE_CAMEL_3_58', language: 'vala')
+endif
+
 sushi = find_program('sushi', required: false)
 if not sushi.found()
   warning('sushi is not installed. Attachment preview will fall back to the default app.')

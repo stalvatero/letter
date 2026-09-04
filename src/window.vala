@@ -483,6 +483,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.mail_session.folder_changed.connect (on_camel_folder_changed);
             this.mail_session.message_sent.connect (on_message_sent);
             this.mail_session.draft_saved.connect (on_draft_saved);
+            this.mail_session.draft_removed.connect (on_draft_removed);
             this.mail_session.transfer_failed.connect (on_transfer_failed);
             bind_reader_mailbox ();
         }
@@ -3329,7 +3330,70 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (message == null)
             return;
 
+        if (is_draft_message (message)) {
+            edit_draft.begin (message);
+            return;
+        }
+
         open_message_window.begin (message);
+    }
+
+    private bool is_draft_message (Message? message) {
+        if (message == null)
+            return false;
+        if (message.uid != null && message.uid.has_prefix ("local-draft-"))
+            return true;
+        var folder = folder_for_message (message);
+        return folder != null && folder.kind == FolderKind.DRAFTS;
+    }
+
+    private async void edit_draft (Message message) {
+        var app = get_application () as Application;
+        var account = this.selected_account;
+        var folder = folder_for_message (message);
+        if (app == null || this.mail_session == null || account == null || folder == null)
+            return;
+
+        MessageContent? content = this.open_content;
+        if (content == null || this.open_message_uid != message.uid)
+            content = this.mail_session.peek_body (account, folder, message.uid);
+        if (content == null) {
+            try {
+                content = yield this.mail_session.load_message (account, folder, message.uid, null);
+            } catch (Error e) {
+                this.toast_overlay.add_toast (new Adw.Toast (e.message) {
+                    timeout = 4,
+                });
+                return;
+            }
+        }
+        if (content == null)
+            return;
+
+        string to;
+        string? cc;
+        string? bcc;
+        Utils.resend_addresses (content, out to, out cc, out bcc);
+        var subject = content.subject;
+        if (subject == _("(No subject)"))
+            subject = "";
+
+        var compose = new ComposeWindow (
+            app,
+            this.mail_session,
+            app.accounts,
+            account,
+            to,
+            cc,
+            subject,
+            content,
+            false,
+            bcc,
+            false,
+            message,
+            folder
+        );
+        compose.present ();
     }
 
     private async void load_message_body (Message message) {
@@ -3752,6 +3816,17 @@ public class Mail.Window : Adw.ApplicationWindow {
         pump_sync.begin ();
     }
 
+    private void on_draft_removed (Account account, Folder folder, string uid) {
+        if (!is_current_account (account) || uid.length == 0)
+            return;
+
+        remove_from_folder_cache (account, folder, uid);
+        if (folder.total > 0)
+            folder.total--;
+        refresh_folder_badge (folder);
+        remove_message_from_list (uid, folder.full_name);
+    }
+
     private void bump_folder_total (Folder folder) {
         if (folder.total >= 0)
             folder.total++;
@@ -3811,6 +3886,10 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void on_send_again () {
+        if (is_draft_message (this.open_message)) {
+            edit_draft.begin (this.open_message);
+            return;
+        }
         compose_from_open (ComposeKind.SEND_AGAIN);
     }
 
@@ -3826,7 +3905,8 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (app == null || this.mail_session == null || this.open_content == null)
             return;
         if (kind == ComposeKind.SEND_AGAIN
-            && this.open_message != null && this.open_message.is_placeholder)
+            && this.open_message != null && this.open_message.is_placeholder
+            && !is_draft_message (this.open_message))
             return;
         if (kind != ComposeKind.FORWARD && kind != ComposeKind.REPLY_ALL
             && kind != ComposeKind.SEND_AGAIN
@@ -5229,6 +5309,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         var has_message = message != null;
         var has = has_message && this.open_content != null;
         var outgoing = has_message && message.outgoing;
+        var draft = is_draft_message (message);
         var archived = folder != null && folder.is_archive_mailbox;
         var junk = folder != null && folder.kind == FolderKind.JUNK;
         var any_archive = has_message && !outgoing && !archived;
@@ -5243,10 +5324,13 @@ public class Mail.Window : Adw.ApplicationWindow {
             }
         }
 
-        set_win_action_enabled ("reply", has_message && !outgoing);
-        set_win_action_enabled ("reply-all", has_message);
-        set_win_action_enabled ("forward", has_message);
-        set_win_action_enabled ("send-again", has_message && outgoing && !message.is_placeholder);
+        set_win_action_enabled ("reply", has_message && !outgoing && !draft);
+        set_win_action_enabled ("reply-all", has_message && !draft);
+        set_win_action_enabled ("forward", has_message && !draft);
+        set_win_action_enabled (
+            "send-again",
+            has_message && ((outgoing && !message.is_placeholder) || draft)
+        );
         set_win_action_enabled ("move", has_message || thread_n > 1);
         set_win_action_enabled ("archive", any_archive);
         set_win_action_enabled ("delete", has_message || thread_n > 1);
@@ -5264,7 +5348,8 @@ public class Mail.Window : Adw.ApplicationWindow {
             has_message && message.flagged,
             can_important,
             has_message && message.important,
-            outgoing
+            outgoing,
+            draft
         );
     }
 
@@ -5274,10 +5359,11 @@ public class Mail.Window : Adw.ApplicationWindow {
         bool bookmarked,
         bool important_visible,
         bool important,
-        bool outgoing
+        bool outgoing,
+        bool draft = false
     ) {
         this.message_reader?.set_seen (seen, seen_enabled);
-        this.message_reader?.set_outgoing (outgoing);
+        this.message_reader?.set_outgoing (outgoing, draft);
         this.message_reader?.set_bookmarked (bookmarked);
         this.message_reader?.set_important (important_visible, important);
     }
@@ -5686,15 +5772,16 @@ public class Mail.Window : Adw.ApplicationWindow {
 
         var folder = folder_for_message (message);
         var outgoing = message.outgoing;
+        var draft = is_draft_message (message);
         var archived = folder != null && folder.is_archive_mailbox;
         var junk = folder != null && folder.kind == FolderKind.JUNK;
         var has_junk = find_folder_kind (FolderKind.JUNK) != null;
         var group = new SimpleActionGroup ();
 
-        add_ctx_action (group, "reply", !outgoing, () => on_reply ());
-        add_ctx_action (group, "reply-all", true, () => on_reply_all ());
-        add_ctx_action (group, "forward", true, () => on_forward ());
-        add_ctx_action (group, "send-again", outgoing && !message.is_placeholder, () => on_send_again ());
+        add_ctx_action (group, "reply", !outgoing && !draft, () => on_reply ());
+        add_ctx_action (group, "reply-all", !draft, () => on_reply_all ());
+        add_ctx_action (group, "forward", !draft, () => on_forward ());
+        add_ctx_action (group, "send-again", (outgoing && !message.is_placeholder) || draft, () => on_send_again ());
         add_ctx_action (group, "move", true, () => on_move ());
         add_ctx_action (group, "archive", !outgoing && !archived, () => on_archive ());
         add_ctx_action (group, "spam", !outgoing && !junk && has_junk, () => mark_open_spam.begin (true));
@@ -5709,12 +5796,16 @@ public class Mail.Window : Adw.ApplicationWindow {
 
         var menu = new Menu ();
         var compose = new Menu ();
-        if (outgoing)
+        if (draft)
+            compose.append (_("Edit Draft"), "ctx.send-again");
+        else if (outgoing)
             compose.append (_("Send Again"), "ctx.send-again");
         else
             compose.append (_("Reply"), "ctx.reply");
-        compose.append (_("Reply All"), "ctx.reply-all");
-        compose.append (_("Forward"), "ctx.forward");
+        if (!draft) {
+            compose.append (_("Reply All"), "ctx.reply-all");
+            compose.append (_("Forward"), "ctx.forward");
+        }
         menu.append_section (null, compose);
 
         var file = new Menu ();
@@ -6542,6 +6633,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.mail_session.folder_changed.disconnect (on_camel_folder_changed);
             this.mail_session.message_sent.disconnect (on_message_sent);
             this.mail_session.draft_saved.disconnect (on_draft_saved);
+            this.mail_session.draft_removed.disconnect (on_draft_removed);
             this.mail_session.transfer_failed.disconnect (on_transfer_failed);
         }
     }

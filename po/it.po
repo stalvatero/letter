@@ -1221,6 +1221,9 @@ msgstr "Inoltra"
 msgid "Send Again"
 msgstr "Invia di nuovo"
 
+msgid "Edit Draft"
+msgstr "Modifica bozza"
+
 msgid "Move"
 msgstr "Sposta"
 

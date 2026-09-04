@@ -38,6 +38,9 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
     private uint initial_attachment_count;
     private MessageContent? reply_of;
     private MessageContent? thread_of;
+    private Message? editing_draft;
+    private Folder? editing_draft_folder;
+    private Account? editing_draft_account;
 
     public ComposeWindow (
         Gtk.Application app,
@@ -50,12 +53,15 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         MessageContent? quoted = null,
         bool forward_quote = false,
         string? bcc = null,
-        bool resend = false
+        bool resend = false,
+        Message? editing_draft = null,
+        Folder? editing_draft_folder = null
     ) {
         var settings = new Settings (Config.APP_ID);
+        var editing = editing_draft != null;
         Object (
             application: app,
-            title: _("New Message"),
+            title: editing ? _("Edit Draft") : _("New Message"),
             default_width: settings.get_int ("compose-width").clamp (480, 4000),
             default_height: settings.get_int ("compose-height").clamp (360, 4000)
         );
@@ -64,10 +70,14 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         this.signature_store = new SignatureStore (settings);
         this.signature_store.migrate_if_needed (store);
         this.session = session;
-        this.reply_of = (!forward_quote && !resend) ? quoted : null;
-        this.thread_of = !resend ? quoted : null;
+        this.editing_draft = editing_draft;
+        this.editing_draft_folder = editing_draft_folder;
+        this.editing_draft_account = selected;
+        var edit_body = resend || editing;
+        this.reply_of = (!forward_quote && !edit_body) ? quoted : null;
+        this.thread_of = thread_parent_for_compose (quoted, forward_quote, edit_body, editing);
         this.focus_to_field = quoted == null || forward_quote;
-        this.skip_initial_signature = resend;
+        this.skip_initial_signature = edit_body;
         resizable = true;
         width_request = 480;
         height_request = 360;
@@ -175,7 +185,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
             quoted,
             forward_quote,
             !this.focus_to_field,
-            resend,
+            edit_body,
             initial_signature
         );
         this.body_view.files_dropped.connect ((files) => handle_dropped_files.begin (files));
@@ -209,7 +219,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         };
         this.attachments_box.add_css_class ("compose-attachments");
 
-        if ((forward_quote || resend) && quoted != null)
+        if ((forward_quote || edit_body) && quoted != null)
             add_attachments_from (quoted);
 
         this.initial_attachment_count = this.attachments.length;
@@ -238,6 +248,30 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
 
         close_request.connect (on_close_request);
         update_send_sensitive ();
+    }
+
+    private static MessageContent? thread_parent_for_compose (
+        MessageContent? quoted,
+        bool forward_quote,
+        bool edit_body,
+        bool editing_draft
+    ) {
+        if (forward_quote || quoted == null)
+            return null;
+        if (!edit_body)
+            return quoted;
+        if (!editing_draft)
+            return null;
+
+        /* Keep reply threading from the stored draft headers. */
+        var parent = quoted.in_reply_to;
+        if (parent == null || parent.strip ().length == 0)
+            return null;
+        return new MessageContent () {
+            message_id = parent,
+            in_reply_to = parent,
+            references = quoted.references ?? parent,
+        };
     }
 
     private delegate void HeaderClicked ();
@@ -529,7 +563,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         string plain;
         string html;
         yield this.body_view.get_bodies (out plain, out html);
-        yield this.session.save_draft (
+        var saved = yield this.session.save_draft (
             account,
             this.to_row.text,
             this.cc_row.text,
@@ -540,6 +574,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
             this.attachments,
             this.thread_of
         );
+        yield finish_editing_draft (account, saved);
         yield remember_clean_state ();
     }
 
@@ -636,12 +671,13 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
                 attachments,
                 thread_of
             );
+            yield replace_editing_draft ();
             app?.contacts.remember_recipients (to_recipients);
             app?.contacts.remember_recipients (cc_recipients);
         } catch (Error e) {
             var message = Utils.friendly_send_error (e);
             try {
-                yield session.save_draft (
+                var saved = yield session.save_draft (
                     account,
                     to,
                     cc,
@@ -652,12 +688,41 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
                     attachments,
                     thread_of
                 );
+                yield finish_editing_draft (account, saved);
                 app?.show_mail_toast (
                     "%s %s".printf (message, _("The message was saved to Drafts."))
                 );
             } catch (Error save_error) {
                 app?.show_mail_toast (message);
             }
+        }
+    }
+
+    private async void replace_editing_draft () {
+        yield finish_editing_draft (null, null);
+    }
+
+    private async void finish_editing_draft (Account? account, Message? replacement) {
+        var draft = this.editing_draft;
+        var folder = this.editing_draft_folder;
+        var owner = account ?? this.editing_draft_account ?? selected_account ();
+        if (draft != null && folder != null && owner != null
+            && draft.uid != null && draft.uid.length > 0
+            && (replacement == null || replacement.uid != draft.uid)) {
+            try {
+                yield this.session.delete_message (owner, folder, draft.uid, null);
+            } catch (Error e) {
+                warning ("Could not remove replaced draft: %s", e.message);
+            }
+        }
+
+        if (replacement != null) {
+            this.editing_draft = replacement;
+            this.editing_draft_account = owner;
+        } else {
+            this.editing_draft = null;
+            this.editing_draft_folder = null;
+            this.editing_draft_account = null;
         }
     }
 
@@ -1553,7 +1618,9 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         );
         var manager = this.webview.get_user_content_manager ();
         manager.script_message_received.connect (on_script_message);
-        if (!manager.register_script_message_handler ("compose", (string) null))
+        /* Empty world name = default world. NULL can fail registration on some
+         * WebKitGTK builds, which silently breaks the compose message bridge. */
+        if (!manager.register_script_message_handler ("compose", ""))
             warning ("Could not register compose script message handler");
         this.webview.add_css_class ("compose-body");
         this.webview.decide_policy.connect (on_decide_policy);
@@ -1609,13 +1676,31 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         this.image_size_original = new SimpleAction ("compose-image-original", null);
         this.image_delete = new SimpleAction ("compose-image-delete", null);
         this.unlink_action = new SimpleAction ("compose-unlink", null);
-        this.image_size_small.activate.connect (() => apply_to_current_image ("small"));
-        this.image_size_medium.activate.connect (() => apply_to_current_image ("medium"));
-        this.image_size_original.activate.connect (() => apply_to_current_image ("original"));
-        this.image_delete.activate.connect (delete_current_image);
+        /* Drive size/delete through in-page JS. The selected <img> is already
+         * known there (contextmenu/click); relying on async current_image_id
+         * made the context menu a no-op when the bridge lagged. */
+        this.image_size_small.activate.connect (() => run_compose_image_js ("applySize", "small"));
+        this.image_size_medium.activate.connect (() => run_compose_image_js ("applySize", "medium"));
+        this.image_size_original.activate.connect (() => run_compose_image_js ("applySize", "original"));
+        this.image_delete.activate.connect (() => run_compose_image_js ("requestDelete", null));
         this.unlink_action.activate.connect (remove_current_link);
         this.learn_spelling = new SimpleAction ("compose-learn-spelling", null);
         this.learn_spelling.activate.connect (() => learn_selected_spelling.begin ());
+    }
+
+    private void run_compose_image_js (string method, string? arg) {
+        var js = arg != null
+            ? "window.mailCompose && window.mailCompose.%s && window.mailCompose.%s(%s);".printf (
+                method, method, js_string (arg))
+            : "window.mailCompose && window.mailCompose.%s && window.mailCompose.%s();".printf (
+                method, method);
+        this.webview.evaluate_javascript.begin (js, -1, null, null, null, (obj, res) => {
+            try {
+                this.webview.evaluate_javascript.end (res);
+            } catch (Error e) {
+                debug ("Could not run compose image %s: %s", method, e.message);
+            }
+        });
     }
 
     private void remove_current_link () {
@@ -1633,16 +1718,6 @@ public class Mail.ComposeHtmlView : Gtk.Box {
                 }
             }
         );
-    }
-
-    private void apply_to_current_image (string size) {
-        if (this.current_image_id != null)
-            apply_stored_image_size (this.current_image_id, size);
-    }
-
-    private void delete_current_image () {
-        if (this.current_image_id != null)
-            delete_stored_image (this.current_image_id);
     }
 
     private void on_script_message (JSC.Value value) {
@@ -1704,8 +1779,14 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         this.current_image_id = id;
 
         unowned uint8[] data = store_bytes.get_data ();
-        var html = "<img class=\"mail-inline-image\" draggable=\"true\" data-mail-id=\"%s\" data-mail-size=\"original\" src=\"data:%s;base64,%s\" alt=\"%s\" width=\"%d\" height=\"%d\" style=\"max-width:100%%;height:auto;\">".printf (
+        var html = ("<img class=\"mail-inline-image\" draggable=\"true\" "
+            + "data-mail-id=\"%s\" data-mail-size=\"original\" "
+            + "data-mail-natural-w=\"%d\" data-mail-natural-h=\"%d\" "
+            + "src=\"data:%s;base64,%s\" alt=\"%s\" width=\"%d\" height=\"%d\" "
+            + "style=\"max-width:100%%;height:auto;\">").printf (
             id,
+            store_pixbuf.get_width (),
+            store_pixbuf.get_height (),
             store_mime,
             Base64.encode (data),
             Markup.escape_text (alt),
@@ -2663,6 +2744,8 @@ blockquote:not(.mail-quote) {
                 var applying = false;
                 var selectedImg = null;
                 var contextLink = null;
+                var SIZE_SMALL = """ + INLINE_SMALL_WIDTH.to_string () + """;
+                var SIZE_MEDIUM = """ + INLINE_MEDIUM_WIDTH.to_string () + """;
                 var labels = {
                     small: """ + js_string (_("Small")) + """,
                     medium: """ + js_string (_("Medium")) + """,
@@ -2725,6 +2808,57 @@ blockquote:not(.mail-quote) {
                     return img && img.getAttribute('data-mail-id');
                 }
 
+                function rememberNatural(img) {
+                    if (!img)
+                        return;
+                    var nw = parseInt(img.getAttribute('data-mail-natural-w'), 10);
+                    var nh = parseInt(img.getAttribute('data-mail-natural-h'), 10);
+                    if (!(nw > 0) && img.naturalWidth > 0)
+                        nw = img.naturalWidth;
+                    if (!(nh > 0) && img.naturalHeight > 0)
+                        nh = img.naturalHeight;
+                    if (!(nw > 0))
+                        nw = parseInt(img.getAttribute('width'), 10) || 0;
+                    if (!(nh > 0))
+                        nh = parseInt(img.getAttribute('height'), 10) || 0;
+                    if (nw > 0)
+                        img.setAttribute('data-mail-natural-w', String(nw));
+                    if (nh > 0)
+                        img.setAttribute('data-mail-natural-h', String(nh));
+                    return { w: nw || 0, h: nh || 0 };
+                }
+
+                /* Instant, in-page resize. Vala may later replace the data URI
+                 * with a recompressed copy; the UI must not depend on that. */
+                function applySize(size) {
+                    var img = selectedImg;
+                    if (!img || !resizableImage(img))
+                        return;
+                    var nat = rememberNatural(img);
+                    var target = size === 'small' ? SIZE_SMALL
+                        : size === 'medium' ? SIZE_MEDIUM
+                        : nat.w;
+                    if (size !== 'original' && nat.w > 0 && nat.w < target)
+                        target = nat.w;
+                    if (!(target > 0))
+                        return;
+                    var height = nat.w > 0
+                        ? Math.max(1, Math.round(nat.h * target / nat.w))
+                        : 0;
+                    img.setAttribute('width', String(target));
+                    if (height > 0)
+                        img.setAttribute('height', String(height));
+                    img.style.width = target + 'px';
+                    img.style.height = 'auto';
+                    img.style.maxWidth = '100%';
+                    img.setAttribute('data-mail-size', size);
+                    markBar();
+                    placeBar();
+                    var id = imageId(img);
+                    if (id)
+                        postCompose('size|' + id + '|' + size);
+                }
+
                 function barAction(e, run) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -2744,17 +2878,17 @@ blockquote:not(.mail-quote) {
                         e.preventDefault();
                         e.stopPropagation();
                     });
+                    bar.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
                     ['small', 'medium', 'original'].forEach(function (size) {
                         var button = document.createElement('button');
                         button.type = 'button';
                         button.dataset.size = size;
                         button.textContent = labels[size];
-                        button.addEventListener('pointerdown', function (e) {
-                            barAction(e, function () {
-                                var id = imageId(selectedImg);
-                                if (id)
-                                    postCompose('size|' + id + '|' + size);
-                            });
+                        button.addEventListener('click', function (e) {
+                            barAction(e, function () { applySize(size); });
                         });
                         bar.appendChild(button);
                     });
@@ -2762,11 +2896,10 @@ blockquote:not(.mail-quote) {
                     remove.type = 'button';
                     remove.className = 'mail-img-delete';
                     remove.textContent = labels.remove;
-                    remove.addEventListener('pointerdown', function (e) {
+                    remove.addEventListener('click', function (e) {
                         barAction(e, function () {
-                            var id = imageId(selectedImg);
-                            if (id)
-                                postCompose('delete|' + id);
+                            if (window.mailCompose && window.mailCompose.requestDelete)
+                                window.mailCompose.requestDelete();
                         });
                     });
                     bar.appendChild(remove);
@@ -2810,6 +2943,7 @@ blockquote:not(.mail-quote) {
                 }
 
                 function selectImage(img) {
+                    rememberNatural(img);
                     if (selectedImg === img) {
                         placeBar();
                     } else {
@@ -2835,14 +2969,21 @@ blockquote:not(.mail-quote) {
                         img.setAttribute('data-mail-id', id);
                         if (!img.getAttribute('data-mail-size'))
                             img.setAttribute('data-mail-size', 'original');
+                        rememberNatural(img);
+                        if (!img.complete || !(img.naturalWidth > 0)) {
+                            img.addEventListener('load', function () {
+                                rememberNatural(img);
+                            }, { once: true });
+                        }
                     },
-                    requestSize: function (size) {
-                        var id = imageId(selectedImg);
-                        if (id)
-                            postCompose('size|' + id + '|' + size);
-                    },
+                    applySize: applySize,
+                    requestSize: applySize,
                     requestDelete: function () {
-                        var id = imageId(selectedImg);
+                        var img = selectedImg;
+                        var id = imageId(img);
+                        if (img)
+                            img.remove();
+                        clearSelection();
                         if (id)
                             postCompose('delete|' + id);
                     },
@@ -2850,14 +2991,16 @@ blockquote:not(.mail-quote) {
                         var img = editor.querySelector('img[data-mail-id="' + id + '"]');
                         if (!img)
                             return;
+                        rememberNatural(img);
                         img.src = src;
                         img.setAttribute('width', width);
                         img.setAttribute('height', height);
+                        img.style.width = width + 'px';
                         img.style.maxWidth = '100%';
                         img.style.height = 'auto';
-                        img.style.removeProperty('width');
                         img.setAttribute('data-mail-size', size);
-                        selectImage(img);
+                        if (selectedImg === img || imageId(selectedImg) === id)
+                            selectImage(img);
                     },
                     removeImage: function (id) {
                         var img = editor.querySelector('img[data-mail-id="' + id + '"]');

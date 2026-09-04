@@ -232,8 +232,8 @@ public class Mail.MessageReader : Gtk.Box {
         this.header_actions.set_seen (seen, enabled);
     }
 
-    public void set_outgoing (bool outgoing) {
-        this.header_actions.set_outgoing (outgoing);
+    public void set_outgoing (bool outgoing, bool draft = false) {
+        this.header_actions.set_outgoing (outgoing, draft);
     }
 
     public void set_important (bool visible, bool important) {
@@ -1115,15 +1115,25 @@ public class Mail.MessageActionBar : Gtk.Box {
         this.print_button.visible = !bulk;
     }
 
-    public void set_outgoing (bool outgoing) {
-        if (outgoing) {
+    public void set_outgoing (bool outgoing, bool draft = false) {
+        if (draft) {
+            this.reply_button.icon_name = "document-edit-symbolic";
+            this.reply_button.tooltip_text = _("Edit Draft");
+            this.reply_button.action_name = "win.send-again";
+            this.reply_all_button.visible = false;
+            this.forward_button.visible = false;
+        } else if (outgoing) {
             this.reply_button.icon_name = "mail-send-symbolic";
             this.reply_button.tooltip_text = _("Send Again");
             this.reply_button.action_name = "win.send-again";
+            this.reply_all_button.visible = !this.bulk;
+            this.forward_button.visible = !this.bulk;
         } else {
             this.reply_button.icon_name = "mail-reply-sender-symbolic";
             this.reply_button.tooltip_text = _("Reply");
             this.reply_button.action_name = "win.reply";
+            this.reply_all_button.visible = !this.bulk;
+            this.forward_button.visible = !this.bulk;
         }
     }
 

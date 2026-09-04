@@ -35,6 +35,7 @@ public class Mail.MailSession : Camel.Session {
     public signal void folder_changed (string account_key, string folder_name);
     public signal void message_sent (Account account, Message? sent);
     public signal void draft_saved (Account account, Message? draft);
+    public signal void draft_removed (Account account, Folder folder, string uid);
     public signal void transfer_failed (Account account, Folder from, GenericArray<string> uids, string error);
 
     public MailSession (E.SourceRegistry registry) {
@@ -2005,6 +2006,8 @@ public class Mail.MailSession : Camel.Session {
         }
         drop_body (account, folder, uid);
         apply_camel_counts (folder, camel_folder);
+        if (folder.kind == FolderKind.DRAFTS)
+            draft_removed (account, folder, uid);
     }
 
     public async void delete_uids (Account account, Folder folder, GenericArray<string> uids, Folder? trash) throws Error {
@@ -2815,7 +2818,7 @@ public class Mail.MailSession : Camel.Session {
         message_sent (account, sent);
     }
 
-    public async void save_draft (
+    public async Message? save_draft (
         Account account,
         string to,
         string? cc,
@@ -2849,13 +2852,15 @@ public class Mail.MailSession : Camel.Session {
         Folder? drafts;
         var uid = yield save_to_folder (account, FolderKind.DRAFTS, mime, cancellable, out drafts);
         if (drafts == null)
-            return;
+            return null;
 
         if (uid == null || uid.length == 0)
             uid = "local-draft-%lld".printf (new DateTime.now_utc ().to_unix ());
         var content = MessageContent.from_mime (uid, mime);
         this.body_cache.set (body_key (account, drafts, uid), content);
-        draft_saved (account, message_from_mime (uid, mime, drafts, content.plain_text ?? body));
+        var draft = message_from_mime (uid, mime, drafts, content.plain_text ?? body);
+        draft_saved (account, draft);
+        return draft;
     }
 
     private static Camel.MimeMessage build_outgoing_mime (
