@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@app_id@</id>
+  <name>@app_name@</name>
+  <summary>Read and send mail</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer id="io.github.stalvatero">
+    <name>Salvatore Oscurato</name>
+  </developer>
+  <description>
+    <p>
+      Letter is a GNOME mail client built on GTK 4 and libadwaita. It uses
+      GNOME Online Accounts and Evolution Data Server, the same stack as
+      Calendar and Contacts, so Google, Microsoft 365, Exchange, and IMAP
+      accounts already configured on the desktop appear here without a
+      second setup.
+    </p>
+    <p>
+      Read conversations, search, compose HTML mail, and get notifications.
+      Add accounts in Settings → Online Accounts. Letter needs GNOME 50 or later.
+    </p>
+  </description>
+  <launchable type="desktop-id">@app_id@.desktop</launchable>
+  <url type="homepage">https://github.com/stalvatero/letter</url>
+  <url type="bugtracker">https://github.com/stalvatero/letter/issues</url>
+  <translation type="gettext">letter</translation>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <recommends>
+    <id>org.gnome.NautilusPreviewer</id>
+  </recommends>
+  <content_rating type="oars-1.1"/>
+  <branding>
+    <color type="primary" scheme_preference="light">#1a5fb4</color>
+    <color type="primary" scheme_preference="dark">#62a0ea</color>
+  </branding>
+  <kudos>
+    <kudo>HiDpiIcon</kudo>
+    <kudo>HighContrast</kudo>
+    <kudo>ModernToolkit</kudo>
+    <kudo>Notifications</kudo>
+  </kudos>
+  <categories>
+    <category>Network</category>
+    <category>Email</category>
+  </categories>
+  <releases>
+    <release version="@version@" date="2026-09-03">
+      <description>
+        <p>First public beta: reading, composing, search, notifications, and GNOME Online Accounts.</p>
+      </description>
+    </release>
+  </releases>
+</component>

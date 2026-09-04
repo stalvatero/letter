@@ -1,0 +1,431 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $MailWindow: Adw.ApplicationWindow {
+  title: _("Letter");
+  default-width: 1100;
+  default-height: 750;
+  width-request: 360;
+  height-request: 400;
+
+  ShortcutController {
+    Shortcut {
+      trigger: "F5";
+      action: "action(win.refresh)";
+    }
+
+    Shortcut {
+      trigger: "F9";
+      action: "action(win.toggle-sidebar)";
+    }
+
+    Shortcut {
+      trigger: "<Ctrl>f";
+      action: "action(win.search)";
+    }
+
+    Shortcut {
+      trigger: "<Ctrl>n";
+      action: "action(win.compose)";
+    }
+
+    Shortcut {
+      trigger: "F11";
+      action: "action(win.fullscreen)";
+    }
+
+    Shortcut {
+      trigger: "<Ctrl>p";
+      action: "action(win.print)";
+    }
+
+    Shortcut {
+      trigger: "<Ctrl>comma";
+      action: "action(app.preferences)";
+    }
+
+    Shortcut {
+      trigger: "<Ctrl>q";
+      action: "action(app.quit)";
+    }
+
+    Shortcut {
+      trigger: "<Ctrl>w";
+      action: "action(window.close)";
+    }
+  }
+
+  content: Adw.ToastOverlay toast_overlay {
+    child: Adw.OverlaySplitView folder_split {
+      pin-sidebar: true;
+      show-sidebar: true;
+      min-sidebar-width: 220;
+      max-sidebar-width: 320;
+      sidebar-width-fraction: 0.22;
+
+      sidebar: Gtk.Box account_shell {
+        orientation: horizontal;
+        hexpand: false;
+        vexpand: true;
+
+        Gtk.Box account_rail {
+          orientation: vertical;
+          hexpand: false;
+          vexpand: true;
+          width-request: 56;
+
+          styles [
+            "account-rail",
+          ]
+
+          Button account_rail_add {
+            icon-name: "list-add-symbolic";
+            tooltip-text: _("Add Account");
+            action-name: "app.online-accounts";
+            hexpand: true;
+            valign: fill;
+
+            styles [
+              "flat",
+              "account-rail-add",
+            ]
+          }
+
+          Gtk.Box account_rail_list {
+            orientation: vertical;
+            spacing: 0;
+            hexpand: true;
+            vexpand: true;
+            halign: fill;
+            valign: start;
+
+            styles [
+              "account-rail-list",
+            ]
+          }
+        }
+
+        Adw.ToolbarView account_pane {
+          hexpand: true;
+          vexpand: true;
+
+          [top]
+          Adw.HeaderBar account_header {
+            show-start-title-buttons: false;
+            show-end-title-buttons: false;
+
+            title-widget: Adw.WindowTitle {
+              title: _("Online Accounts");
+            };
+          }
+
+          content: Adw.Bin sidebar_bin {
+            child: Adw.StatusPage no_accounts_page {
+              icon-name: "mail-unread-symbolic";
+              title: _("No Mail Accounts");
+              description: _("Add Google, Microsoft 365, or IMAP in GNOME Settings. Letter uses the same accounts as Calendar and Contacts.");
+              valign: center;
+
+              child: Button {
+                label: _("Online Accounts");
+                action-name: "app.online-accounts";
+                halign: center;
+
+                styles [
+                  "pill",
+                  "suggested-action",
+                ]
+              };
+            };
+          };
+
+          [bottom]
+          Gtk.Box {
+            orientation: vertical;
+            hexpand: true;
+            margin-top: 4;
+            margin-bottom: 12;
+            margin-start: 10;
+            margin-end: 10;
+
+            styles [
+              "account-goa-hint",
+            ]
+
+            Label {
+              label: _("This pane shows only the accounts and services enabled in GNOME Online Accounts. Add or change mail accounts there.");
+              wrap: true;
+              justify: fill;
+              xalign: 0;
+              use-markup: false;
+            }
+          }
+        }
+      };
+
+      content: Gtk.Paned content_split {
+        wide-handle: true;
+        position: 280;
+        resize-start-child: false;
+        shrink-start-child: false;
+
+        start-child: Adw.ToolbarView {
+          width-request: 200;
+
+          [top]
+          Adw.HeaderBar {
+            show-start-title-buttons: false;
+            show-end-title-buttons: false;
+
+            [start]
+            ToggleButton sidebar_button {
+              icon-name: "sidebar-show-symbolic";
+              tooltip-text: _("Toggle Sidebar");
+            }
+
+            title-widget: Adw.WindowTitle folder_title {
+              title: _("Folders");
+            };
+          }
+
+          content: Adw.Bin folder_bin {
+            child: Adw.StatusPage no_folders_page {
+              icon-name: "folder-symbolic";
+              title: _("Select an Account");
+              description: _("Choose an account in the sidebar to load its folders.");
+              valign: center;
+            };
+          };
+
+          [bottom]
+          Gtk.Box folder_status_bar {
+            visible: false;
+            spacing: 8;
+            hexpand: true;
+            margin-start: 10;
+            margin-end: 10;
+            margin-top: 4;
+            margin-bottom: 6;
+
+            styles [
+              "folder-status-bar",
+            ]
+
+            Adw.Spinner {
+              width-request: 14;
+              height-request: 14;
+            }
+
+            Gtk.Label folder_status_label {
+              hexpand: true;
+              xalign: 0;
+              ellipsize: end;
+              use-markup: false;
+
+              styles [
+                "caption",
+                "dim-label",
+              ]
+            }
+          }
+        };
+
+        end-child: Adw.ToolbarView {
+          [top]
+          Adw.HeaderBar {
+            [start]
+            Button compose_button {
+              tooltip-text: _("New Message");
+              action-name: "win.compose";
+
+              styles [
+                "suggested-action",
+                "pill",
+                "compose-button",
+              ]
+
+              Box {
+                spacing: 6;
+                valign: center;
+
+                Image {
+                  icon-name: "mail-message-new-symbolic";
+                }
+
+                Label {
+                  label: _("New");
+                }
+              }
+            }
+
+            [start]
+            ToggleButton unread_filter_button {
+              icon-name: "mail-unread-symbolic";
+              tooltip-text: _("Show unread only");
+
+              styles [
+                "unread-filter",
+              ]
+            }
+
+            [start]
+            ToggleButton conversation_button {
+              icon-name: "view-list-symbolic";
+              tooltip-text: _("Group by conversation");
+
+              styles [
+                "conversation-toggle",
+              ]
+            }
+
+            [start]
+            $MailSearchField message_search {
+              placeholder-text: _("Search");
+              width-request: 220;
+              hexpand: false;
+              valign: fill;
+            }
+
+            title-widget: Adw.WindowTitle conversation_title {
+              title: _("Letter");
+            };
+
+            [end]
+            MenuButton menu_button {
+              icon-name: "open-menu-symbolic";
+              tooltip-text: _("Main Menu");
+              primary: true;
+              menu-model: primary_menu;
+            }
+
+            [end]
+            Adw.Spinner conversation_sync_spinner {
+              visible: false;
+              tooltip-text: _("Updating…");
+              width-request: 18;
+              height-request: 18;
+
+              styles [
+                "sync-spinner",
+              ]
+            }
+          }
+
+          content: Gtk.Paned message_split {
+            wide-handle: true;
+            position: 360;
+            resize-start-child: false;
+            shrink-start-child: false;
+
+            start-child: Adw.Bin list_bin {
+              width-request: 260;
+
+              child: Adw.StatusPage conversation_page {
+                icon-name: "mail-unread-symbolic";
+                title: _("Select a Folder");
+                description: _("Messages from the selected folder will appear here.");
+                valign: center;
+
+                styles [
+                  "status-body",
+                ]
+              };
+            };
+
+            end-child: Adw.Bin reader_bin {
+              child: Adw.StatusPage reader_page {
+                icon-name: "mail-unread-symbolic";
+                title: _("Select a Message");
+                description: _("Choose a message from the list to read it.");
+                valign: center;
+
+                styles [
+                  "status-body",
+                ]
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+
+  Adw.Breakpoint {
+    condition ("max-width: 1000sp")
+
+    setters {
+      folder_split.collapsed: true;
+    }
+  }
+}
+
+menu primary_menu {
+  section {
+    item {
+      custom: "theme";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Refresh");
+      action: "win.refresh";
+    }
+
+    item {
+      label: _("_New Message");
+      action: "win.compose";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Print");
+      action: "win.print";
+    }
+
+    item {
+      label: _("_Fullscreen");
+      action: "win.fullscreen";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Online Accounts…");
+      action: "app.online-accounts";
+    }
+
+    item {
+      label: _("_Calendar");
+      action: "app.open-calendar";
+    }
+
+    item {
+      label: _("C_ontacts");
+      action: "app.open-contacts";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Preferences");
+      action: "app.preferences";
+    }
+
+    item {
+      label: _("_Welcome");
+      action: "app.welcome";
+    }
+
+    item {
+      label: _("_Keyboard Shortcuts");
+      action: "app.shortcuts";
+    }
+
+    item {
+      label: _("_About Letter");
+      action: "app.about";
+    }
+  }
+}

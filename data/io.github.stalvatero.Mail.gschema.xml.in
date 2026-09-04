@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <!-- Compatibility schema: lets us migrate user settings after renaming
+       the app from Mail → Letter. -->
+  <schema id="@app_id@" path="/io/github/stalvatero/Mail/" gettext-domain="@gettext_package@">
+    <key name="window-width" type="i">
+      <default>1100</default>
+      <summary>Window width</summary>
+      <description>Width of the main window in pixels.</description>
+    </key>
+    <key name="window-height" type="i">
+      <default>750</default>
+      <summary>Window height</summary>
+      <description>Height of the main window in pixels.</description>
+    </key>
+    <key name="window-maximized" type="b">
+      <default>false</default>
+      <summary>Window maximized</summary>
+      <description>Whether the main window is maximized.</description>
+    </key>
+    <key name="show-folder-sidebar" type="b">
+      <default>true</default>
+      <summary>Show folder sidebar</summary>
+      <description>Whether the folder sidebar is visible on wide layouts.</description>
+    </key>
+    <key name="folder-pane-width" type="i">
+      <default>280</default>
+      <summary>Folder pane width</summary>
+      <description>Width of the folder list pane in pixels.</description>
+    </key>
+    <key name="last-account-uid" type="s">
+      <default>''</default>
+      <summary>Last selected account</summary>
+      <description>UID of the account shown when Mail last quit.</description>
+    </key>
+    <key name="last-folder" type="s">
+      <default>''</default>
+      <summary>Last selected folder</summary>
+      <description>Full name of the folder shown when Mail last quit.</description>
+    </key>
+    <key name="collapsed-folders" type="as">
+      <default>[]</default>
+      <summary>Collapsed folders</summary>
+      <description>Account and folder paths whose subfolders are hidden in the sidebar.</description>
+    </key>
+    <key name="color-scheme" type="s">
+      <choices>
+        <choice value="default"/>
+        <choice value="light"/>
+        <choice value="dark"/>
+      </choices>
+      <default>'default'</default>
+      <summary>Color scheme</summary>
+      <description>Application color scheme: follow the system, light, or dark.</description>
+    </key>
+    <key name="reader-zoom" type="d">
+      <default>1.0</default>
+      <range min="0.5" max="3.0"/>
+      <summary>Message body zoom</summary>
+      <description>Zoom factor for the message body when reading mail.</description>
+    </key>
+    <key name="reading-pane" type="s">
+      <choices>
+        <choice value="right"/>
+        <choice value="bottom"/>
+        <choice value="hidden"/>
+      </choices>
+      <default>'right'</default>
+      <summary>Reading pane</summary>
+      <description>Where the message reader is shown: right of the list, below it, or hidden.</description>
+    </key>
+    <key name="message-pane-width" type="i">
+      <default>360</default>
+      <summary>Message list width</summary>
+      <description>Width or height of the message list next to the reading pane, in pixels.</description>
+    </key>
+    <key name="compose-width" type="i">
+      <default>720</default>
+      <summary>Compose window width</summary>
+      <description>Width of the new-message window in pixels.</description>
+    </key>
+    <key name="compose-height" type="i">
+      <default>640</default>
+      <summary>Compose window height</summary>
+      <description>Height of the new-message window in pixels.</description>
+    </key>
+    <key name="trusted-senders" type="as">
+      <default>[]</default>
+      <summary>Trusted senders</summary>
+      <description>Email addresses allowed to load remote images. Microsoft 365 and Exchange also trust your mailbox, your organization domain, and contacts in the address book.</description>
+    </key>
+    <key name="sync-interval" type="i">
+      <default>300</default>
+      <summary>Sync interval</summary>
+      <description>Seconds between background checks for new mail. Use 0 to check only when requested (F5).</description>
+    </key>
+    <key name="body-cache-days" type="i">
+      <default>180</default>
+      <summary>Download recent messages</summary>
+      <description>Download the full body of messages newer than this many days (60, 180, or 365). Use 0 to download the entire mailbox. Bodies outside the window are removed at startup.</description>
+    </key>
+    <key name="mark-as-read" type="s">
+      <choices>
+        <choice value="selection"/>
+        <choice value="delay"/>
+        <choice value="never"/>
+      </choices>
+      <default>'selection'</default>
+      <summary>Mark as read</summary>
+      <description>When to mark the open message as read: as soon as it is selected, after five seconds, or never.</description>
+    </key>
+    <key name="conversation-view" type="b">
+      <default>true</default>
+      <summary>Conversation view</summary>
+      <description>Group messages that belong to the same thread into a single row.</description>
+    </key>
+    <key name="notifications" type="b">
+      <default>true</default>
+      <summary>Desktop notifications</summary>
+      <description>Show a notification when new mail arrives, with actions to archive or delete it.</description>
+    </key>
+    <key name="notification-sound" type="s">
+      <default>'message-new-instant'</default>
+      <summary>Notification sound</summary>
+      <description>Freedesktop sound name, a file URI, or none to stay silent when new mail arrives.</description>
+    </key>
+    <key name="last-download-folder" type="s">
+      <default>''</default>
+      <summary>Last download folder</summary>
+      <description>URI of the last folder used to save attachments.</description>
+    </key>
+    <key name="compose-signatures" type="a(ss)">
+      <default>[]</default>
+      <summary>Legacy compose signatures</summary>
+      <description>Old global signatures. Copied into per-account signatures once, then unused.</description>
+    </key>
+    <key name="compose-signature-name" type="s">
+      <default>''</default>
+      <summary>Legacy selected signature</summary>
+      <description>Name of the last global signature. Kept for migration.</description>
+    </key>
+    <key name="account-signatures" type="a(sss)">
+      <default>[]</default>
+      <summary>Per-account signatures</summary>
+      <description>Signatures as account key, name, and HTML body.</description>
+    </key>
+    <key name="account-signature-choice" type="a(ss)">
+      <default>[]</default>
+      <summary>Default signature per account</summary>
+      <description>Starred default signature name for new messages from each account.</description>
+    </key>
+    <key name="signatures-migrated" type="b">
+      <default>false</default>
+      <summary>Signatures migrated</summary>
+      <description>Whether global signatures have been copied to each mail account.</description>
+    </key>
+    <key name="welcome-shown" type="b">
+      <default>false</default>
+      <summary>Welcome shown</summary>
+      <description>Whether the first-run welcome has been dismissed.</description>
+    </key>
+  </schema>
+</schemalist>
+

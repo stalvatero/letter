@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- GNOME app icon canvas: 128×128 with 8 px inset squircle -->
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="#1a5fb4"/>
+  <g transform="translate(8 8) scale(0.875)">
+    <rect x="22" y="30" width="84" height="68" rx="8" fill="#f6f5f4"/>
+    <path d="M22 38.5 L64 68 L106 38.5" fill="none" stroke="#1a5fb4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="28" y="82" font-family="Cantarell, sans-serif" font-weight="bold" font-size="10" fill="#9a9996">S</text>
+    <rect x="38" y="78" width="28" height="4" rx="2" fill="#9a9996"/>
+    <rect x="28" y="88" width="52" height="4" rx="2" fill="#c0bfbc"/>
+  </g>
+</svg>

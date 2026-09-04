@@ -1,5 +1,6 @@
 /_build/
 /build/
+/_flatpak_build/
 .flatpak-builder/
 *.flatpak
 /repo/
@@ -8,6 +9,7 @@
 *.ui~
 meson-logs/
 .cache/
+.cursor/
 
 # Local debug artefacts
 *.core

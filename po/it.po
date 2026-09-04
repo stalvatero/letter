@@ -1,0 +1,1583 @@
+# Italian translation for Letter.
+# SPDX-FileCopyrightText: 2026 stalvatero
+# SPDX-License-Identifier: GPL-3.0-or-later
+msgid ""
+msgstr ""
+"Project-Id-Version: letter 0.9.0-beta.1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-26 12:00+0200\n"
+"PO-Revision-Date: 2026-08-26 12:00+0200\n"
+"Last-Translator: stalvatero\n"
+"Language-Team: Italian\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Read and send mail"
+msgstr "Leggi e invia la posta"
+
+msgid "Letter"
+msgstr "Lettera"
+
+msgid "Letter (Development)"
+msgstr "Lettera (Sviluppo)"
+
+msgid "Add Account"
+msgstr "Aggiungi account"
+
+msgid "No Mail Accounts"
+msgstr "Nessun account di posta"
+
+msgid "Add Google, Microsoft 365, or IMAP in GNOME Settings. Letter uses the same accounts as Calendar and Contacts."
+msgstr "Aggiungi Google, Microsoft 365 o IMAP in Impostazioni. Lettera usa gli stessi account di Calendario e Contatti."
+
+msgid "Online Accounts"
+msgstr "Account online"
+
+msgid "Toggle Sidebar"
+msgstr "Mostra o nascondi la barra laterale"
+
+msgid "Folders"
+msgstr "Cartelle"
+
+msgid "Select an Account"
+msgstr "Seleziona un account"
+
+msgid "Choose an account in the sidebar to load its folders."
+msgstr "Scegli un account nella barra laterale per caricarne le cartelle."
+
+msgid "Main Menu"
+msgstr "Menu principale"
+
+msgid "Select a Folder"
+msgstr "Seleziona una cartella"
+
+msgid "Messages from the selected folder will appear here."
+msgstr "I messaggi della cartella selezionata compariranno qui."
+
+msgid "_Refresh Accounts"
+msgstr "A_ggiorna account"
+
+msgid "_Online Accounts…"
+msgstr "_Account online…"
+
+msgid "_Calendar"
+msgstr "_Calendario"
+
+msgid "C_ontacts"
+msgstr "C_ontatti"
+
+msgid "_Preferences"
+msgstr "Preferen_ze"
+
+msgid "_Keyboard Shortcuts"
+msgstr "_Scorciatoie da tastiera"
+
+msgid "_About Letter"
+msgstr "I_nformazioni su Lettera"
+
+msgid "_Welcome"
+msgstr "_Benvenuto"
+
+msgid "Welcome"
+msgstr "Benvenuto"
+
+msgid "Welcome to Letter"
+msgstr "Benvenuto in Lettera"
+
+msgid "Letter is the email application designed for the GNOME desktop and integrates with Calendar and Contacts. It uses the same accounts you already have: Google, Microsoft 365, Exchange, IMAP."
+msgstr "Lettera è l’applicazione di posta elettronica studiata appositamente per l’ambiente desktop GNOME e si integra con Calendario e Contatti. Usa gli stessi account che hai già: Google, Microsoft 365, Exchange, IMAP."
+
+msgid "One experience, one interface"
+msgstr "Esperienza e interfaccia unica"
+
+msgid "Sign-in stays in Online Accounts in GNOME Settings. Evolution Data Server handles the mail flow. Letter uses the GTK 4 and libadwaita libraries, so GNOME 50 or later is required for it to work correctly."
+msgstr "Gli accessi restano in Account online delle Impostazioni di Sistema GNOME. Evolution Data Server gestisce il flusso di posta elettronica. Lettera sfrutta le librerie GTK 4 e libadwaita, motivo per cui per un corretto funzionamento è richiesto GNOME a partire dalla versione 50 e successive."
+
+msgid "What Letter needs"
+msgstr "Cosa serve a Lettera"
+
+msgid "Add at least one mail account in Settings → Online Accounts. IMAP is added there too. Microsoft 365 also needs the evolution-ews package. Without Online Accounts, Letter has nothing to show — by design."
+msgstr "Aggiungi almeno un account di posta in Impostazioni → Account online. Anche IMAP si aggiunge lì. Microsoft 365 richiede anche il pacchetto evolution-ews. Senza Account online, Lettera non ha nulla da mostrare: è voluto."
+
+msgid "Back"
+msgstr "Indietro"
+
+msgid "Next"
+msgstr "Avanti"
+
+msgid "Get Started"
+msgstr "Inizia"
+
+msgid "IMAP"
+msgstr "IMAP"
+
+msgid "Google"
+msgstr "Google"
+
+msgid "Microsoft 365"
+msgstr "Microsoft 365"
+
+msgid "Exchange"
+msgstr "Exchange"
+
+msgid "On this computer"
+msgstr "Su questo computer"
+
+msgid "Other"
+msgstr "Altro"
+
+msgid "Shares a calendar with Calendar"
+msgstr "Condivide un calendario con Calendario"
+
+msgid "Shares an address book with Contacts"
+msgstr "Condivide una rubrica con Contatti"
+
+msgid "Email enabled"
+msgstr "Email abilitate"
+
+msgid "Calendar enabled"
+msgstr "Calendario abilitato"
+
+msgid "Address book enabled"
+msgstr "Rubrica abilitata"
+
+msgid "Letter is disabled in Online Accounts"
+msgstr "Lettera è disabilitata negli Account online"
+
+msgid "This pane shows only the accounts and services enabled in GNOME Online Accounts. Add or change mail accounts there."
+msgstr "In questo riquadro sono visualizzati solo gli account e i servizi abilitati in Account online delle impostazioni GNOME. Solo da lì è possibile modificare o aggiungere account di posta elettronica."
+
+msgid "Offline"
+msgstr "Offline"
+
+msgid "Enable the mail service in Online Accounts settings"
+msgstr "Abilita il servizio in impostazioni account online"
+
+msgid "Offline — enable the service in Online Accounts settings"
+msgstr "Offline — abilita il servizio in impostazioni account online"
+
+msgid "Hide account list"
+msgstr "Nascondi elenco account"
+
+msgid "Show account list"
+msgstr "Mostra elenco account"
+
+msgid "Preferences"
+msgstr "Preferenze"
+
+msgid "General"
+msgstr "Generale"
+
+msgid "GNOME integration"
+msgstr "Integrazione GNOME"
+
+msgid "Letter reads the same Evolution Data Server used by Calendar and Contacts, and the same GNOME Online Accounts for Google, Microsoft 365, and IMAP."
+msgstr "Lettera usa lo stesso Evolution Data Server di Calendario e Contatti, e gli stessi account online GNOME per Google, Microsoft 365 e IMAP."
+
+msgid "Mail accounts"
+msgstr "Account di posta"
+
+msgid "Calendars"
+msgstr "Calendari"
+
+msgid "Address books"
+msgstr "Rubriche"
+
+msgid "Accounts"
+msgstr "Account"
+
+msgid "Add or remove providers in GNOME Settings. Changes appear here automatically."
+msgstr "Aggiungi o rimuovi i provider in Impostazioni. Le modifiche compaiono qui automaticamente."
+
+msgid "Google, Microsoft 365, Exchange, IMAP"
+msgstr "Google, Microsoft 365, Exchange, IMAP"
+
+msgid "Open Calendar"
+msgstr "Apri Calendario"
+
+msgid "Open Contacts"
+msgstr "Apri Contatti"
+
+msgid "Loading Folders"
+msgstr "Caricamento cartelle"
+
+msgid "Connecting to “%s”…"
+msgstr "Connessione a «%s»…"
+
+msgid "Evolution Data Server Unavailable"
+msgstr "Evolution Data Server non disponibile"
+
+msgid "Letter needs the same data server used by Calendar and Contacts."
+msgstr "Lettera ha bisogno dello stesso data server usato da Calendario e Contatti."
+
+msgid "No Folders"
+msgstr "Nessuna cartella"
+
+msgid "The account did not publish any subscribed folders."
+msgstr "L'account non ha pubblicato cartelle sottoscritte."
+
+msgid "Could Not Load Folders"
+msgstr "Impossibile caricare le cartelle"
+
+msgid "Message contents will appear here once fetching is implemented."
+msgstr "Il contenuto dei messaggi comparirà qui quando il recupero sarà implementato."
+
+msgid "Password prompts are not implemented yet. Add the account in GNOME Online Accounts."
+msgstr "La richiesta della password non è ancora implementata. Aggiungi l'account in Account online."
+
+msgid "This account is not yet available to Evolution Data Server."
+msgstr "Questo account non è ancora disponibile in Evolution Data Server."
+
+msgid "Mail source “%s” was not found."
+msgstr "L'origine di posta «%s» non è stata trovata."
+
+msgid "The account has no mail backend."
+msgstr "L'account non ha un backend di posta."
+
+msgid "No data source found for UID “%s”"
+msgstr "Nessuna origine dati trovata per l'UID «%s»"
+
+msgid "%s authentication failed"
+msgstr "Autenticazione %s non riuscita"
+
+msgid "A GNOME mail client that shares accounts with Calendar and Contacts."
+msgstr "Un client di posta GNOME che condivide gli account con Calendario e Contatti."
+
+msgid "translator-credits"
+msgstr "Salvatore Oscurato"
+
+msgid "Quit"
+msgstr "Esci"
+
+msgid "Keyboard shortcuts"
+msgstr "Scorciatoie da tastiera"
+
+msgid "Letter shortcuts"
+msgstr "Scorciatoie di Lettera"
+
+msgid "Refresh accounts"
+msgstr "Aggiorna account"
+
+msgid "Toggle sidebar"
+msgstr "Barra laterale"
+
+msgid "%d unread"
+msgid_plural "%d unread"
+msgstr[0] "%d non letto"
+msgstr[1] "%d non letti"
+
+msgid "%d message"
+msgid_plural "%d messages"
+msgstr[0] "%d messaggio"
+msgstr[1] "%d messaggi"
+
+msgid "Calendar, contacts, and Graph mail need the evolution-ews backends. The Evolution window is not required and should stay closed."
+msgstr "Calendario, contatti e posta Graph richiedono i backend di evolution-ews. La finestra di Evolution non serve e va lasciata chiusa."
+
+msgid "Graph backends"
+msgstr "Backend Graph"
+
+msgid "Installed (evolution-ews)"
+msgstr "Installati (evolution-ews)"
+
+msgid "Missing — install evolution-ews"
+msgstr "Mancanti: installa evolution-ews"
+
+msgid "Dependencies"
+msgstr "Dipendenze"
+
+msgid "Dependencies and recommended packages"
+msgstr "Dipendenze e pacchetti consigliati"
+
+msgid "Check the software requirements for Letter to work correctly."
+msgstr "Verifica i requisiti software per il corretto funzionamento di Lettera"
+
+msgid "Letter is made for the GNOME desktop from version 50 onward and makes full use of the GTK 4 and libadwaita libraries. A normal GNOME installation already includes everything needed to make it work. Check the essential packages below, and the optional ones only if you need them."
+msgstr "Lettera è pensata per l’ambiente GNOME dalla versione 50 in poi e sfrutta in modo completo le librerie GTK 4 e Libadwaita. Una normale installazione di GNOME include già tutto il necessario per farla funzionare. Controlla di seguito i pacchetti indispensabili e quelli facoltativi da installare solo se ti servono."
+
+msgid "Essential"
+msgstr "Indispensabili"
+
+msgid "GNOME Online Accounts"
+msgstr "Account online GNOME"
+
+msgid "Account sign-in for Google, Microsoft 365, Exchange, and IMAP"
+msgstr "Accesso account per Google, Microsoft 365, Exchange e IMAP"
+
+msgid "Evolution Data Server"
+msgstr "Evolution Data Server"
+
+msgid "Mail, calendar, and contacts backend used by Letter"
+msgstr "Backend di posta, calendario e contatti usato da Lettera"
+
+msgid "All checked packages are installed on this system"
+msgstr "Tutti i pacchetti controllati sono installati su questo sistema"
+
+msgid "%u package is missing on this system"
+msgid_plural "%u packages are missing on this system"
+msgstr[0] "%u pacchetto manca su questo sistema"
+msgstr[1] "%u pacchetti mancano su questo sistema"
+
+msgid "Debian / Ubuntu"
+msgstr "Debian / Ubuntu"
+
+msgid "Fedora"
+msgstr "Fedora"
+
+msgid "Arch Linux"
+msgstr "Arch Linux"
+
+msgid "Required"
+msgstr "Indispensabili"
+
+msgid "GTK 4"
+msgstr "GTK 4"
+
+msgid "libadwaita"
+msgstr "libadwaita"
+
+msgid "Libraries Letter is built against. They are present if the application is running."
+msgstr "Librerie con cui Lettera è compilata. Sono presenti se l’applicazione è in esecuzione."
+
+msgid "Application toolkit"
+msgstr "Toolkit dell’interfaccia"
+
+msgid "GNOME interface library"
+msgstr "Libreria di interfaccia GNOME"
+
+msgid "WebKitGTK"
+msgstr "WebKitGTK"
+
+msgid "Message and compose HTML engine"
+msgstr "Motore HTML per lettura e scrittura"
+
+msgid "Accounts, calendars, and address books"
+msgstr "Account, calendari e rubriche"
+
+msgid "Install evolution-data-server"
+msgstr "Installa evolution-data-server"
+
+msgid "Camel"
+msgstr "Camel"
+
+msgid "Mail protocol library"
+msgstr "Libreria dei protocolli di posta"
+
+msgid "Google, Microsoft 365, and IMAP logins"
+msgstr "Accessi Google, Microsoft 365 e IMAP"
+
+msgid "Install gnome-online-accounts"
+msgstr "Installa gnome-online-accounts"
+
+msgid "GSound"
+msgstr "GSound"
+
+msgid "Notification sounds"
+msgstr "Suoni delle notifiche"
+
+msgid "Install gsound"
+msgstr "Installa gsound"
+
+msgid "Recommended"
+msgstr "Consigliate"
+
+msgid "Optional packages for Microsoft 365, spell checking while writing, and attachment preview. The Evolution window is not required and should stay closed."
+msgstr "Pacchetti opzionali per Microsoft 365, il controllo ortografico in scrittura e l’anteprima degli allegati. La finestra di Evolution non serve e va lasciata chiusa."
+
+msgid "The Evolution window is not required and should stay closed."
+msgstr "La finestra di Evolution non serve e va lasciata chiusa."
+
+msgid "Microsoft Graph backends"
+msgstr "Backend Microsoft Graph"
+
+msgid "evolution-ews for Microsoft 365 mail, calendar, and contacts"
+msgstr "evolution-ews per posta, calendario e contatti Microsoft 365"
+
+msgid "Install evolution-ews"
+msgstr "Installa evolution-ews"
+
+msgid "Enchant"
+msgstr "Enchant"
+
+msgid "Spell-checking broker used by the compose editor"
+msgstr "Broker del controllo ortografico usato nell’editor"
+
+msgid "Install enchant"
+msgstr "Installa enchant"
+
+msgid "Enchant Hunspell plugin"
+msgstr "Plugin Hunspell di Enchant"
+
+msgid "Connects Enchant to Hunspell dictionaries"
+msgstr "Collega Enchant ai dizionari Hunspell"
+
+msgid "Hunspell"
+msgstr "Hunspell"
+
+msgid "Spell-checking engine"
+msgstr "Motore di controllo ortografico"
+
+msgid "Spell checking in the compose editor. Install Hunspell plus a dictionary for your language."
+msgstr "Controllo ortografico nell’editor. Installa Hunspell e un dizionario per la tua lingua."
+
+msgid "Install Hunspell and the dictionary for your language. Enchant is pulled in automatically."
+msgstr "Installa Hunspell e il dizionario per la tua lingua. Enchant arriva da solo come dipendenza."
+
+msgid "Search your package manager for hunspell- followed by the language code."
+msgstr "Cerca nel gestore pacchetti hunspell- seguito dal codice della lingua."
+
+msgid "Examples: hunspell-it, hunspell-en-us, hunspell-fr, hunspell-de-de."
+msgstr "Esempi: hunspell-it, hunspell-en-us, hunspell-fr, hunspell-de-de."
+
+msgid "The compose editor uses the same language as the desktop."
+msgstr "L’editor usa la stessa lingua del desktop."
+
+msgid "Install hunspell"
+msgstr "Installa hunspell"
+
+msgid "Hunspell dictionary"
+msgstr "Dizionario Hunspell"
+
+msgid "Dictionary for the desktop language"
+msgstr "Dizionario per la lingua del desktop"
+
+msgid "Install %s"
+msgstr "Installa %s"
+
+msgid "Sushi"
+msgstr "Sushi"
+
+msgid "Attachment preview"
+msgstr "Anteprima degli allegati"
+
+msgid "Quick attachment preview. Without it, Letter opens the file in the default application."
+msgstr "Anteprima rapida degli allegati. Se manca, Lettera apre il file con l’applicazione predefinita."
+
+msgid "Install sushi"
+msgstr "Installa sushi"
+
+msgid "Installed"
+msgstr "Installato"
+
+msgid "Missing"
+msgstr "Mancante"
+
+msgid "Unknown sender"
+msgstr "Mittente sconosciuto"
+
+msgid "(No subject)"
+msgstr "(Nessun oggetto)"
+
+msgid "Folder “%s” was not found."
+msgstr "La cartella «%s» non è stata trovata."
+
+msgid "Loading Messages"
+msgstr "Caricamento messaggi"
+
+msgid "Fetching the list from “%s”…"
+msgstr "Recupero dell'elenco da «%s»…"
+
+msgid "No Messages"
+msgstr "Nessun messaggio"
+
+msgid "This folder is empty."
+msgstr "Questa cartella è vuota."
+
+msgid "Could Not Load Messages"
+msgstr "Impossibile caricare i messaggi"
+
+msgid "Updating…"
+msgstr "Aggiornamento…"
+
+msgid "Select a Message"
+msgstr "Seleziona un messaggio"
+
+msgid "Choose a message from the list to read it."
+msgstr "Scegli un messaggio dall'elenco per leggerlo."
+
+msgid "%u conversation selected"
+msgid_plural "%u conversations selected"
+msgstr[0] "%u conversazione selezionata"
+msgstr[1] "%u conversazioni selezionate"
+
+msgid "Archive, move, delete, or mark as read or unread."
+msgstr "Archivia, sposta, elimina o segna come lette o non lette."
+
+msgid "To"
+msgstr "A"
+
+msgid "Date"
+msgstr "Data"
+
+msgid "Attachments"
+msgstr "Allegati"
+
+msgid "To:"
+msgstr "A:"
+
+msgid "Address book"
+msgstr "Rubrica"
+
+msgid "Address Book"
+msgstr "Rubrica"
+
+msgid "Search contacts"
+msgstr "Cerca contatti"
+
+msgid "No Contacts"
+msgstr "Nessun contatto"
+
+msgid "No Matching Contacts"
+msgstr "Nessun contatto corrispondente"
+
+msgid "Try a different name or email address."
+msgstr "Prova un nome o un indirizzo email diverso."
+
+msgid "Contacts from Online Accounts and recent recipients will appear here."
+msgstr "Qui compariranno i contatti degli account online e i destinatari recenti."
+
+msgid "Type a name or email to search the address book."
+msgstr "Digita un nome o un’email per cercare in rubrica."
+
+msgid "Recent recipient"
+msgstr "Destinatario recente"
+
+msgid "Cc:"
+msgstr "Cc:"
+
+msgid "+ %u"
+msgstr "+ %u"
+
+msgid "%u more recipient"
+msgid_plural "%u more recipients"
+msgstr[0] "%u altro destinatario"
+msgstr[1] "%u altri destinatari"
+
+msgid "Show less"
+msgstr "Mostra meno"
+
+msgid "Show fewer recipients"
+msgstr "Mostra meno destinatari"
+
+msgid "Could Not Open Message"
+msgstr "Impossibile aprire il messaggio"
+
+msgid "Message could not be opened."
+msgstr "Il messaggio non può essere aperto."
+
+msgid "This message is still syncing with the server. Try again in a moment."
+msgstr "Questo messaggio è ancora in sincronizzazione con il server. Riprova tra un momento."
+
+msgid "This message has no readable content."
+msgstr "Questo messaggio non ha contenuto leggibile."
+
+msgid "Reading"
+msgstr "Lettura"
+
+msgid "Reading pane"
+msgstr "Riquadro di lettura"
+
+msgid "Beside the list, below it, or hidden."
+msgstr "A fianco dell'elenco, sotto, oppure nascosto."
+
+msgid "On the right"
+msgstr "A destra"
+
+msgid "Below the list"
+msgstr "Sotto l'elenco"
+
+msgid "Hidden"
+msgstr "Nascosto"
+
+msgid "Mark as read"
+msgstr "Segna come letta"
+
+msgid "When an open message is marked as read."
+msgstr "Quando un messaggio aperto viene segnato come letto."
+
+msgid "On selection"
+msgstr "Alla selezione"
+
+msgid "After 5 seconds"
+msgstr "Dopo 5 secondi"
+
+msgid "Never"
+msgstr "Mai"
+
+msgid "New Message"
+msgstr "Nuovo messaggio"
+
+msgid "Compose a new message"
+msgstr "Componi un nuovo messaggio"
+
+msgid "New"
+msgstr "Nuova"
+
+msgid "Reply All"
+msgstr "Rispondi a tutti"
+
+msgid "Show unread only"
+msgstr "Solo non lette"
+
+msgid "Showing unread messages"
+msgstr "Solo messaggi non letti"
+
+msgid "Group by conversation"
+msgstr "Raggruppa in conversazioni"
+
+msgid "Showing conversations"
+msgstr "Vista conversazioni"
+
+msgid "Conversations"
+msgstr "Conversazioni"
+
+msgid "Notifications"
+msgstr "Notifiche"
+
+msgid "Desktop alerts for new mail."
+msgstr "Avvisi desktop per la posta nuova."
+
+msgid "Notification sound"
+msgstr "Suono di notifica"
+
+msgid "Default"
+msgstr "Predefinito"
+
+msgid "Message"
+msgstr "Messaggio"
+
+msgid "Complete"
+msgstr "Completato"
+
+msgid "Bell"
+msgstr "Campanello"
+
+msgid "Custom file…"
+msgstr "File personalizzato…"
+
+msgid "Silent"
+msgstr "Nessuno"
+
+msgid "Play the selected sound"
+msgstr "Riproduci il suono selezionato"
+
+msgid "Played with new-mail alerts."
+msgstr "Riprodotto con gli avvisi di posta nuova."
+
+msgid "No notification sound."
+msgstr "Nessun suono di notifica."
+
+msgid "Choose a sound"
+msgstr "Scegli un suono"
+
+msgid "Audio files"
+msgstr "File audio"
+
+msgid "All files"
+msgstr "Tutti i file"
+
+msgid "Messages in this conversation"
+msgstr "Messaggi in questa conversazione"
+
+msgid "From me"
+msgstr "Da me"
+
+msgid "Received"
+msgstr "Ricevuta"
+
+msgid "Sent"
+msgstr "Inviata"
+
+msgid "Forwarded"
+msgstr "Inoltrata"
+
+msgid "Group related messages into threads."
+msgstr "Raggruppa i messaggi correlati in conversazioni."
+
+msgid "%s, %s +%u"
+msgstr "%s, %s +%u"
+
+msgid "Search"
+msgstr "Cerca"
+
+msgid "Search this folder"
+msgstr "Cerca in questa cartella"
+
+msgid "Search all folders"
+msgstr "Cerca in tutte le cartelle"
+
+msgid "Search all folders. Filter with from: and to:"
+msgstr "Cerca in tutte le cartelle. Filtra con from: e to: (da: e a:)"
+
+msgid "Search all folders. Filter with contains:, from: and to:"
+msgstr "Cerca in tutte le cartelle. Filtra con contains:, from: e to: (contiene:, da: e a:)"
+
+msgid "From: %s"
+msgstr "Da: %s"
+
+msgid "To: %s"
+msgstr "A: %s"
+
+msgid "Contains: %s"
+msgstr "Contiene: %s"
+
+msgid "Search sender"
+msgstr "Cerca mittente"
+
+msgid "Search recipients"
+msgstr "Cerca destinatari"
+
+msgid "Search everywhere"
+msgstr "Cerca ovunque"
+
+msgid "Clear search"
+msgstr "Cancella ricerca"
+
+msgid "Remove"
+msgstr "Rimuovi"
+
+msgid "Search Results"
+msgstr "Risultati della ricerca"
+
+msgid "Close Search"
+msgstr "Chiudi ricerca"
+
+msgid "Searching"
+msgstr "Ricerca in corso"
+
+msgid "Looking in every folder…"
+msgstr "Controllo di tutte le cartelle…"
+
+msgid "Searching all folders…"
+msgstr "Ricerca in tutte le cartelle…"
+
+msgid "No Matches"
+msgstr "Nessun risultato"
+
+msgid "No messages in this folder match the search."
+msgstr "Nessun messaggio in questa cartella corrisponde alla ricerca."
+
+msgid "No messages in any folder match the search."
+msgstr "Nessun messaggio corrisponde alla ricerca."
+
+msgid "%d match"
+msgid_plural "%d matches"
+msgstr[0] "%d risultato"
+msgstr[1] "%d risultati"
+
+msgid "No Unread Messages"
+msgstr "Nessun messaggio non letto"
+
+msgid "Turn off the unread filter to see the rest of this folder."
+msgstr "Disattiva il filtro non lette per vedere il resto della cartella."
+
+msgid "_New Message"
+msgstr "_Nuovo messaggio"
+
+msgid "_Refresh"
+msgstr "A_ggiorna"
+
+msgid "_Print"
+msgstr "_Stampa"
+
+msgid "_Fullscreen"
+msgstr "_Schermo intero"
+
+msgid "Fullscreen"
+msgstr "Schermo intero"
+
+msgid "Zoom In"
+msgstr "Ingrandisci"
+
+msgid "Zoom Out"
+msgstr "Riduci"
+
+msgid "Reset Zoom"
+msgstr "Ripristina zoom"
+
+msgid "Follow the system appearance"
+msgstr "Segui l’aspetto del sistema"
+
+msgid "Light appearance"
+msgstr "Aspetto chiaro"
+
+msgid "Dark appearance"
+msgstr "Aspetto scuro"
+
+msgid "Send"
+msgstr "Invia"
+
+msgid "Cancel"
+msgstr "Annulla"
+
+msgid "From"
+msgstr "Da"
+
+msgid "Cc"
+msgstr "Cc"
+
+msgid "Bcc"
+msgstr "Ccn"
+
+msgid "Subject"
+msgstr "Oggetto"
+
+msgid "Attachment"
+msgstr "Allegato"
+
+msgid "Save “%s”"
+msgstr "Salva «%s»"
+
+msgid "Remove “%s”"
+msgstr "Rimuovi «%s»"
+
+msgid "Preview “%s”"
+msgstr "Anteprima di «%s»"
+
+msgid "Preview or save “%s”"
+msgstr "Anteprima o salvataggio di «%s»"
+
+msgid "Preview"
+msgstr "Anteprima"
+
+msgid "Save"
+msgstr "Salva"
+
+msgid "Edit"
+msgstr "Modifica"
+
+msgid "The attachment “%s” is empty."
+msgstr "L'allegato «%s» è vuoto."
+
+msgid "Forwarded message"
+msgstr "Messaggio inoltrato"
+
+msgid "Attach file"
+msgstr "Allega file"
+
+msgid "Attach Files"
+msgstr "Allega file"
+
+msgid "Show Bcc"
+msgstr "Mostra Ccn"
+
+msgid "Font"
+msgstr "Carattere"
+
+msgid "Font size"
+msgstr "Dimensione"
+
+msgid "Sans Serif"
+msgstr "Sans serif"
+
+msgid "Serif"
+msgstr "Serif"
+
+msgid "Monospace"
+msgstr "Monospace"
+
+msgid "Small"
+msgstr "Piccolo"
+
+msgid "Normal"
+msgstr "Normale"
+
+msgid "Large"
+msgstr "Grande"
+
+msgid "Huge"
+msgstr "Grandissimo"
+
+msgid "Bold"
+msgstr "Grassetto"
+
+msgid "Italic"
+msgstr "Corsivo"
+
+msgid "Underline"
+msgstr "Sottolineato"
+
+msgid "Strikethrough"
+msgstr "Barrato"
+
+msgid "Insert Emoji"
+msgstr "Inserisci emoji"
+
+msgid "Paste as Plain Text"
+msgstr "Incolla come testo semplice"
+
+msgid "Add to Dictionary"
+msgstr "Aggiungi al dizionario"
+
+msgid "View Image"
+msgstr "Visualizza immagine"
+
+msgid "The image could not be opened."
+msgstr "Impossibile aprire l’immagine."
+
+msgid "Ignore Spelling"
+msgstr "Ignora ortografia"
+
+msgid "Text Color"
+msgstr "Colore del testo"
+
+msgid "Highlight"
+msgstr "Evidenziazione"
+
+msgid "Default Color"
+msgstr "Colore predefinito"
+
+msgid "No Highlight"
+msgstr "Nessuna evidenziazione"
+
+msgid "Custom Color…"
+msgstr "Colore personalizzato…"
+
+msgid "Bullet list (Tab indents, Shift+Tab outdents)"
+msgstr "Elenco puntato (Tab rientra, Maiusc+Tab riduce il rientro)"
+
+msgid "Numbered list (Tab indents, Shift+Tab outdents)"
+msgstr "Elenco numerato (Tab rientra, Maiusc+Tab riduce il rientro)"
+
+msgid "Decrease Indent"
+msgstr "Riduci rientro"
+
+msgid "Increase Indent"
+msgstr "Aumenta rientro"
+
+msgid "Black"
+msgstr "Nero"
+
+msgid "Gray"
+msgstr "Grigio"
+
+msgid "Red"
+msgstr "Rosso"
+
+msgid "Orange"
+msgstr "Arancione"
+
+msgid "Gold"
+msgstr "Oro"
+
+msgid "Green"
+msgstr "Verde"
+
+msgid "Blue"
+msgstr "Blu"
+
+msgid "Purple"
+msgstr "Viola"
+
+msgid "White"
+msgstr "Bianco"
+
+msgid "Yellow"
+msgstr "Giallo"
+
+msgid "Pink"
+msgstr "Rosa"
+
+msgid "Signature"
+msgstr "Firma"
+
+msgid "Signatures"
+msgstr "Firme"
+
+msgid "Add Signature"
+msgstr "Aggiungi firma"
+
+msgid "New Signature"
+msgstr "Nuova firma"
+
+msgid "Edit Signature"
+msgstr "Modifica firma"
+
+msgid "No signatures yet"
+msgstr "Ancora nessuna firma"
+
+msgid "Add a signature to use it when writing messages from this account."
+msgstr "Aggiungi una firma da usare quando scrivi messaggi da questo account."
+
+msgid "Each account has its own signatures. Star the one that should be added to new messages. You can still pick another signature while writing."
+msgstr "Ogni account ha le proprie firme. La stellina indica quella usata nei nuovi messaggi. In scrittura puoi comunque sceglierne un’altra."
+
+msgid "Default for new messages. Click to stop using it automatically."
+msgstr "Predefinita per i nuovi messaggi. Clicca per non usarla più automaticamente."
+
+msgid "Use as the default for new messages from this account"
+msgstr "Usa come predefinita per i nuovi messaggi di questo account"
+
+msgid "The signature is added after two blank lines and a -- mark, before any quoted reply."
+msgstr "La firma viene aggiunta dopo due righe vuote e il segno --, prima di un’eventuale citazione."
+
+msgid "Delete “%s”?"
+msgstr "Eliminare «%s»?"
+
+msgid "This signature will no longer be available when writing messages from this account."
+msgstr "Questa firma non sarà più disponibile quando scrivi messaggi da questo account."
+
+msgid "Insert Image"
+msgstr "Inserisci immagine"
+
+msgid "Remove Link"
+msgstr "Elimina collegamento"
+
+msgid "Images"
+msgstr "Immagini"
+
+msgid "Open this account in GNOME Settings"
+msgstr "Apri questo account in Impostazioni"
+
+msgid "None"
+msgstr "Nessuna"
+
+msgid "New signature…"
+msgstr "Nuova firma…"
+
+msgid "This text is added at the end of messages you send."
+msgstr "Questo testo viene aggiunto in fondo ai messaggi che invii."
+
+msgid "Name"
+msgstr "Nome"
+
+msgid "Could not attach “%s”."
+msgstr "Impossibile allegare «%s»."
+
+msgid "Folders cannot be attached."
+msgstr "Non è possibile allegare le cartelle."
+
+msgid "“%s” is too large to attach. Use a file transfer service and send the link instead."
+msgstr "«%s» è troppo grande e non può essere allegato. Usa un servizio di trasferimento file e invia il collegamento."
+
+msgid "%u files are too large to attach. Use a file transfer service and send the links instead."
+msgstr "%u file sono troppo grandi e non possono essere allegati. Usa un servizio di trasferimento file e invia i collegamenti."
+
+msgid "Attach or insert this image?"
+msgstr "Allegare o inserire questa immagine?"
+
+msgid "“%s” can be attached to the message or placed in the body."
+msgstr "«%s» può essere allegata al messaggio o inserita nel corpo."
+
+msgid "Attach"
+msgstr "Allega"
+
+msgid "Don't Attach"
+msgstr "Non allegare"
+
+msgid "Include original attachments?"
+msgstr "Includere gli allegati originali?"
+
+msgid "You added someone who did not receive the original message. Attach the file from that message?"
+msgstr "Hai aggiunto qualcuno che non ha ricevuto il messaggio originale. Vuoi allegare il file di quel messaggio?"
+
+msgid "You added someone who did not receive the original message. Attach the files from that message?"
+msgstr "Hai aggiunto qualcuno che non ha ricevuto il messaggio originale. Vuoi allegare i file di quel messaggio?"
+
+msgid "Insert"
+msgstr "Inserisci"
+
+msgid "Could not insert “%s”."
+msgstr "Impossibile inserire «%s»."
+
+msgid "The image was resized to stay under 2 MB."
+msgstr "L'immagine è stata ridimensionata per restare sotto i 2 MB."
+
+msgid "Medium"
+msgstr "Medio"
+
+msgid "Original"
+msgstr "Originale"
+
+msgid "Image Size"
+msgstr "Dimensione immagine"
+
+msgid "Save Attachment"
+msgstr "Salva allegato"
+
+msgid "Save Attachments"
+msgstr "Salva allegati"
+
+msgid "Download All"
+msgstr "Scarica tutti"
+
+msgid "Save all attachments"
+msgstr "Salva tutti gli allegati"
+
+msgid "This account has no sending identity."
+msgstr "Questo account non ha un'identità di invio."
+
+msgid "Add at least one recipient."
+msgstr "Aggiungi almeno un destinatario."
+
+msgid "No outgoing server is configured for “%s”."
+msgstr "Nessun server in uscita è configurato per «%s»."
+
+msgid "Evolution Data Server is unavailable."
+msgstr "Evolution Data Server non è disponibile."
+
+msgid "New message"
+msgstr "Nuovo messaggio"
+
+msgid "Refresh"
+msgstr "Aggiorna"
+
+msgid "Remote images are blocked until you trust this sender."
+msgstr "Le immagini remote sono bloccate finché non consideri attendibile il mittente."
+
+msgid "Trust Sender"
+msgstr "Mittente attendibile"
+
+msgid "Save this message as a draft?"
+msgstr "Salvare questo messaggio come bozza?"
+
+msgid "It will be stored in Drafts so you can finish it later."
+msgstr "Verrà salvato in Bozze per poterlo completare più tardi."
+
+msgid "Discard"
+msgstr "Scarta"
+
+msgid "Keep Editing"
+msgstr "Continua a modificare"
+
+msgid "Save Draft"
+msgstr "Salva bozza"
+
+msgid "Saved to Drafts"
+msgstr "Salvata in Bozze"
+
+msgid "No account is configured to send mail."
+msgstr "Nessun account è configurato per inviare posta."
+
+msgid "This built-in local account is not used. Choose an online account."
+msgstr "Questo account locale non viene usato. Scegli un account online."
+
+msgid "No Drafts folder was found for this account."
+msgstr "Nessuna cartella Bozze trovata per questo account."
+
+msgid "No Sent folder was found for this account."
+msgstr "Nessuna cartella Posta inviata trovata per questo account."
+
+msgid "“%s” is not a valid email address."
+msgstr "«%s» non è un indirizzo email valido."
+
+msgid "Check the recipients. At least one address is not valid."
+msgstr "Controlla i destinatari. Almeno un indirizzo non è valido."
+
+msgid "You do not have permission to send this message."
+msgstr "Non hai i permessi per inviare questo messaggio."
+
+msgid "The mailbox is full. The message could not be sent."
+msgstr "La casella è piena. Il messaggio non è stato inviato."
+
+msgid "The server took too long to respond. Try again."
+msgstr "Il server ha impiegato troppo tempo a rispondere. Riprova."
+
+msgid "Could not reach the mail server. Check your connection."
+msgstr "Impossibile raggiungere il server di posta. Controlla la connessione."
+
+msgid "The message was not sent."
+msgstr "Il messaggio non è stato inviato."
+
+msgid "The message could not be sent."
+msgstr "Il messaggio non può essere inviato."
+
+msgid "The message was saved to Drafts."
+msgstr "Il messaggio è stato salvato in Bozze."
+
+msgid "recipient"
+msgstr "destinatario"
+
+msgid "Reply"
+msgstr "Rispondi"
+
+msgid "Forward"
+msgstr "Inoltra"
+
+msgid "Send Again"
+msgstr "Invia di nuovo"
+
+msgid "Move"
+msgstr "Sposta"
+
+msgid "Open"
+msgstr "Apri"
+
+msgid "Archive"
+msgstr "Archivia"
+
+msgctxt "Mail folder"
+msgid "Archive"
+msgstr "Archivio"
+
+msgid "Inbox"
+msgstr "Posta in arrivo"
+
+msgid "All Mail"
+msgstr "Tutti i messaggi"
+
+msgid "Starred"
+msgstr "Speciali"
+
+msgid "Important"
+msgstr "Importanti"
+
+msgid "Mark as Important"
+msgstr "Segna come importante"
+
+msgid "Not Important"
+msgstr "Non importante"
+
+msgid "No Important folder was found for this account."
+msgstr "Nessuna cartella Importanti è stata trovata per questo account."
+
+msgid "Delete"
+msgstr "Elimina"
+
+msgid "Mark as Unread"
+msgstr "Segna come non letta"
+
+msgid "Mark as Read"
+msgstr "Segna come letta"
+
+msgid "Bookmark"
+msgstr "Aggiungi segnalibro"
+
+msgid "Bookmarked"
+msgstr "Con segnalibro"
+
+msgid "Remove Bookmark"
+msgstr "Rimuovi segnalibro"
+
+msgid "Bookmarks"
+msgstr "Segnalibri"
+
+msgid "No Bookmarks"
+msgstr "Nessun segnalibro"
+
+msgid "Bookmark a message to collect it here. Bookmarks sync with the flag used by Outlook, Gmail, and IMAP."
+msgstr "Aggiungi un segnalibro a un messaggio per raccoglierlo qui. I segnalibri corrispondono al contrassegno di Outlook, Gmail e IMAP."
+
+msgid "No Unread Bookmarks"
+msgstr "Nessun segnalibro non letto"
+
+msgid "Remove All Bookmarks"
+msgstr "Rimuovi tutti i segnalibri"
+
+msgid "Remove all bookmarks?"
+msgstr "Rimuovere tutti i segnalibri?"
+
+msgid "Every bookmarked message in this account will lose its bookmark. The messages themselves will not be deleted."
+msgstr "Tutti i messaggi con segnalibro di questo account perderanno il contrassegno. I messaggi non verranno eliminati."
+
+msgid "Mark All as Read"
+msgstr "Segna tutte come lette"
+
+msgid "Mark All as Unread"
+msgstr "Segna tutte come non lette"
+
+msgid "New Subfolder…"
+msgstr "Nuova sottocartella…"
+
+msgid "Rename…"
+msgstr "Rinomina…"
+
+msgid "Rename Folder"
+msgstr "Rinomina cartella"
+
+msgid "Choose a new name for “%s”."
+msgstr "Scegli un nuovo nome per «%s»."
+
+msgid "Rename"
+msgstr "Rinomina"
+
+msgid "A folder named “%s” already exists."
+msgstr "Esiste già una cartella chiamata «%s»."
+
+msgid "Expand"
+msgstr "Espandi"
+
+msgid "Collapse"
+msgstr "Comprimi"
+
+msgid "New Subfolder"
+msgstr "Nuova sottocartella"
+
+msgid "The folder will be created under “%s”."
+msgstr "La cartella verrà creata in «%s»."
+
+msgid "Create"
+msgstr "Crea"
+
+msgid "Enter a folder name."
+msgstr "Inserisci un nome per la cartella."
+
+msgid "Folder names cannot contain slashes."
+msgstr "I nomi delle cartelle non possono contenere barre."
+
+msgid "Move to Trash"
+msgstr "Sposta nel cestino"
+
+msgid "Move “%s” to Trash?"
+msgstr "Spostare «%s» nel cestino?"
+
+msgid "The folder will be moved to Trash. You can restore it from there."
+msgstr "La cartella verrà spostata nel cestino. Potrai ripristinarla da lì."
+
+msgid "The folder and its subfolders will be moved to Trash. You can restore them from there."
+msgstr "La cartella e le sue sottocartelle verranno spostate nel cestino. Potrai ripristinarle da lì."
+
+msgid "Restore"
+msgstr "Ripristina"
+
+msgid "Empty"
+msgstr "Svuota"
+
+msgid "Empty “%s”?"
+msgstr "Svuotare «%s»?"
+
+msgid "All messages in this folder will be permanently deleted. This cannot be undone."
+msgstr "Tutti i messaggi in questa cartella verranno eliminati in modo permanente. Questa azione non può essere annullata."
+
+msgid "Delete Permanently"
+msgstr "Elimina definitivamente"
+
+msgid "Delete “%s” permanently?"
+msgstr "Eliminare definitivamente «%s»?"
+
+msgid "This cannot be undone."
+msgstr "Questa azione non può essere annullata."
+
+msgid "Mark as Spam"
+msgstr "Segna come spam"
+
+msgid "Not Spam"
+msgstr "Non è spam"
+
+msgid "Print"
+msgstr "Stampa"
+
+msgid "No Junk folder was found for this account."
+msgstr "Nessuna cartella Posta indesiderata è stata trovata per questo account."
+
+msgid "No Inbox folder was found for this account."
+msgstr "Nessuna cartella Posta in arrivo è stata trovata per questo account."
+
+msgid "Mark as unread"
+msgstr "Segna come non letta"
+
+msgid "Reading “%s”…"
+msgstr "Lettura di «%s»…"
+
+msgid "Reading mailbox…"
+msgstr "Lettura della casella…"
+
+msgid "Updating “%s”…"
+msgstr "Aggiornamento di «%s»…"
+
+msgid "Updating mailbox…"
+msgstr "Aggiornamento della casella…"
+
+msgid "Checking folders…"
+msgstr "Controllo delle cartelle…"
+
+msgid "Syncing mailbox…"
+msgstr "Sincronizzazione della casella…"
+
+msgid "Downloading messages in “%s”…"
+msgstr "Download dei messaggi in «%s»…"
+
+msgid "Move to Folder"
+msgstr "Sposta nella cartella"
+
+msgid "Choose where to move this message."
+msgstr "Scegli dove spostare questo messaggio."
+
+msgid "Choose where to move the selected messages."
+msgstr "Scegli dove spostare i messaggi selezionati."
+
+msgid "%u more new message"
+msgid_plural "%u more new messages"
+msgstr[0] "%u altro nuovo messaggio"
+msgstr[1] "%u altri nuovi messaggi"
+
+msgid "No Archive folder was found for this account."
+msgstr "Nessuna cartella Archivio trovata per questo account."
+
+msgid "On %s, %s wrote"
+msgstr "Il %s, %s ha scritto"
+
+msgid "Updating folders…"
+msgstr "Aggiornamento cartelle…"
+
+msgid "Downloading recent messages…"
+msgstr "Download dei messaggi recenti…"
+
+msgid "Updating headers for “%s”…"
+msgstr "Aggiornamento intestazioni di «%s»…"
+
+msgid "Checking “%s”…"
+msgstr "Verifica di «%s»…"
+
+msgid "Checking for new mail…"
+msgstr "Controllo della posta nuova…"
+
+msgid "Headers stay local for every folder. Bodies and attachments are kept only for the period you choose. The first sync can take a while; after that, folders stay up to date."
+msgstr "Le intestazioni restano in locale per ogni cartella. Corpi e allegati solo per il periodo scelto. La prima sincronizzazione può richiedere tempo; poi le cartelle restano aggiornate."
+
+msgid "Synchronization"
+msgstr "Sincronizzazione"
+
+msgid "Letter keeps a local copy of headers and of recent messages, then checks the server in the background."
+msgstr "Lettera tiene una copia locale delle intestazioni e dei messaggi recenti, poi controlla il server in background."
+
+msgid "Check for new mail"
+msgstr "Controlla la posta nuova"
+
+msgid "How often to refresh mail while Letter is open."
+msgstr "Ogni quanto aggiornare la posta mentre Lettera è aperta."
+
+msgid "Every 30 seconds"
+msgstr "Ogni 30 secondi"
+
+msgid "Every minute"
+msgstr "Ogni minuto"
+
+msgid "Every 2 minutes"
+msgstr "Ogni 2 minuti"
+
+msgid "Every 5 minutes"
+msgstr "Ogni 5 minuti"
+
+msgid "Every 15 minutes"
+msgstr "Ogni 15 minuti"
+
+msgid "Every 30 minutes"
+msgstr "Ogni 30 minuti"
+
+msgid "Manually (F5)"
+msgstr "Manualmente (F5)"
+
+msgid "Very frequent checks may hit server rate limits."
+msgstr "Controlli troppo frequenti possono urtare i limiti del server."
+
+msgid "Download message bodies"
+msgstr "Scarica il corpo dei messaggi"
+
+msgid "Keep full messages for this period. Older bodies are removed at startup; headers stay for search."
+msgstr "Conserva i messaggi completi per questo periodo. I corpi più vecchi si rimuovono all’avvio; le intestazioni restano per la ricerca."
+
+msgid "Last 2 months"
+msgstr "Ultimi 2 mesi"
+
+msgid "Last 6 months"
+msgstr "Ultimi 6 mesi"
+
+msgid "Last year"
+msgstr "Ultimo anno"
+
+msgid "Download all"
+msgstr "Scarica tutto"
+
+msgid "Downloading everything can take time and fill the disk."
+msgstr "Scaricare tutto può richiedere tempo e riempire il disco."
+
+msgid "Local library"
+msgstr "Libreria locale"
+
+msgid "Letter stores headers and recent bodies itself. At startup it trims bodies outside your download window. Clearing an account removes only that local copy; mail stays on the server."
+msgstr "Lettera conserva intestazioni e corpi recenti. All’avvio elimina i corpi fuori dalla finestra di scaricamento. Svuotare un account cancella solo la copia locale; la posta resta sul server."
+
+msgid "Disk used"
+msgstr "Spazio su disco"
+
+msgid "Reset"
+msgstr "Ripristina"
+
+msgid "Delete Letter’s local copy and rebuild it from the server"
+msgstr "Elimina la copia locale di Lettera e ricostruiscila dal server"
+
+msgid "Reset “%s”?"
+msgstr "Ripristinare «%s»?"
+
+msgid "This deletes Letter’s local library for this account (%s). Messages stay on the server. The next sync rebuilds headers and recent bodies from scratch. Use this if the account is damaged or stuck."
+msgstr "Elimina la libreria locale di Lettera per questo account (%s). I messaggi restano sul server. La sincronizzazione successiva ricostruisce da zero intestazioni e corpi recenti. Usalo se l’account è danneggiato o bloccato."
+
+msgid "Reset Local Library"
+msgstr "Ripristina la libreria locale"
+
+msgid "Open a Letter window first, then try again."
+msgstr "Apri prima una finestra di Lettera, poi riprova."
+
+msgid "Local library cleared. Letter is rebuilding “%s”."
+msgstr "Libreria locale svuotata. Lettera sta ricostruendo «%s»."
+
+msgid "This account has no local mail library."
+msgstr "Questo account non ha una libreria di posta locale."
+
+msgid "Refusing to delete files outside Letter’s library."
+msgstr "Rifiuto di eliminare file fuori dalla libreria di Lettera."
+
+msgid "Meeting Invitation"
+msgstr "Invito a una riunione"
+
+msgid "Meeting Response"
+msgstr "Risposta alla riunione"
+
+msgid "Meeting Cancelled"
+msgstr "Riunione annullata"
+
+msgid "Meeting"
+msgstr "Riunione"
+
+msgid "This event is waiting for your reply."
+msgstr "Questo evento è in attesa di una risposta."
+
+msgid "Accept"
+msgstr "Accetta"
+
+msgid "Tentative"
+msgstr "Provvisorio"
+
+msgid "Decline"
+msgstr "Rifiuta"
+
+msgid "Accepted. The organizer will be notified."
+msgstr "Accettato. L’organizzatore verrà avvisato."
+
+msgid "Marked as tentative. The organizer will be notified."
+msgstr "Segnato come provvisorio. L’organizzatore verrà avvisato."
+
+msgid "Declined. The organizer will be notified."
+msgstr "Rifiutato. L’organizzatore verrà avvisato."
+
+msgid "This meeting was accepted."
+msgstr "Questa riunione è stata accettata."
+
+msgid "This meeting was marked as tentative."
+msgstr "Questa riunione è stata segnata come provvisoria."
+
+msgid "This meeting was declined."
+msgstr "Questa riunione è stata rifiutata."
+
+msgid "This meeting was cancelled."
+msgstr "Questa riunione è stata annullata."
+
+msgid "This is a meeting response."
+msgstr "Questo messaggio è una risposta a una riunione."
+
+msgid "This message is a meeting invitation."
+msgstr "Questo messaggio è un invito a una riunione."
+
+msgid "This invitation could not be read."
+msgstr "Impossibile leggere questo invito."
+
+msgid "No calendar is available for this account."
+msgstr "Nessun calendario è disponibile per questo account."
+
+msgid "Could not open the calendar."
+msgstr "Impossibile aprire il calendario."
+

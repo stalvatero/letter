@@ -1,0 +1,21 @@
+[Desktop Entry]
+# Translators: the application name shown in the app grid, window title and tooltips
+Name=@app_name@
+Comment=Read and send mail
+Exec=@bindir@/letter
+# Translators: Do not translate
+Icon=@icon@
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Network;Email;
+# Translators: Search terms to find this application. Do not translate or localize the semicolons. The list MUST also end with a semicolon.
+Keywords=email;mail;imap;google;outlook;exchange;
+StartupNotify=true
+DBusActivatable=false
+MimeType=x-scheme-handler/mailto;
+X-GNOME-UsesNotifications=true
+Actions=new-message;
+
+[Desktop Action new-message]
+Name=New Message
+Exec=@bindir@/letter --new-message
