@@ -137,6 +137,19 @@ chmod +x scripts/install.sh # give execute permissions
 
 The script asks for administrator rights (`sudo`) for packages and for `meson install`. After it finishes, open **Letter** from the app grid. Add at least one account in **Settings → Online Accounts**, then start Letter again.
 
+## Update
+
+To update this build, from the same source tree run (example ~/letter):
+
+```sh
+git pull #refresh local tree
+./scripts/install.sh # compile the updates and install as normal app
+```
+
+
+
+## Uninstall
+
 To remove this build, from the same source tree run:
 
 ```sh
@@ -147,10 +160,6 @@ chmod +x scripts/uninstall.sh
 That uninstalls Letter from `/usr/local` and deletes the source tree (including a clone left under `~/.cache/letter/src` when the install script downloaded it). Add `--purge-data` if you also want to delete the local mail cache under `~/.local/share/letter` and `~/.cache/letter`. Online Accounts stay in GNOME Settings.
 
 Flatpak and native packages will come later.
-
-## Contributing
-
-Letter is a personal project. I welcome **bug reports, feature requests, and feedback** through [GitHub Issues](https://github.com/stalvatero/letter/issues). I do not accept pull requests at this time — I prefer to keep the codebase under my direct control while the project is young.
 
 ## Build from source
 
@@ -166,6 +175,10 @@ sudo meson install -C _build
 
 The Meson `development` profile is only for local work (`meson devenv`). It uses a different application ID and the libadwaita development stripe.
 
+## Contributing
+
+Letter is a personal project. I welcome **bug reports, feature requests, and feedback** through [GitHub Issues](https://github.com/stalvatero/letter/issues). I do not accept pull requests at this time — I prefer to keep the codebase under my direct control while the project is young.
+
 ## Where it runs
 
 Letter is a GNOME application. I design it, test it, and use it every day on my Arch Linux and **GNOME 50**. That is the supported environment for this beta.
@@ -175,6 +188,19 @@ It needs a recent GNOME platform, not “any desktop that happens to have GTK”
 **KDE Plasma, Hyprland, and other desktops** are the same story: the window might compile if you install the GNOME libraries it links against, plus Online Accounts and Evolution Data Server, and if those services actually run. I do not use those desktops, I do not provide a how-to, and I will not treat breakage there as a Letter bug. You are free to try. If you get it running, enjoy it — you are on your own.
 
 Without GNOME Online Accounts there is nothing to show. That is by design, on any desktop.
+
+## Tested on
+
+- Arch Linux
+- Fedora Workstation 44
+- Ubuntu 26.04.1 LTS
+- openSUSE Tumbleweed
+
+## Support
+
+If Letter is useful to you and you would like to support its development, you can contribute via [GitHub Sponsors](https://github.com/sponsors/stalvatero) or [PayPal](https://paypal.me/soscurato). Thank you.
+
+Se Letter ti è utile e vuoi sostenerne lo sviluppo, puoi contribuire con [GitHub Sponsors](https://github.com/sponsors/stalvatero) o [PayPal](https://paypal.me/soscurato). Grazie.
 
 ## License
 
