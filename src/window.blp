@@ -282,7 +282,7 @@ template $MailWindow: Adw.ApplicationWindow {
             [start]
             $MailSearchField message_search {
               placeholder-text: _("Search");
-              width-request: 160;
+              width-request: 220;
               hexpand: true;
               valign: fill;
             }
@@ -359,7 +359,7 @@ template $MailWindow: Adw.ApplicationWindow {
     setters {
       folder_split.collapsed: true;
       compose_label.visible: false;
-      message_search.width-request: 120;
+      message_search.width-request: 180;
     }
   }
 }

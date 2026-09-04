@@ -81,7 +81,6 @@ public class Mail.Window : Adw.ApplicationWindow {
     private Gtk.Box list_pane;
     private Adw.Bin list_body;
     private Gtk.Revealer search_banner;
-    private MessageActionBar list_action_bar;
     private MailSession? mail_session;
     private Account? selected_account;
     private bool selecting_account;
@@ -386,8 +385,6 @@ public class Mail.Window : Adw.ApplicationWindow {
             vexpand = true,
             child = this.message_list,
         };
-        this.list_action_bar = new MessageActionBar ();
-        this.list_action_bar.add_css_class ("list-action-bar");
         var search_bar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
             hexpand = true,
         };
@@ -415,7 +412,6 @@ public class Mail.Window : Adw.ApplicationWindow {
             child = this.message_scrolled,
         };
         this.list_pane = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
-        this.list_pane.append (this.list_action_bar);
         this.list_pane.append (this.search_banner);
         this.list_pane.append (this.list_body);
 
@@ -3496,7 +3492,6 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.reader_page.title = _("Select a Message");
         this.reader_page.description = _("Choose a message from the list to read it.");
         this.reader_bin.child = this.reader_page;
-        this.list_action_bar?.set_bulk (false);
         if (this.thread_action_bar != null)
             this.thread_action_bar.visible = false;
     }
@@ -5152,10 +5147,6 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.message_reader?.set_seen (false, false);
             this.message_reader?.set_outgoing (false);
             this.message_reader?.set_important (false, false);
-            this.list_action_bar?.set_bookmarked (false);
-            this.list_action_bar?.set_seen (false, false);
-            this.list_action_bar?.set_outgoing (false);
-            this.list_action_bar?.set_important (false, false);
             return;
         }
 
@@ -5197,7 +5188,6 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.thread_action_bar.visible = thread_n > 1 && this.thread_revealer.reveal_child;
 
         var n = selected_count ();
-        this.list_action_bar?.set_bulk (n > 1 && thread_n <= 1);
         if (n > 1 && thread_n <= 1) {
             var messages = selected_listed_messages ();
             var has = messages.length > 0;
@@ -5290,10 +5280,6 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.message_reader?.set_outgoing (outgoing);
         this.message_reader?.set_bookmarked (bookmarked);
         this.message_reader?.set_important (important_visible, important);
-        this.list_action_bar?.set_seen (seen, seen_enabled);
-        this.list_action_bar?.set_outgoing (outgoing);
-        this.list_action_bar?.set_bookmarked (bookmarked);
-        this.list_action_bar?.set_important (important_visible, important);
     }
 
     private void set_win_action_enabled (string name, bool enabled) {

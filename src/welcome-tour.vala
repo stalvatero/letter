@@ -109,6 +109,7 @@ public class Mail.WelcomeTour : Object {
 
     private void go_next () {
         if (this.page_index + 1 >= this.carousel.n_pages) {
+            Utils.open_online_accounts ();
             finished ();
             return;
         }

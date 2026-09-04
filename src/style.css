@@ -121,9 +121,8 @@
 }
 
 .message-reader .reader-action-row {
-  padding: 4px 12px;
-  background: color-mix(in srgb, var(--view-fg-color) 6%, var(--view-bg-color));
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 35%, transparent);
+  padding: 2px 12px 4px;
+  background: var(--view-bg-color);
 }
 
 .message-action-bar.list-action-bar {
