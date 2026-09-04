@@ -50,12 +50,5 @@ public class Mail.SetupWindow : Adw.ApplicationWindow {
         };
         view.add_top_bar (new Adw.HeaderBar ());
         this.content = view;
-
-        close_request.connect (() => {
-            var mail_app = application as Application;
-            if (mail_app != null && !mail_app.has_mail_accounts ())
-                mail_app.quit ();
-            return false;
-        });
     }
 }

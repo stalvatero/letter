@@ -174,25 +174,32 @@ public class Mail.Application : Adw.Application {
         if (this.activate_pending)
             return;
         this.activate_pending = true;
+        hold ();
         try {
             if (!this.accounts.loaded)
                 yield this.accounts.load ();
             show_window_for_accounts ();
         } finally {
             this.activate_pending = false;
+            release ();
         }
     }
 
     private void show_window_for_accounts () {
         if (this.accounts.has_mail_accounts ()) {
-            dismiss_setup_window ();
+            /* Present main first so destroying SetupWindow is never the last
+             * window — otherwise Gtk.Application quits immediately. */
             var window = main_window ();
             if (window == null)
                 window = new Window (this);
+            window.visible = true;
             window.present ();
+            dismiss_setup_window ();
             queue_welcome (window);
             return;
         }
+
+        cancel_welcome ();
 
         /* No mail yet: keep the empty three-pane shell closed. */
         var main = main_window ();
@@ -320,9 +327,23 @@ public class Mail.Application : Adw.Application {
             return;
         this.welcome_idle = Idle.add (() => {
             this.welcome_idle = 0;
+            if (!this.accounts.has_mail_accounts ())
+                return Source.REMOVE;
             present_welcome (parent);
             return Source.REMOVE;
         });
+    }
+
+    private void cancel_welcome () {
+        if (this.welcome_idle != 0) {
+            Source.remove (this.welcome_idle);
+            this.welcome_idle = 0;
+        }
+        if (this.welcome != null) {
+            var dialog = this.welcome;
+            this.welcome = null;
+            dialog.force_close ();
+        }
     }
 
     private void present_welcome (Gtk.Window parent) {
