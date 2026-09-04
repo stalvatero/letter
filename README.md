@@ -120,7 +120,9 @@ Tip: Use the **Microsoft 365** (Graph) account type, not classic Exchange Web Se
 
 ## Install
 
-There is no distribution package yet. For this beta, the easiest path is the install script i provided in the repo (scripts/install.sh): it clones the source if needed, installs the build packages for Arch, Fedora, or Debian/Ubuntu, compiles Letter, and installs it to `/usr/local`.
+There is no distribution package yet. For this beta, the easiest path is the install script in the repo (`scripts/install.sh`): it clones the source if needed, installs the build packages for Arch, Fedora, or Debian/Ubuntu, compiles Letter, and installs it to `/usr/local`.
+
+> **Note — this installs from source.** The first run may download compilers and development packages (`-devel` / `-dev` headers and related tools), depending on what your distribution already has. That is normal for any build-from-source path, and it can look heavier than installing a ready-made app. The script checks what is missing and installs only what Letter needs from your distribution’s **official repositories** (via `pacman`, `dnf`, or `apt`). When a Flatpak or distro package is available, that will be the lighter option for everyday users.
 
 For easy installation and testing, use those commands in your terminal:
 
