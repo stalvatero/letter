@@ -11,46 +11,70 @@ public class Mail.AccountStore : Object {
     public signal void changed ();
 
     private bool watching = false;
+    private bool loading = false;
+
+    public bool has_mail_accounts () {
+        for (uint i = 0; i < this.items.get_n_items (); i++) {
+            var account = this.items.get_item (i) as Account;
+            if (account == null || !account.has_mail)
+                continue;
+            if (account.kind == AccountKind.LOCAL)
+                continue;
+            return true;
+        }
+        return false;
+    }
 
     public async void load () {
+        while (this.loading) {
+            Idle.add (load.callback);
+            yield;
+        }
+        if (this.loaded)
+            return;
+
+        this.loading = true;
         this.error_message = null;
 
         try {
-            this.registry = yield new E.SourceRegistry (null);
-        } catch (Error e) {
-            warning ("Could not connect to Evolution Data Server: %s", e.message);
-            this.error_message = e.message;
-        }
-
-        try {
-            this.goa = yield new Goa.Client (null);
-        } catch (Error e) {
-            warning ("Could not connect to GNOME Online Accounts: %s", e.message);
-            if (this.error_message == null)
+            try {
+                this.registry = yield new E.SourceRegistry (null);
+            } catch (Error e) {
+                warning ("Could not connect to Evolution Data Server: %s", e.message);
                 this.error_message = e.message;
-        }
+            }
 
-        rebuild ();
-        this.loaded = true;
-        changed ();
+            try {
+                this.goa = yield new Goa.Client (null);
+            } catch (Error e) {
+                warning ("Could not connect to GNOME Online Accounts: %s", e.message);
+                if (this.error_message == null)
+                    this.error_message = e.message;
+            }
 
-        if (this.watching)
-            return;
+            rebuild ();
+            this.loaded = true;
+            changed ();
 
-        this.watching = true;
+            if (!this.watching) {
+                this.watching = true;
 
-        if (this.registry != null) {
-            this.registry.source_added.connect (() => rebuild_and_notify ());
-            this.registry.source_removed.connect (() => rebuild_and_notify ());
-            this.registry.source_changed.connect (() => rebuild_and_notify ());
-            this.registry.source_enabled.connect (() => rebuild_and_notify ());
-            this.registry.source_disabled.connect (() => rebuild_and_notify ());
-        }
+                if (this.registry != null) {
+                    this.registry.source_added.connect (() => rebuild_and_notify ());
+                    this.registry.source_removed.connect (() => rebuild_and_notify ());
+                    this.registry.source_changed.connect (() => rebuild_and_notify ());
+                    this.registry.source_enabled.connect (() => rebuild_and_notify ());
+                    this.registry.source_disabled.connect (() => rebuild_and_notify ());
+                }
 
-        if (this.goa != null) {
-            this.goa.account_added.connect (() => rebuild_and_notify ());
-            this.goa.account_removed.connect (() => rebuild_and_notify ());
-            this.goa.account_changed.connect (() => rebuild_and_notify ());
+                if (this.goa != null) {
+                    this.goa.account_added.connect (() => rebuild_and_notify ());
+                    this.goa.account_removed.connect (() => rebuild_and_notify ());
+                    this.goa.account_changed.connect (() => rebuild_and_notify ());
+                }
+            }
+        } finally {
+            this.loading = false;
         }
     }
 

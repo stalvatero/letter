@@ -111,6 +111,15 @@ msgstr "Avanti"
 msgid "Get Started"
 msgstr "Inizia"
 
+msgid "Add a mail account"
+msgstr "Aggiungi un account di posta"
+
+msgid "Letter uses the same accounts as Calendar and Contacts. Add Google, Microsoft 365, or IMAP in Settings → Online Accounts, then return here."
+msgstr "Lettera usa gli stessi account di Calendario e Contatti. Aggiungi Google, Microsoft 365 o IMAP in Impostazioni → Account online, poi torna qui."
+
+msgid "Letter stays closed until at least one mail account is available."
+msgstr "Lettera resta chiusa finché non è disponibile almeno un account di posta."
+
 msgid "IMAP"
 msgstr "IMAP"
 

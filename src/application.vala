@@ -8,7 +8,9 @@ public class Mail.Application : Adw.Application {
     private Settings settings;
     private bool quit_in_progress;
     private WelcomeDialog? welcome;
+    private SetupWindow? setup_window;
     private uint welcome_idle;
+    private bool activate_pending;
 
     private const ActionEntry[] ACTION_ENTRIES = {
         { "quit", on_quit },
@@ -64,6 +66,7 @@ public class Mail.Application : Adw.Application {
         normalize_body_cache_days ();
         this.accounts.load.begin ();
         this.accounts.changed.connect (on_accounts_changed);
+        this.accounts.changed.connect (on_accounts_changed_ui);
         Environment.set_application_name (Utils.app_display_name ());
         Gtk.Window.set_default_icon_name (Config.APP_ID);
 
@@ -160,14 +163,58 @@ public class Mail.Application : Adw.Application {
     }
 
     public override void activate () {
-        var window = get_active_window () as Window;
-        if (window == null)
-            window = new Window (this);
+        present_for_accounts.begin ();
+    }
 
-        window.present ();
-        if (!this.accounts.loaded)
-            this.accounts.load.begin ();
-        queue_welcome (window);
+    public bool has_mail_accounts () {
+        return this.accounts.has_mail_accounts ();
+    }
+
+    private async void present_for_accounts () {
+        if (this.activate_pending)
+            return;
+        this.activate_pending = true;
+        try {
+            if (!this.accounts.loaded)
+                yield this.accounts.load ();
+            show_window_for_accounts ();
+        } finally {
+            this.activate_pending = false;
+        }
+    }
+
+    private void show_window_for_accounts () {
+        if (this.accounts.has_mail_accounts ()) {
+            dismiss_setup_window ();
+            var window = main_window ();
+            if (window == null)
+                window = new Window (this);
+            window.present ();
+            queue_welcome (window);
+            return;
+        }
+
+        /* No mail yet: keep the empty three-pane shell closed. */
+        var main = main_window ();
+        if (main != null)
+            main.visible = false;
+
+        if (this.setup_window == null) {
+            this.setup_window = new SetupWindow (this);
+            this.setup_window.close_request.connect (() => {
+                this.setup_window = null;
+                return false;
+            });
+        }
+        this.setup_window.present ();
+    }
+
+    private void dismiss_setup_window () {
+        if (this.setup_window == null)
+            return;
+        var win = this.setup_window;
+        this.setup_window = null;
+        win.destroy ();
     }
 
     public override int command_line (ApplicationCommandLine command_line) {
@@ -207,6 +254,14 @@ public class Mail.Application : Adw.Application {
     private void on_accounts_changed () {
         this.contacts.bind_registry (this.accounts.registry);
         this.calendars.bind_registry (this.accounts.registry);
+    }
+
+    private void on_accounts_changed_ui () {
+        if (!this.accounts.loaded)
+            return;
+        /* User may add mail in Online Accounts while SetupWindow is open. */
+        if (this.setup_window != null || !this.accounts.has_mail_accounts ())
+            show_window_for_accounts ();
     }
 
     public void show_mail_toast (string message) {
@@ -372,11 +427,9 @@ public class Mail.Application : Adw.Application {
         activate ();
         var raw = param != null ? param.get_string () : "";
         var token = this.notifier.resolve (raw);
-        var win = get_active_window () as Window;
-        if (win == null) {
-            win = new Window (this);
-            win.present ();
-        }
+        var win = main_window ();
+        if (win == null)
+            return;
         win.handle_notification (kind, token);
     }
 

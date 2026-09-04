@@ -52,6 +52,7 @@ mail_sources = files(
   'signature-editor.vala',
   'dependency-page.vala',
   'welcome-dialog.vala',
+  'setup-window.vala',
   'format-toolbar.vala',
   'theme-selector.vala',
   'utils.vala',
