@@ -73,7 +73,7 @@ msgid "_Calendar"
 msgstr "_Kalender"
 
 msgid "C_ontacts"
-msgstr "_Kontakte"
+msgstr "K_ontakte"
 
 msgid "_Preferences"
 msgstr "_Einstellungen"
@@ -172,7 +172,7 @@ msgid "Shares a calendar with Calendar"
 msgstr "Verwendet einen gemeinsamen Kalender mit Kalender"
 
 msgid "Shares an address book with Contacts"
-msgstr "Verwendet ein gemeinsames Adressbuch mit Kontakte"
+msgstr "Verwendet ein gemeinsames Adressbuch mit Kontakten"
 
 msgid "Email enabled"
 msgstr "E-Mail aktiviert"
@@ -319,7 +319,7 @@ msgstr "Authentifizierung für %s fehlgeschlagen"
 
 msgid "A GNOME mail client that shares accounts with Calendar and Contacts."
 msgstr ""
-"Ein GNOME-E-Mail-Programm, das Konten mit Kalender und Kontakte teilt."
+"Ein GNOME-E-Mail-Programm, das Konten mit Kalender und Kontakten teilt."
 
 msgid "translator-credits"
 msgstr "Mitwirkende der deutschen Übersetzung"
@@ -1544,7 +1544,7 @@ msgid "Mark as Spam"
 msgstr "Als unerwünscht markieren"
 
 msgid "Not Spam"
-msgstr "Nicht unerwünscht"
+msgstr "Kein Spam"
 
 msgid "Print"
 msgstr "Drucken"
@@ -1682,7 +1682,7 @@ msgid "Last 6 months"
 msgstr "Letzte 6 Monate"
 
 msgid "Last year"
-msgstr "Letztes Jahr"
+msgstr "Letzte 12 Monate"
 
 msgid "Download all"
 msgstr "Alle herunterladen"
