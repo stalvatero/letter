@@ -73,7 +73,7 @@ msgid "_Calendar"
 msgstr "_Kalender"
 
 msgid "C_ontacts"
-msgstr "_Kontakte"
+msgstr "K_ontakte"
 
 msgid "_Preferences"
 msgstr "_Einstellungen"
@@ -1682,7 +1682,7 @@ msgid "Last 6 months"
 msgstr "Letzte 6 Monate"
 
 msgid "Last year"
-msgstr "Letztes Jahr"
+msgstr "Letzte 12 Monate"
 
 msgid "Download all"
 msgstr "Alle herunterladen"
