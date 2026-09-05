@@ -196,12 +196,6 @@ Without GNOME Online Accounts there is nothing to show. That is by design, on an
 - Ubuntu 26.04.1 LTS
 - openSUSE Tumbleweed
 
-## Support
-
-If Letter is useful to you and you would like to support its development, you can contribute via [GitHub Sponsors](https://github.com/sponsors/stalvatero) or [PayPal](https://paypal.me/soscurato). Thank you.
-
-Se Letter ti è utile e vuoi sostenerne lo sviluppo, puoi contribuire con [GitHub Sponsors](https://github.com/sponsors/stalvatero) o [PayPal](https://paypal.me/soscurato). Grazie.
-
 ## License
 
 [GPL-3.0-or-later](COPYING)
