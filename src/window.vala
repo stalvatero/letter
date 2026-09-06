@@ -1828,8 +1828,11 @@ public class Mail.Window : Adw.ApplicationWindow {
                 continue;
 
             var account = row.account;
+            var tooltip = account.email != null && account.email.length > 0
+                ? account.email
+                : account.display_name;
             var button = new Gtk.ToggleButton () {
-                tooltip_text = account.display_name,
+                tooltip_text = tooltip,
                 valign = Gtk.Align.CENTER,
                 halign = Gtk.Align.CENTER,
                 hexpand = true,
