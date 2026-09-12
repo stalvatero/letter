@@ -307,6 +307,17 @@ public class Mail.Application : Adw.Application {
             return;
         }
 
+        /* Moves, deletes and flag changes are queued in memory for responsive
+         * UI. Drain them before destroying MailSession and its Camel services. */
+        var mail_windows = new GenericArray<Window> ();
+        foreach (var window in get_windows ()) {
+            var mail = window as Window;
+            if (mail != null)
+                mail_windows.add (mail);
+        }
+        for (uint i = 0; i < mail_windows.length; i++)
+            yield mail_windows[i].prepare_to_close ();
+
         this.shutting_down = true;
         var windows = new GenericArray<Gtk.Window> ();
         foreach (var window in get_windows ())

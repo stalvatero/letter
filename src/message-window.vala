@@ -217,8 +217,21 @@ public class Mail.MessageWindow : Adw.ApplicationWindow {
                     yield this.session.copy_message (this.account, this.folder, this.message.uid, destination);
             } else {
                 var source = this.folder.kind == FolderKind.IMPORTANT ? this.folder : destination;
+                var uid = this.message.uid;
+                if (this.folder.kind != FolderKind.IMPORTANT) {
+                    uid = yield this.session.find_matching_uid (
+                        this.account,
+                        destination,
+                        this.message
+                    );
+                    if (uid == null) {
+                        throw new IOError.NOT_FOUND (
+                            _("This message is still syncing with the server. Try again in a moment.")
+                        );
+                    }
+                }
                 var uids = new GenericArray<string> ();
-                uids.add (this.message.uid);
+                uids.add (uid);
                 yield this.session.delete_uids (this.account, source, uids, null);
                 if (this.folder.kind == FolderKind.IMPORTANT) {
                     folder_changed ();

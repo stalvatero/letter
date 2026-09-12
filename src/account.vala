@@ -487,6 +487,9 @@ public class Mail.Message : Object {
     public string? conversation_key { get; set; }
     public string? search_blob { get; set; }
     public bool local_only { get; set; }
+    public string? transfer_source_uid { get; set; }
+    public string? transfer_source_folder { get; set; }
+    public bool pending_important_removal { get; set; }
 
     public bool is_placeholder {
         get {
