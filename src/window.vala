@@ -75,6 +75,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     private GLib.ListStore message_store;
     private Gtk.MultiSelection message_selection;
     private uint selection_anchor = Gtk.INVALID_LIST_POSITION;
+    private string? list_focus_conversation_id;
+    private uint list_focus_index = Gtk.INVALID_LIST_POSITION;
     private Gtk.ScrolledWindow account_scrolled;
     private Gtk.ScrolledWindow folder_scrolled;
     private Gtk.ScrolledWindow message_scrolled;
@@ -3632,6 +3634,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         apply_offline_heading ();
         var keep_uid = this.pending_select_uid;
         this.pending_select_uid = null;
+        clear_list_focus ();
         if (keep_uid == null) {
             this.open_message_uid = null;
             this.open_content = null;
@@ -5242,6 +5245,9 @@ public class Mail.Window : Adw.ApplicationWindow {
         var conversation = selected_conversation ();
         if (conversation == null)
             return;
+
+        if (position != Gtk.INVALID_LIST_POSITION)
+            remember_list_focus (conversation, position);
 
         var message = pick_listed_open (conversation);
         if (message == null)
@@ -7091,7 +7097,7 @@ public class Mail.Window : Adw.ApplicationWindow {
 
         /* Optimistic moves relocate the Message into the destination folder
          * instead of removing it. Prefer the next message still listed in the
-         * current folder (Inbox, …), not the one just archived/trashed. */
+         * current folder, not the one just archived/trashed. */
         var keep = this.open_message;
         if (keep == null
             || !conversation.contains (keep.uid, keep.folder_full_name)
@@ -7148,6 +7154,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (conversations.length == 0) {
             this.message_selection.unselect_all ();
             this.selection_anchor = Gtk.INVALID_LIST_POSITION;
+            clear_list_focus ();
             this.open_content = null;
             this.open_message = null;
             this.open_message_uid = null;
@@ -7157,16 +7164,18 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
         }
 
-        var drop = new HashTable<Conversation, uint8> (direct_hash, direct_equal);
+        var drop = new HashTable<string, uint8> (str_hash, str_equal);
         for (uint i = 0; i < conversations.length; i++)
-            drop.set (conversations[i], 1);
+            drop.set (conversations[i].id, 1);
+
+        var focus = neighbor_focus_index_for_drop_ids (drop);
 
         this.restoring_selection = true;
         var n = this.message_store.n_items;
         var keepers = new GenericArray<Object> ();
         for (uint i = 0; i < n; i++) {
             var item = this.message_store.get_item (i) as Conversation;
-            if (item != null && drop.contains (item))
+            if (item != null && drop.contains (item.id))
                 continue;
             keepers.add (item);
         }
@@ -7176,13 +7185,15 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.message_store.splice (0, n, items);
         this.message_selection.unselect_all ();
         this.selection_anchor = Gtk.INVALID_LIST_POSITION;
-        this.restoring_selection = false;
         this.open_content = null;
         this.open_message = null;
         this.open_message_uid = null;
         this.open_conversation = null;
+        clear_list_focus ();
         set_message_actions_enabled (false);
+
         if (this.message_store.n_items == 0) {
+            this.restoring_selection = false;
             if (this.unread_only) {
                 show_conversation_placeholder (
                     _("No Unread Messages"),
@@ -7194,9 +7205,16 @@ public class Mail.Window : Adw.ApplicationWindow {
                     _("This folder is empty.")
                 );
             }
-        } else {
-            show_reader_empty ();
+            update_message_actions ();
+            return;
         }
+
+        var next = focus;
+        if (next == Gtk.INVALID_LIST_POSITION || next >= this.message_store.n_items)
+            next = this.message_store.n_items - 1;
+        select_only_position (next);
+        this.restoring_selection = false;
+        on_message_selection_changed ();
         update_message_actions ();
     }
 
@@ -7327,19 +7345,85 @@ public class Mail.Window : Adw.ApplicationWindow {
         cache.add (message);
     }
 
-    private void drop_conversation_row (Conversation conversation) {
-        uint index = Gtk.INVALID_LIST_POSITION;
+    private void remember_list_focus (Conversation conversation, uint position) {
+        if (position == Gtk.INVALID_LIST_POSITION || position >= this.message_store.n_items)
+            return;
+        /* Only refresh the neighbor anchor when the user focuses a different
+         * conversation. Same id after a mid-archive list rebuild must keep the
+         * original newest-in-folder sort slot. */
+        if (this.list_focus_conversation_id != null
+            && this.list_focus_conversation_id == conversation.id
+            && this.list_focus_index != Gtk.INVALID_LIST_POSITION)
+            return;
+
+        this.list_focus_conversation_id = conversation.id;
+        this.list_focus_index = position;
+    }
+
+    private void clear_list_focus () {
+        this.list_focus_conversation_id = null;
+        this.list_focus_index = Gtk.INVALID_LIST_POSITION;
+    }
+
+    private uint find_conversation_index (Conversation conversation) {
         for (uint i = 0; i < this.message_store.n_items; i++) {
-            if (this.message_store.get_item (i) == conversation) {
-                index = i;
-                break;
-            }
+            var item = this.message_store.get_item (i) as Conversation;
+            if (item == null)
+                continue;
+            if (item == conversation || item.id == conversation.id)
+                return i;
         }
+        return Gtk.INVALID_LIST_POSITION;
+    }
+
+    private uint neighbor_focus_index_after_remove (uint removed_index) {
+        var focus = this.list_focus_index;
+        if (focus == Gtk.INVALID_LIST_POSITION)
+            focus = removed_index;
+        if (removed_index < focus && focus > 0)
+            focus--;
+        return focus;
+    }
+
+    private uint neighbor_focus_index_for_drop_ids (HashTable<string, uint8> drop_ids) {
+        var focus = this.list_focus_index;
+        if (this.list_focus_conversation_id == null
+            || !drop_ids.contains (this.list_focus_conversation_id)
+            || focus == Gtk.INVALID_LIST_POSITION) {
+            focus = Gtk.INVALID_LIST_POSITION;
+            for (uint i = 0; i < this.message_store.n_items; i++) {
+                var item = this.message_store.get_item (i) as Conversation;
+                if (item == null || !drop_ids.contains (item.id))
+                    continue;
+                if (focus == Gtk.INVALID_LIST_POSITION || i < focus)
+                    focus = i;
+            }
+            if (focus == Gtk.INVALID_LIST_POSITION)
+                return focus;
+        }
+
+        uint removed_before = 0;
+        for (uint i = 0; i < this.message_store.n_items; i++) {
+            var item = this.message_store.get_item (i) as Conversation;
+            if (item == null || !drop_ids.contains (item.id))
+                continue;
+            if (i < focus)
+                removed_before++;
+        }
+        return focus - removed_before;
+    }
+
+    private void drop_conversation_row (Conversation conversation) {
+        uint index = find_conversation_index (conversation);
+        var next_focus = index != Gtk.INVALID_LIST_POSITION
+            ? neighbor_focus_index_after_remove (index)
+            : this.list_focus_index;
 
         this.open_content = null;
         this.open_message = null;
         this.open_message_uid = null;
         this.open_conversation = null;
+        clear_list_focus ();
         set_message_actions_enabled (false);
 
         if (index == Gtk.INVALID_LIST_POSITION) {
@@ -7356,7 +7440,9 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
         }
 
-        var next = uint.min (index, this.message_store.n_items - 1);
+        var next = next_focus;
+        if (next == Gtk.INVALID_LIST_POSITION || next >= this.message_store.n_items)
+            next = this.message_store.n_items - 1;
         select_only_position (next);
         this.restoring_selection = false;
         on_message_selection_changed ();
@@ -7411,6 +7497,10 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.open_content = null;
         this.open_message = null;
         this.open_message_uid = null;
+        var dropping_open = conversation != null
+            && this.open_conversation != null
+            && (this.open_conversation == conversation
+                || this.open_conversation.id == conversation.id);
         this.open_conversation = null;
         set_message_actions_enabled (false);
 
@@ -7420,15 +7510,27 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
         }
 
+        var next_focus = neighbor_focus_index_after_remove (index);
+        if (dropping_open)
+            clear_list_focus ();
+        else if (this.list_focus_index != Gtk.INVALID_LIST_POSITION
+            && index < this.list_focus_index
+            && this.list_focus_index > 0) {
+            this.list_focus_index--;
+        }
+
         this.restoring_selection = true;
         this.message_store.remove (index);
         if (this.message_store.n_items == 0) {
             this.restoring_selection = false;
+            clear_list_focus ();
             show_reader_empty ();
             return;
         }
 
-        var next = uint.min (index, this.message_store.n_items - 1);
+        var next = next_focus;
+        if (next == Gtk.INVALID_LIST_POSITION || next >= this.message_store.n_items)
+            next = this.message_store.n_items - 1;
         select_only_position (next);
         this.restoring_selection = false;
         on_message_selection_changed ();
