@@ -10,14 +10,14 @@ This is not a GNOME Core application, but it follows the clean GNOME 50 look and
 
 Feel free to try it out and enjoy the app's potential. All feedback is welcome.
 
-**1.0.0-rc.4** is the current release candidate toward 1.0. It is meant for daily use: reading, composing, search, notifications, and cache-first sync are in place. Account setup still happens only in GNOME Settings → Online Accounts. There is no in-app IMAP wizard and no mailbox that exists only inside Letter. This RC gathers feedback before **1.0.0**.
+**1.0.0-rc.5** is the current release candidate toward 1.0. It is meant for daily use: reading, composing, search, notifications, and cache-first sync are in place. Account setup still happens only in GNOME Settings → Online Accounts. There is no in-app IMAP wizard and no mailbox that exists only inside Letter. This RC gathers feedback before **1.0.0**.
 
 ### Available languages
 
 - English
 - Italian
 - German (translation by [Christian Lauinger](https://github.com/ChrisLauinger77))
-- Brazilian Portuguese
+- Brazilian Portuguese (translation by [Thiago Haeitmann](https://github.com/ThiagoHaeitmann))
 - More will come — translations via pull request are very welcome.
 
 
@@ -133,42 +133,26 @@ Tip: Use the **Microsoft 365** (Graph) account type, not classic Exchange Web Se
 
 ## Install
 
-There is no Flathub listing and no distro package yet. For **1.0.0-rc.4**, download the **Flatpak bundle** from the [GitHub Releases](https://github.com/stalvatero/letter/releases) page (file named like `Letter-1.0.0-rc.4-x86_64.flatpak`).
-
-Letter needs the **GNOME Platform 50** runtime from Flathub. Add the Flathub remote once (if it is not already configured), then install the downloaded file:
+Download Flatpak or `.deb` from [Releases](https://github.com/stalvatero/letter/releases). Flatpak needs GNOME Platform **50** from Flathub. The `.deb` is for Debian/Ubuntu (`letter`).
 
 ```sh
+# Flatpak
 flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install --user ~/Downloads/Letter-1.0.0-rc.4-x86_64.flatpak
+flatpak install --user ./Letter-*-x86_64.flatpak
+
+# Debian / Ubuntu
+sudo apt install ./Letter-*-amd64.deb
 ```
 
-Adjust the path to wherever you saved the `.flatpak`. Flatpak will download **org.gnome.Platform//50** from Flathub on first install if it is missing.
-
-Then open **Letter** from the app grid / drawer, or run:
-
-```sh
-flatpak run io.github.stalvatero.Letter
-```
-
-Add at least one account in **Settings → Online Accounts**, then start Letter again if it was already open.
-
-## Update
-
-Download the newer `.flatpak` from [Releases](https://github.com/stalvatero/letter/releases) and install it the same way. Flatpak replaces the previous Letter build:
-
-```sh
-flatpak install --user ~/Downloads/Letter-….flatpak
-```
-
-
+Add an account in **Settings → Online Accounts**, then open Letter.
 
 ## Uninstall
 
 ```sh
 flatpak uninstall --user io.github.stalvatero.Letter
+# or
+sudo apt remove letter
 ```
-
-Online Accounts stay in GNOME Settings. Local Letter data under `~/.var/app/io.github.stalvatero.Letter/` can be removed by hand if you also want a clean slate.
 
 ## Build from source
 
@@ -211,7 +195,7 @@ sudo meson install -C _build
 
 The Meson `development` profile is only for local work (`meson devenv`). It uses a different application ID and the libadwaita development stripe.
 
-Maintainers who need to **produce** a `.flatpak` for a GitHub Release can run `./scripts/build-flatpak.sh` (requires `flatpak-builder`; first build is long because it compiles EDS into the sandbox). End users should use the bundle from Releases instead.
+Maintainers: `./scripts/build-flatpak.sh` and `./scripts/build-deb.sh` produce the Release artifacts. End users should use [Releases](https://github.com/stalvatero/letter/releases).
 
 ## Contributing
 

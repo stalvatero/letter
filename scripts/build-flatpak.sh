@@ -8,7 +8,7 @@
 # Usage:
 #   ./scripts/build-flatpak.sh              # build repo + .flatpak only
 #   FLATPAK_INSTALL=1 ./scripts/build-flatpak.sh   # also install --user
-#   FLATPAK_BUNDLE=Letter-1.0.0-rc.4-x86_64.flatpak ./scripts/build-flatpak.sh
+#   FLATPAK_BUNDLE=Letter-1.0.0-rc.5-x86_64.flatpak ./scripts/build-flatpak.sh
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,7 +17,7 @@ cd "$root"
 manifest=io.github.stalvatero.Letter.yml
 build_dir="${FLATPAK_BUILD_DIR:-build-flatpak}"
 repo_dir="${FLATPAK_REPO_DIR:-repo}"
-bundle="${FLATPAK_BUNDLE:-Letter-$(git describe --tags --always 2>/dev/null || echo 1.0.0-rc.4)-x86_64.flatpak}"
+bundle="${FLATPAK_BUNDLE:-Letter-$(git describe --tags --always 2>/dev/null || echo 1.0.0-rc.5)-x86_64.flatpak}"
 do_install="${FLATPAK_INSTALL:-0}"
 
 if ! command -v flatpak-builder >/dev/null; then

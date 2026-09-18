@@ -56,7 +56,18 @@
     <category>Email</category>
   </categories>
   <releases>
-    <release version="@version@" type="development" date="2026-09-17">
+    <release version="@version@" type="development" date="2026-09-18">
+      <description>
+        <p>
+          Fifth 1.0 release candidate. Brazilian Portuguese translation,
+          Debian/Ubuntu .deb on Releases beside Flatpak, reliable list
+          selection after emptying a conversation from the current folder, and
+          compose no longer autosaves drafts every two minutes (avoids
+          duplicate drafts on Microsoft 365).
+        </p>
+      </description>
+    </release>
+    <release version="1.0.0-rc.4" type="development" date="2026-09-17">
       <description>
         <p>
           Fourth 1.0 release candidate. Recipient chips offer Write to and Copy

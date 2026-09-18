@@ -7,7 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 How we maintain it:
 
-- During development, add bullets under **[Unreleased](https://github.com/stalvatero/letter/compare/v1.0.0-rc.4...HEAD)**.
+- During development, add bullets under **[Unreleased](https://github.com/stalvatero/letter/compare/v1.0.0-rc.5...HEAD)**.
 - On each release (rc or stable), rename that section to the version + date, and
 copy a short summary into `data/io.github.stalvatero.Letter.metainfo.xml.in.in`
 (`<releases>`, leave msgstr empty in po files — keep release notes in English)
@@ -17,18 +17,37 @@ refactors unless they affect behaviour.
 
 
 
-## [Unreleased](https://github.com/stalvatero/letter/compare/v1.0.0-rc.4...HEAD)
+## [Unreleased](https://github.com/stalvatero/letter/compare/v1.0.0-rc.5...HEAD)
+
+
+
+## [1.0.0-rc.5](https://github.com/stalvatero/letter/compare/v1.0.0-rc.4...v1.0.0-rc.5) - 2026-09-18
 
 
 ### Translations
 
-- Added Brazilian Portuguese translation.
+- Added Brazilian Portuguese translation (Thiago Haeitmann).
 
+
+### Added
+
+- Debian / Ubuntu `.deb` package on GitHub Releases alongside the Flatpak
+  bundle (`Letter-…-amd64.deb`, package name `letter`).
+
+
+### Fixed
+
+- After every message of a conversation leaves the current folder (archive,
+  move, or trash), list selection stays next to that conversation’s place in
+  the list — anchored to its newest message there — instead of jumping near
+  the oldest.
 
 
 ### Changed
 
-- Compose no longer autosaves to Drafts every two minutes. Save with the toolbar button, or choose Save / Discard when closing; This fix avoid duplicates expecially with M365 accounts.
+- Compose no longer autosaves to Drafts every two minutes. Save with the
+  toolbar button, or choose Save / Discard when closing; this avoids duplicate
+  drafts especially with Microsoft 365 accounts.
 
 
 

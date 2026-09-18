@@ -5,7 +5,7 @@
 #
 # Usage:
 #   ./scripts/build-deb.sh
-#   DEB_OUT=Letter-1.0.0-rc.4-amd64.deb ./scripts/build-deb.sh
+#   DEB_OUT=Letter-1.0.0-rc.5-amd64.deb ./scripts/build-deb.sh
 #   ./scripts/build-deb.sh --install   # also sudo dpkg -i the result
 set -euo pipefail
 
