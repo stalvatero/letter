@@ -1287,8 +1287,6 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (attachments.length > 0)
             compose.attach_pending_files (attachments);
         compose.present ();
-        if (from_outbox)
-            compose.seed_autosave.begin ();
     }
 
     private void on_send_starting () {
@@ -5820,7 +5818,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         fill_thread_list (this.open_conversation ?? conversation, this.open_message ?? shown);
     }
 
-    private void on_draft_saved (Account account, Message? draft) {
+    private void on_draft_saved (Account account, Message? draft, string? replaced_uid) {
         if (draft == null || !is_current_account (account))
             return;
 
@@ -5828,24 +5826,37 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (folder == null)
             return;
 
+        if (replaced_uid != null && replaced_uid.length > 0 && replaced_uid != draft.uid) {
+            remove_from_folder_cache (account, folder, replaced_uid);
+            remove_message_from_list (replaced_uid, folder.full_name);
+        }
+
         draft.folder_full_name = folder.full_name;
         draft.folder_name = folder.name;
         var key = message_cache_key (account, folder);
         var cache = this.message_cache.get (key);
         if (cache != null) {
-            var existing = matching_outgoing_send (cache, draft);
+            Message? existing = null;
+            for (uint i = 0; i < cache.length; i++) {
+                if (cache[i].uid == draft.uid
+                    && (cache[i].folder_full_name ?? "") == (draft.folder_full_name ?? "")) {
+                    existing = cache[i];
+                    break;
+                }
+            }
             if (existing == null) {
                 var next = new GenericArray<Message> ();
                 next.add (draft);
-                for (uint i = 0; i < cache.length; i++)
+                for (uint i = 0; i < cache.length; i++) {
+                    if (replaced_uid != null && cache[i].uid == replaced_uid)
+                        continue;
                     next.add (cache[i]);
+                }
                 this.message_cache.set (key, next);
                 cache = next;
                 bump_folder_total (folder);
                 if (is_current_folder (folder) && this.search_text.length == 0)
                     display_messages (account, folder, cache);
-            } else {
-                Conversation.prune_duplicate_sends (cache);
             }
         } else {
             bump_folder_total (folder);

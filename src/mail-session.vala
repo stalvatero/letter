@@ -62,7 +62,7 @@ public class Mail.MailSession : Camel.Session {
     public signal void send_starting ();
     public signal void send_finished ();
     public signal void message_sent (Account account, Message? sent);
-    public signal void draft_saved (Account account, Message? draft);
+    public signal void draft_saved (Account account, Message? draft, string? replaced_uid);
     public signal void draft_removed (Account account, Folder folder, string uid);
     public signal void transfer_failed (Account account, Folder from, GenericArray<string> uids, string error);
 
@@ -3219,7 +3219,8 @@ public class Mail.MailSession : Camel.Session {
     }
 
     /* Mark deleted in the local Camel store only — server push waits for the
-     * normal folder sync interval (draft autosave / replace must not hit Graph). */
+     * normal folder sync interval (routine soft-delete / flags). Draft revision
+     * replace uses purge_replaced_draft instead so Microsoft 365 sees it now. */
     public async void delete_message_local (Account account, Folder folder, string uid) throws Error {
         var camel_folder = yield open_camel_folder (account, folder, null);
         camel_folder.set_message_flags (uid, Camel.MessageFlags.DELETED, Camel.MessageFlags.DELETED);
@@ -3227,8 +3228,7 @@ public class Mail.MailSession : Camel.Session {
         apply_camel_counts (folder, camel_folder);
         if (folder.kind == FolderKind.DRAFTS)
             draft_removed (account, folder, uid);
-        /* Queue DELETED so the replaced draft disappears on the server too;
-         * without this, each autosave left another live Drafts copy on M365. */
+        /* Queue DELETED so the soft-deleted UID disappears on the server too. */
         var uids = new GenericArray<string> ();
         uids.add (uid);
         enqueue_flag_flush (account, folder, uids);
@@ -5314,18 +5314,52 @@ public class Mail.MailSession : Camel.Session {
         this.body_cache.set (body_key (account, drafts, uid), content);
         var draft = message_from_mime (uid, mime, drafts, content.plain_text ?? body);
 
-        /* Replace previous revision locally; sync timer pushes append/delete. */
+        /* Replace previous revision: purge locally and push to the server now.
+         * Deferred flag flush left duplicate Drafts on Microsoft 365. */
         if (replace_uid != null && replace_uid.length > 0 && replace_uid != uid) {
             var old_folder = replace_folder ?? drafts;
             try {
-                yield delete_message_local (account, old_folder, replace_uid);
+                yield purge_replaced_draft (account, old_folder, replace_uid, cancellable);
             } catch (Error e) {
                 warning ("Could not replace previous draft: %s", e.message);
             }
         }
 
-        draft_saved (account, draft);
+        draft_saved (account, draft, replace_uid);
         return draft;
+    }
+
+    /* Drop a superseded Drafts UID from Camel and the server immediately. */
+    private async void purge_replaced_draft (
+        Account account,
+        Folder folder,
+        string uid,
+        Cancellable? cancellable
+    ) throws Error {
+        var camel_folder = yield open_camel_folder (account, folder, cancellable);
+        camel_folder.set_message_flags (uid, Camel.MessageFlags.DELETED, Camel.MessageFlags.DELETED);
+        drop_body (account, folder, uid);
+        apply_camel_counts (folder, camel_folder);
+        if (folder.kind == FolderKind.DRAFTS)
+            draft_removed (account, folder, uid);
+
+        try {
+            /* Graph: synchronize pushes DELETED; full-folder expunge is unsafe.
+             * Other backends can expunge the single deleted UID. */
+            yield push_deleted_and_expunge (
+                camel_folder,
+                folder.name,
+                1,
+                true,
+                !backend_saves_sent_on_server (account),
+                cancellable
+            );
+        } catch (Error e) {
+            warning ("Immediate draft purge deferred to flag flush: %s", e.message);
+            var uids = new GenericArray<string> ();
+            uids.add (uid);
+            enqueue_flag_flush (account, folder, uids);
+        }
     }
 
     private static Camel.MimeMessage build_outgoing_mime (

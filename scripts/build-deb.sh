@@ -47,18 +47,35 @@ if [ -z "$project_ver" ]; then
   exit 1
 fi
 
-# Debian sorts 1.0.0~rc.4 before 1.0.0; keep a trailing -1 revision.
+# Debian sorts 1.0.0~rc.4 before 1.0.0. Revision: DEB_REVISION, else bump
+# past the installed letter package so apt install ./….deb upgrades cleanly.
 debian_upstream="$project_ver"
 if [[ "$project_ver" == *-* ]]; then
   debian_upstream="${project_ver%%-*}~${project_ver#*-}"
 fi
-debian_ver="${debian_upstream}-1"
+if [ -n "${DEB_REVISION:-}" ]; then
+  deb_rev="$DEB_REVISION"
+else
+  deb_rev=1
+  installed_ver="$(dpkg-query -W -f='${Version}' letter 2>/dev/null || true)"
+  if [[ "$installed_ver" == "${debian_upstream}-"* ]]; then
+    cur_rev="${installed_ver##*-}"
+    if [[ "$cur_rev" =~ ^[0-9]+$ ]]; then
+      deb_rev=$((cur_rev + 1))
+    else
+      deb_rev=2
+    fi
+  fi
+fi
+debian_ver="${debian_upstream}-${deb_rev}"
 arch="$(dpkg-architecture -qDEB_HOST_ARCH)"
 pkg_name="letter"
 build_dir="${DEB_BUILD_DIR:-_build-deb}"
 stage_dir="${DEB_STAGE_DIR:-build-deb/stage}"
 out_dir="${DEB_OUT_DIR:-.}"
 bundle="${DEB_OUT:-${out_dir}/Letter-${project_ver}-${arch}.deb}"
+
+echo "Package version: ${debian_ver} (file $(basename "$bundle"))"
 
 echo "Configuring $build_dir (prefix=/usr, profile=default, release)…"
 if [ -d "$build_dir" ]; then
@@ -193,6 +210,8 @@ dpkg-deb -I "$bundle"
 echo
 echo "Install with (preferred — resolves Depends):"
 echo "  sudo apt install ./$(basename "$bundle")"
+echo "Same upstream version already installed? Use:"
+echo "  sudo apt install --reinstall ./$(basename "$bundle")"
 echo
 echo "Remove with:"
 echo "  sudo apt remove letter"
@@ -207,8 +226,8 @@ if [ "$do_install" = "1" ]; then
     *) apt_deb="./$bundle" ;;
   esac
   if [ "$(id -u)" -eq 0 ]; then
-    apt install -y "$apt_deb"
+    apt install -y --reinstall "$apt_deb"
   else
-    sudo apt install -y "$apt_deb"
+    sudo apt install -y --reinstall "$apt_deb"
   fi
 fi

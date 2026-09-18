@@ -55,7 +55,7 @@ Feel free to try it out and enjoy the app's potential. All feedback is welcome.
 - At startup and on each sync cycle, Letter still probes non-Inbox folders lightly: empty lists that have mail on the server, or lists whose remote counts drifted (for example mail filed from a phone)
 - Archive, trash, move, and flag changes update the UI immediately; the server push waits for the sync timer, F5, startup, or quit (so Send stays responsive)
 - Pending soft changes survive a quit, crash or offline working in a small on-disk registry and flush on the next start
-- Sending uses a virtual **Outbox** (retry / edit / cancel); compose autosaves to **Drafts** every two minutes
+- Sending uses a virtual **Outbox** (retry / edit / cancel); 
 
 
 
@@ -75,8 +75,7 @@ Feel free to try it out and enjoy the app's potential. All feedback is welcome.
 - Insert image inline, resize from the format toolbar (or the context menu). You can also insert image by drag-and-drop from your PC
 - Address book picker from Online Accounts and recent recipients, drag recipient pills
 - When you reply and add a new recipient, Letter can offer to attach files from the original message
-
-**Compose and laptop power saving.** The composer is an HTML editor based on WebKit (the same engine used to show HTML mail). That is heavier than a plain text field: each keystroke goes through a separate web process, layout, and redraw. On a laptop in **Power Saver**, the system throttles CPU and GPU on purpose, so typing in compose can feel laggy or delayed. That is not a mail-sync bug and not Letter “blocking” a thread. Use **Balanced** or **Performance** while writing long messages. The message *reader* runs with JavaScript disabled; only the composer needs the WebKit editing stack for real HTML mail (bold, quotes, signatures, inline images, paste from other clients).
+- Save drafts
 
 ### Keyboard
 

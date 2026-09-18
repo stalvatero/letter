@@ -21,6 +21,12 @@ refactors unless they affect behaviour.
 
 
 
+### Changed
+
+- Compose no longer autosaves to Drafts every two minutes. Save with the toolbar button, or choose Save / Discard when closing; This fix avoid duplicates expecially with M365 accounts.
+
+
+
 ## [1.0.0-rc.4](https://github.com/stalvatero/letter/compare/v1.0.0-rc.3...v1.0.0-rc.4) - 2026-09-17
 
 

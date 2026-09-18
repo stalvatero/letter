@@ -10,6 +10,7 @@ public class Mail.FormatToolbar : Gtk.Box {
     private Gtk.ToggleButton underline_toggle;
     private Gtk.ToggleButton strike_toggle;
     private bool toolbar_live = true;
+    private uint toolbar_live_idle;
 
     public FormatToolbar (ComposeHtmlView view) {
         Object (orientation: Gtk.Orientation.HORIZONTAL, spacing: 6);
@@ -77,6 +78,17 @@ public class Mail.FormatToolbar : Gtk.Box {
         append (formats);
     }
 
+    private void suppress_toolbar_commands () {
+        this.toolbar_live = false;
+        if (this.toolbar_live_idle != 0)
+            Source.remove (this.toolbar_live_idle);
+        this.toolbar_live_idle = Idle.add (() => {
+            this.toolbar_live_idle = 0;
+            this.toolbar_live = true;
+            return Source.REMOVE;
+        });
+    }
+
     private void on_format_state_changed (
         string font,
         string size,
@@ -85,20 +97,23 @@ public class Mail.FormatToolbar : Gtk.Box {
         string underline,
         string strike
     ) {
-        this.toolbar_live = false;
+        suppress_toolbar_commands ();
         var font_index = ComposeHtmlView.font_family_index (this.font_families, font);
-        this.font_drop.selected = font_index >= 0
+        var font_sel = font_index >= 0
             ? (uint) font_index
             : Gtk.INVALID_LIST_POSITION;
+        if (this.font_drop.selected != font_sel)
+            this.font_drop.selected = font_sel;
         var size_index = ComposeHtmlView.font_size_index (size);
-        this.size_drop.selected = size_index >= 0
+        var size_sel = size_index >= 0
             ? (uint) size_index
             : Gtk.INVALID_LIST_POSITION;
+        if (this.size_drop.selected != size_sel)
+            this.size_drop.selected = size_sel;
         ComposeHtmlView.apply_format_toggle (this.bold_toggle, bold);
         ComposeHtmlView.apply_format_toggle (this.italic_toggle, italic);
         ComposeHtmlView.apply_format_toggle (this.underline_toggle, underline);
         ComposeHtmlView.apply_format_toggle (this.strike_toggle, strike);
-        this.toolbar_live = true;
     }
 
     private Gtk.ToggleButton format_toggle_button (string icon, string tooltip, string command) {
