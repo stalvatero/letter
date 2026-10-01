@@ -641,6 +641,7 @@ public class Mail.MailSession : Camel.Session {
     public bool last_list_refresh_failed { get; private set; }
     /* Camel UID summary shrank past INCOMPLETE_REFRESH_SHRINK_MAX this refresh. */
     public bool last_list_refresh_rewound { get; private set; }
+    public bool last_list_refresh_completed { get; private set; }
 
     public async GenericArray<Message> list_messages (
         Account account,
@@ -664,9 +665,11 @@ public class Mail.MailSession : Camel.Session {
         this.last_list_refresh_failed = false;
         this.last_list_refresh_rewound = false;
         var refresh_completed = true;
+        var refresh_performed = false;
         if (refresh
             && refresh_timeout_seconds != REFRESH_INFO_SKIP
             && !folder_has_pending_flags (account, folder)) {
+            refresh_performed = true;
             refresh_completed = yield refresh_folder_info (
                 camel_folder,
                 high,
@@ -701,7 +704,7 @@ public class Mail.MailSession : Camel.Session {
             merged = true;
         }
 
-        /* Header shrink policy (objective, not folder kind/name):
+        /* Header shrink policy:
          *
          * Catastrophic = incoming + INCOMPLETE_REFRESH_SHRINK_MAX < previous.
          *
@@ -711,7 +714,7 @@ public class Mail.MailSession : Camel.Session {
          *    the server). Empty Trash/Junk from Letter already cleared the
          *    list before this call; a finished walk that returns no UIDs
          *    does the same for any other folder.
-         * 3. Complete refresh + previous already large (≥ HEADER_LIST_LARGE)
+         * 3. Other complete refreshes + previous already large (≥ HEADER_LIST_LARGE)
          *    + catastrophic shrink to a non-empty partial → keep prior list.
          *    Online Archive and any big custom folder can "complete" with a
          *    tiny local UID set; kind/name must not gate this.
@@ -730,6 +733,9 @@ public class Mail.MailSession : Camel.Session {
             } else if (messages.length == 0 && refresh && refresh_completed) {
                 keep = false;
                 reason = "complete empty";
+            } else if (trust_important_refresh (account, folder, refresh_performed && refresh_completed)) {
+                keep = false;
+                reason = "complete Important";
             } else if (previous.length >= HEADER_LIST_LARGE) {
                 keep = true;
                 reason = refresh
@@ -800,7 +806,12 @@ public class Mail.MailSession : Camel.Session {
         messages = retain_local_only (messages, previous);
         Conversation.prune_duplicate_sends (messages);
         apply_counts_from_messages (folder, messages);
+        this.last_list_refresh_completed = refresh_performed && refresh_completed;
         return messages;
+    }
+
+    internal static bool trust_important_refresh (Account account, Folder folder, bool completed) {
+        return completed && account.kind == AccountKind.GOOGLE && folder.kind == FolderKind.IMPORTANT;
     }
 
     /* Keep every prior header; append UIDs present only in the partial list. */
