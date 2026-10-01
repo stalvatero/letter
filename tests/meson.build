@@ -33,3 +33,16 @@ test_threading = executable(
 )
 
 test('threading', test_threading)
+
+test_important_cache = executable(
+  'test-important-cache',
+  mail_sources + files('test-important-cache.vala'),
+  mail_resources,
+  dependencies: mail_deps,
+  include_directories: config_h_dir,
+  vala_args: [
+    '--gresourcesdir', meson.project_build_root() / 'src',
+  ],
+)
+
+test('important-cache', test_important_cache)

@@ -914,7 +914,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         GenericArray<Message> messages,
         HashTable<string, uint8>? known_uids = null,
         bool persist_disk = true,
-        bool accept_empty = false
+        bool accept_removals = false
     ) {
         var key = message_cache_key (account, folder);
         var previous = this.message_cache.get (key);
@@ -929,24 +929,19 @@ public class Mail.Window : Adw.ApplicationWindow {
         /* Always drop locally-hidden (archived/moved pending flush) so Camel
          * summaries and disk header caches cannot resurrect them. */
         var visible = visible_messages (account, folder, messages);
-        /* Scale-based shrink guard (any folder that already has a large Letter
-         * list / disk index / high-water). Kind/name do not gate this. */
-        if (previous != null
-            && previous.length >= MailSession.HEADER_LIST_LARGE
-            && visible.length + LARGE_HEADER_GAP < previous.length) {
-            var water = header_high_water (account, folder);
-            if (water == 0 || visible.length + LARGE_HEADER_GAP < water) {
-                var kept = previous.length;
-                visible = merge_header_lists_keep (previous, visible);
-                Utils.sync_log (
-                    "RAM header cache skip shrink “%s” (keep %u, reject %u)".printf (
-                        folder.name,
-                        kept,
-                        messages.length
-                    )
-                );
-            }
+        var reconciled = reconcile_header_lists (
+            previous, visible, header_high_water (account, folder), accept_removals
+        );
+        if (reconciled != visible) {
+            Utils.sync_log (
+                "RAM header cache skip shrink “%s” (keep %u, reject %u)".printf (
+                    folder.name,
+                    previous.length,
+                    messages.length
+                )
+            );
         }
+        visible = reconciled;
         /* Tip-merge / local-archive appends land at the end; keep newest-first
          * so Archive (and every large list) is not scrolled “alla rinfusa”. */
         sort_messages_by_date (visible);
@@ -958,8 +953,8 @@ public class Mail.Window : Adw.ApplicationWindow {
         message_counts (visible, out total, out unread);
         /* An empty *local* summary must not wipe server-derived tree badges
          * (common for Trash on first open before align). Keep prior counts.
-         * accept_empty is a finished server walk that returned no UIDs. */
-        if (accept_empty || visible.length > 0 || (folder.total <= 0 && folder.unread <= 0)) {
+         * accept_removals allows a finished server walk to clear the list. */
+        if (accept_removals || visible.length > 0 || (folder.total <= 0 && folder.unread <= 0)) {
             folder.unread = unread;
             /* Match the list we actually hold — never keep a Graph/Camel total
              * above the rows on screen (empty ListView + “9460 messaggi”). */
@@ -974,13 +969,11 @@ public class Mail.Window : Adw.ApplicationWindow {
         sync_important_markers ();
         if (known.length > 0)
             notify_new_arrivals (account, folder, visible, known);
-        if (accept_empty && visible.length == 0)
+        if (accept_removals && visible.length == 0)
             clear_header_high_water (account, folder);
         if (persist_disk) {
-            if (accept_empty && visible.length == 0) {
-                /* Write now. A debounced save of the previous list, or a
-                 * click before the 1.5s timer, would put the old index back. */
-                persist_empty_header_list_now (account, folder);
+            if (accept_removals) {
+                persist_header_list_now (account, folder, visible);
             } else {
                 /* Never overwrite a larger on-disk header list with a Camel/Graph
                  * partial — that dropped Archive from ~6k back to ~2.7k across
@@ -1011,11 +1004,18 @@ public class Mail.Window : Adw.ApplicationWindow {
         enforce_message_cache_ceiling ();
     }
 
-    /* Keep every prior header; append UIDs present only in incoming (tips). */
-    private static GenericArray<Message> merge_header_lists_keep (
-        GenericArray<Message> previous,
-        GenericArray<Message> incoming
+    internal static GenericArray<Message> reconcile_header_lists (
+        GenericArray<Message>? previous,
+        GenericArray<Message> incoming,
+        uint high_water,
+        bool accept_shrink
     ) {
+        if (accept_shrink || previous == null
+            || previous.length < MailSession.HEADER_LIST_LARGE
+            || incoming.length + LARGE_HEADER_GAP >= previous.length
+            || (high_water > 0 && incoming.length + LARGE_HEADER_GAP >= high_water))
+            return incoming;
+
         var have = new HashTable<string, uint8> (str_hash, str_equal);
         var result = new GenericArray<Message> ();
         for (uint i = 0; i < previous.length; i++) {
@@ -1129,21 +1129,20 @@ public class Mail.Window : Adw.ApplicationWindow {
         save_header_high_water (account, folder, 0);
     }
 
-    /* Empty Trash / a finished server walk at zero. Cancels a pending save of
-     * the previous list so that snapshot cannot land after this write. */
-    private void persist_empty_header_list_now (Account account, Folder folder) {
+    private void persist_header_list_now (Account account, Folder folder, GenericArray<Message> messages) {
         var key = message_cache_key (account, folder);
         var existing = this.header_cache_save_sources.get (key);
         if (existing != 0) {
             Source.remove (existing);
             this.header_cache_save_sources.remove (key);
         }
-        clear_header_high_water (account, folder);
+        this.header_count_high_water.set (key, messages.length);
         save_header_list_cache (
             account.source_uid ?? account.uid,
             folder.full_name,
             folder.name,
-            new GenericArray<Message> ()
+            messages,
+            true
         );
     }
 
@@ -1348,11 +1347,10 @@ public class Mail.Window : Adw.ApplicationWindow {
              * Persist that empty list; a later open must not resurrect the
              * previous disk index, and the click must not cover it with the
              * aligning spinner. */
-            var accept_empty = messages.length == 0
-                && refresh_timeout_seconds != MailSession.REFRESH_INFO_SKIP
-                && !this.mail_session.last_list_refresh_incomplete
-                && !this.mail_session.last_list_refresh_failed;
-            store_folder_messages (account, folder, messages, known, true, accept_empty);
+            var completed = this.mail_session.last_list_refresh_completed;
+            var accept_removals = completed
+                && (messages.length == 0 || MailSession.trust_important_refresh (account, folder, completed));
+            store_folder_messages (account, folder, messages, known, true, accept_removals);
             Utils.sync_log ("align “%s” ok %s → %u headers".printf (
                 folder.name,
                 Utils.sync_ms (t0),
@@ -4736,7 +4734,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         };
     }
 
-    private static GenericArray<Message>? load_header_list_cache (Account account, Folder folder) {
+    internal static GenericArray<Message>? load_header_list_cache (Account account, Folder folder) {
         var account_uid = account.source_uid ?? account.uid;
         var path = MailSession.header_list_cache_file (account_uid, folder.full_name);
         if (!FileUtils.test (path, FileTest.IS_REGULAR))
@@ -4773,11 +4771,12 @@ public class Mail.Window : Adw.ApplicationWindow {
         return messages;
     }
 
-    private static void save_header_list_cache (
+    internal static void save_header_list_cache (
         string account_uid,
         string folder_full_name,
         string folder_name,
-        GenericArray<Message> messages
+        GenericArray<Message> messages,
+        bool accept_shrink = false
     ) {
         var path = MailSession.header_list_cache_file (account_uid, folder_full_name);
         uint write_n = 0;
@@ -4785,7 +4784,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             if (messages[i].uid != null && messages[i].uid.length > 0 && !messages[i].local_only)
                 write_n++;
         }
-        if (FileUtils.test (path, FileTest.IS_REGULAR)) {
+        if (!accept_shrink && FileUtils.test (path, FileTest.IS_REGULAR)) {
             uint disk_n = 0;
             string existing;
             try {
@@ -4868,6 +4867,8 @@ public class Mail.Window : Adw.ApplicationWindow {
 
         try {
             FileUtils.set_contents (path, builder.str);
+            if (accept_shrink)
+                FileUtils.set_contents (path + ".highwater", "%u\n".printf (messages.length));
             Utils.sync_log ("disk header cache wrote “%s” (%u headers)".printf (
                 folder_name,
                 messages.length
@@ -8892,7 +8893,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
         var empty = new GenericArray<Message> ();
         this.message_cache.set (key, empty);
-        persist_empty_header_list_now (account, folder);
+        persist_header_list_now (account, folder, empty);
         folder.unread = 0;
         folder.total = 0;
         refresh_folder_badge (folder);
