@@ -50,6 +50,24 @@ test(
   },
 )
 
+test_people = executable(
+  'test-people',
+  [
+    meson.project_source_root() / 'src' / 'account.vala',
+    meson.project_source_root() / 'src' / 'people.vala',
+    'test-people.vala',
+  ],
+  dependencies: [
+    glib_dep,
+    gtk_dep,
+    adw_dep,
+    dependency('gobject-2.0'),
+  ],
+  include_directories: config_h_dir,
+)
+
+test('people', test_people)
+
 test_rows = executable(
   'test-rows',
   [
