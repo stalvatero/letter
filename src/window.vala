@@ -2792,6 +2792,22 @@ public class Mail.Window : Adw.ApplicationWindow {
         return this.selected_folder;
     }
 
+    /* In the People view a notification opens the sender's conversation
+     * instead of switching to the folder the mail landed in. */
+    private bool open_notified_person (Folder folder, string uid) {
+        var account = this.selected_account;
+        var message = account != null ? find_cached_message (account, folder, uid) : null;
+        if (message == null)
+            return false;
+
+        var people = new PeopleIndex (account).counterparts (message);
+        var target = people.length > 0 ? person_folder (people[0]) : ensure_people_all_folder ();
+        this.pending_select_uid = uid;
+        this.open_message = message;
+        open_people_view (target);
+        return true;
+    }
+
     private bool is_current_folder (Folder folder) {
         return this.selected_folder != null && this.selected_folder.full_name == folder.full_name;
     }
@@ -4104,7 +4120,11 @@ public class Mail.Window : Adw.ApplicationWindow {
         } else {
             this.open_message_uid = keep_uid;
             this.open_content = null;
-            this.open_message = find_cached_message (this.selected_account, folder, keep_uid);
+            /* People views hold no cache of their own; the caller already set
+             * the message it wants selected. */
+            var found = find_cached_message (this.selected_account, folder, keep_uid);
+            if (found != null || !folder.is_people_view)
+                this.open_message = found;
             cancel_mark_seen ();
         }
 
@@ -5538,6 +5558,9 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void open_notified_message (Folder folder, string uid) {
+        if (this.people_button.active && open_notified_person (folder, uid))
+            return;
+
         FolderRow? row = null;
         for (int i = 0; this.folder_list.get_row_at_index (i) != null; i++) {
             var candidate = this.folder_list.get_row_at_index (i) as FolderRow;
