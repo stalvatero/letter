@@ -2245,6 +2245,30 @@ namespace Mail.Utils {
         return recipients_from_address (internet_address_from_header (raw));
     }
 
+    /* A one-paragraph preview of a message body for the message list: quoted
+     * lines left out, whitespace collapsed. Null when nothing is left. */
+    public static string? preview_from_text (string? text, int max_chars = 200) {
+        if (text == null || text.length == 0)
+            return null;
+        var builder = new StringBuilder ();
+        foreach (var raw in text.split ("\n")) {
+            var line = raw.strip ();
+            if (line.length == 0 || line.has_prefix (">"))
+                continue;
+            if (builder.len > 0)
+                builder.append_c (' ');
+            builder.append (line);
+            if (builder.str.char_count () >= max_chars)
+                break;
+        }
+        var preview = builder.str.replace ("\t", " ");
+        while (preview.contains ("  "))
+            preview = preview.replace ("  ", " ");
+        if (preview.char_count () > max_chars)
+            preview = preview.substring (0, preview.index_of_nth_char (max_chars));
+        return preview.length > 0 ? preview : null;
+    }
+
     /* Lowercase addresses of a header value, separated by commas. */
     public static string address_keys (string? raw) {
         var builder = new StringBuilder ();

@@ -687,6 +687,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.mail_session.draft_saved.connect (on_draft_saved);
             this.mail_session.draft_removed.connect (on_draft_removed);
             this.mail_session.transfer_failed.connect (on_transfer_failed);
+            this.mail_session.preview_ready.connect (on_preview_ready);
             bind_reader_mailbox ();
             ensure_outbox_store ();
             restore_mutation_registry ();
@@ -966,6 +967,51 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
 
+    /* Previews built from cached bodies are not in Camel's summary; keep them
+     * when a sync replaces the header list. */
+    private static void keep_previews (GenericArray<Message>? previous, GenericArray<Message> messages) {
+        if (previous == null)
+            return;
+        var by_uid = new HashTable<string, string> (str_hash, str_equal);
+        for (uint i = 0; i < previous.length; i++) {
+            var preview = previous[i].preview;
+            if (preview != null && preview.length > 0 && previous[i].uid != null)
+                by_uid.set (previous[i].uid, preview);
+        }
+        if (by_uid.size () == 0)
+            return;
+        for (uint i = 0; i < messages.length; i++) {
+            var message = messages[i];
+            if ((message.preview == null || message.preview.length == 0) && message.uid != null)
+                message.preview = by_uid.get (message.uid);
+        }
+    }
+
+    private void on_preview_ready (Account account, Folder folder, string uid, string preview) {
+        var cached = this.message_cache.get (message_cache_key (account, folder));
+        if (cached == null)
+            return;
+        Message? message = null;
+        for (uint i = 0; i < cached.length; i++) {
+            if (cached[i].uid == uid) {
+                message = cached[i];
+                break;
+            }
+        }
+        if (message == null || (message.preview != null && message.preview.length > 0))
+            return;
+
+        message.preview = preview;
+        queue_header_list_cache_save (account, folder, cached);
+        for (uint i = 0; i < this.message_store.get_n_items (); i++) {
+            var conversation = this.message_store.get_item (i) as Conversation;
+            if (conversation != null && conversation.contains (uid, folder.full_name)) {
+                conversation.refresh ();
+                break;
+            }
+        }
+    }
+
     private void store_folder_messages (
         Account account,
         Folder folder,
@@ -988,6 +1034,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         /* Always drop locally-hidden (archived/moved pending flush) so Camel
          * summaries and disk header caches cannot resurrect them. */
         var visible = visible_messages (account, folder, messages);
+        keep_previews (previous, visible);
         /* Scale-based shrink guard. accept_server_shrink is a finished Gmail
          * Important refresh: that shorter list is the label, so it replaces
          * the cache. Every other large folder still keeps the prior list. */

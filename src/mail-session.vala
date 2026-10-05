@@ -82,6 +82,9 @@ public class Mail.MailSession : Camel.Session {
     public signal void draft_saved (Account account, Message? draft, string? replaced_uid);
     public signal void draft_removed (Account account, Folder folder, string uid);
     public signal void transfer_failed (Account account, Folder from, GenericArray<string> uids, string error);
+    /* A body reached the local cache. IMAP servers rarely send previews, so the
+     * message list takes them from here. */
+    public signal void preview_ready (Account account, Folder folder, string uid, string preview);
 
     public MailSession (E.SourceRegistry registry) {
         var data = Path.build_filename (Environment.get_user_data_dir (), "letter", "mail");
@@ -1140,6 +1143,9 @@ public class Mail.MailSession : Camel.Session {
             uid,
             plain_text
         );
+        var preview = Utils.preview_from_text (plain_text);
+        if (preview != null)
+            preview_ready (account, folder, uid, preview);
     }
 
     /* Index MIME already on disk that is not yet in BodyTextIndex (beyond tip
@@ -6058,7 +6064,7 @@ public class Mail.MailSession : Camel.Session {
         if (mime == null)
             return;
         var content = MessageContent.from_mime (uid, mime);
-        this.body_text_index.add (account_uid, folder.full_name, uid, content.plain_text);
+        index_cached_body (account, folder, uid, content.plain_text);
     }
 
     private static bool is_missing_on_server (Error error) {
