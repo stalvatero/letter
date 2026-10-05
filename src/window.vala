@@ -6115,6 +6115,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
 
         row.list_position = item.position;
+        row.hide_sender = this.selected_folder != null && this.selected_folder.person_address != null;
         row.bind (conversation, this.search_text.length > 0 ? this.search_tokens : null);
     }
 
