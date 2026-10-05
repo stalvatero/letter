@@ -2245,6 +2245,31 @@ namespace Mail.Utils {
         return recipients_from_address (internet_address_from_header (raw));
     }
 
+    /* Lowercase addresses of a header value, separated by commas. */
+    public static string address_keys (string? raw) {
+        var builder = new StringBuilder ();
+        if (raw == null || raw.strip ().length == 0)
+            return "";
+        var recipients = parse_recipient_list (raw);
+        for (uint i = 0; i < recipients.length; i++) {
+            var email = sanitize_recipient_text (recipients[i].email).down ();
+            if (email.length == 0 || !email.contains ("@"))
+                continue;
+            if (builder.len > 0)
+                builder.append_c (',');
+            builder.append (email);
+        }
+        return builder.str;
+    }
+
+    public static string join_address_keys (string a, string b) {
+        if (a.length == 0)
+            return b;
+        if (b.length == 0)
+            return a;
+        return a + "," + b;
+    }
+
     public static Camel.InternetAddress internet_address_from_header (string? raw) {
         var address = new Camel.InternetAddress ();
         if (raw != null && raw.strip ().length > 0)

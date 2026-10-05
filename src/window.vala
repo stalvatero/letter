@@ -41,6 +41,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     [GtkChild]
     private unowned Adw.WindowTitle folder_title;
     [GtkChild]
+    private unowned Gtk.ToggleButton people_button;
+    [GtkChild]
     private unowned Adw.Bin folder_bin;
     [GtkChild]
     private unowned Adw.StatusPage no_folders_page;
@@ -101,6 +103,12 @@ public class Mail.Window : Adw.ApplicationWindow {
     private Settings settings;
     private Gtk.ListBox account_list;
     private Gtk.ListBox folder_list;
+    private Gtk.Box people_box;
+    private Gtk.SearchEntry people_filter;
+    private Gtk.ListBox people_list;
+    private Folder? people_all_folder;
+    private HashTable<string, Folder> person_folders;
+    private uint people_refresh_source;
     private Gtk.ListView message_list;
     private GLib.ListStore message_store;
     private Gtk.MultiSelection message_selection;
@@ -431,6 +439,41 @@ public class Mail.Window : Adw.ApplicationWindow {
             return on_folder_key_pressed (keyval);
         });
         this.folder_list.add_controller (folder_keys);
+
+        this.person_folders = new HashTable<string, Folder> (str_hash, str_equal);
+        this.people_list = new Gtk.ListBox () {
+            selection_mode = Gtk.SelectionMode.SINGLE,
+            valign = Gtk.Align.START,
+            hexpand = true,
+        };
+        this.people_list.add_css_class ("navigation-sidebar");
+        this.people_list.add_css_class ("folder-list");
+        this.people_list.row_activated.connect (on_person_activated);
+        this.people_filter = new Gtk.SearchEntry () {
+            placeholder_text = _("Filter People"),
+            margin_start = 8,
+            margin_end = 8,
+            margin_top = 6,
+            margin_bottom = 2,
+        };
+        this.people_filter.search_changed.connect (() => this.people_list.invalidate_filter ());
+        this.people_list.set_filter_func ((row) => {
+            var person = (row as PersonRow)?.person;
+            if (person == null)
+                return true;
+            return person.matches (this.people_filter.text.strip ().down ());
+        });
+        this.people_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
+        this.people_box.append (this.people_filter);
+        this.people_box.append (new Gtk.ScrolledWindow () {
+            hscrollbar_policy = Gtk.PolicyType.NEVER,
+            hexpand = true,
+            vexpand = true,
+            child = this.people_list,
+        });
+        this.people_button.active = this.settings.get_boolean ("show-people");
+        this.people_button.toggled.connect (on_people_toggled);
+        sync_people_button ();
 
         this.message_store = new ListStore (typeof (Conversation));
         this.message_selection = new Gtk.MultiSelection (this.message_store);
@@ -2583,6 +2626,10 @@ public class Mail.Window : Adw.ApplicationWindow {
             show_bookmarked_messages ();
             return;
         }
+        if (folder.is_people_view) {
+            show_people_messages ();
+            return;
+        }
 
         var cache = this.message_cache.get (message_cache_key (account, folder));
         if (cache == null) {
@@ -2597,6 +2644,10 @@ public class Mail.Window : Adw.ApplicationWindow {
         var folder = this.selected_folder;
         if (folder == null)
             return;
+        if (folder.is_people_view) {
+            highlight_selected_person ();
+            return;
+        }
 
         for (int i = 0; this.folder_list.get_row_at_index (i) != null; i++) {
             var row = this.folder_list.get_row_at_index (i) as FolderRow;
@@ -2721,6 +2772,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.selected_account = account;
         this.selected_folder = null;
         this.bookmarks_folder = null;
+        clear_people ();
         clear_search_state ();
         this.settings.set_string ("last-account-uid", account.source_uid ?? account.uid);
         this.folder_title.title = account.display_name;
@@ -3226,7 +3278,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         bool restore,
         Cancellable cancellable
     ) {
-        this.folder_bin.child = this.folder_scrolled;
+        show_sidebar_list ();
         apply_folder_tree (folders);
         remember_folder_tree (account, folders);
         mark_inbox_tree_on_sidebar ();
@@ -3945,6 +3997,13 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void restore_folder_selection () {
+        if (this.people_button.active) {
+            open_people_view (this.selected_folder != null && this.selected_folder.is_people_view
+                ? this.selected_folder
+                : ensure_people_all_folder ());
+            return;
+        }
+
         FolderRow? inbox = null;
         FolderRow? first = null;
 
@@ -3974,12 +4033,16 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (folder_row == null)
             return;
 
-        this.selected_folder = folder_row.folder;
+        open_folder (folder_row.folder);
+    }
+
+    private void open_folder (Folder folder) {
+        this.selected_folder = folder;
         if (is_searching)
             clear_search_state ();
 
-        this.conversation_title.title = folder_row.folder.name;
-        this.conversation_title.subtitle = folder_counts_label (folder_row.folder);
+        this.conversation_title.title = folder.name;
+        this.conversation_title.subtitle = folder_counts_label (folder);
         apply_offline_heading ();
         var keep_uid = this.pending_select_uid;
         this.pending_select_uid = null;
@@ -3994,11 +4057,11 @@ public class Mail.Window : Adw.ApplicationWindow {
         } else {
             this.open_message_uid = keep_uid;
             this.open_content = null;
-            this.open_message = find_cached_message (this.selected_account, folder_row.folder, keep_uid);
+            this.open_message = find_cached_message (this.selected_account, folder, keep_uid);
             cancel_mark_seen ();
         }
 
-        load_messages.begin (folder_row.folder);
+        load_messages.begin (folder);
     }
 
     private async void load_messages (Folder folder) {
@@ -4014,6 +4077,10 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
         if (folder.is_bookmarks_view) {
             show_bookmarked_messages ();
+            return;
+        }
+        if (folder.is_people_view) {
+            show_people_messages ();
             return;
         }
         if (folder.is_gmail_namespace) {
@@ -4232,6 +4299,321 @@ public class Mail.Window : Adw.ApplicationWindow {
         show_conversation_list (listed);
     }
 
+    private void on_people_toggled () {
+        this.settings.set_boolean ("show-people", this.people_button.active);
+        sync_people_button ();
+        if (this.folder_bin.child != this.folder_scrolled && this.folder_bin.child != this.people_box)
+            return;
+
+        show_sidebar_list ();
+        if (this.people_button.active) {
+            open_people_view (ensure_people_all_folder ());
+        } else {
+            clear_people ();
+            restore_folder_selection ();
+        }
+    }
+
+    private void sync_people_button () {
+        this.people_button.tooltip_text = this.people_button.active
+            ? _("Show Folders")
+            : _("Show People");
+    }
+
+    private void show_sidebar_list () {
+        this.folder_bin.child = this.people_button.active
+            ? (Gtk.Widget) this.people_box
+            : (Gtk.Widget) this.folder_scrolled;
+    }
+
+    private Folder ensure_people_all_folder () {
+        if (this.people_all_folder == null) {
+            this.people_all_folder = new Folder () {
+                name = _("All People"),
+                full_name = Folder.PEOPLE_PATH,
+            };
+        }
+        return this.people_all_folder;
+    }
+
+    private Folder person_folder (string address) {
+        var folder = this.person_folders.get (address);
+        if (folder == null) {
+            folder = new Folder () {
+                name = PeopleIndex.name_from_key (address) ?? address,
+                full_name = Folder.PERSON_PREFIX + address,
+            };
+            this.person_folders.set (address, folder);
+        }
+        return folder;
+    }
+
+    private void clear_people () {
+        if (this.people_refresh_source != 0) {
+            Source.remove (this.people_refresh_source);
+            this.people_refresh_source = 0;
+        }
+        this.person_folders.remove_all ();
+        this.people_all_folder = null;
+        this.people_filter.text = "";
+        Gtk.ListBoxRow? row;
+        while ((row = this.people_list.get_row_at_index (0)) != null)
+            this.people_list.remove (row);
+    }
+
+    private void open_people_view (Folder folder) {
+        if (this.selected_account == null)
+            return;
+        rebuild_people_list ();
+        open_folder (folder);
+        highlight_selected_person ();
+    }
+
+    private void on_person_activated (Gtk.ListBoxRow row) {
+        var person_row = row as PersonRow;
+        if (person_row != null)
+            open_folder (person_row.folder);
+    }
+
+    private void highlight_selected_person () {
+        var folder = this.selected_folder;
+        for (int i = 0; this.people_list.get_row_at_index (i) != null; i++) {
+            var row = this.people_list.get_row_at_index (i) as PersonRow;
+            if (row != null && folder != null && row.folder.full_name == folder.full_name) {
+                this.people_list.select_row (row);
+                return;
+            }
+        }
+        this.people_list.unselect_all ();
+    }
+
+    /* Header lists change in bursts during sync; rebuild once they settle. */
+    private void queue_people_refresh () {
+        if (!this.people_button.active || this.people_refresh_source != 0)
+            return;
+        this.people_refresh_source = Timeout.add (300, () => {
+            this.people_refresh_source = 0;
+            rebuild_people_list ();
+            if (this.selected_folder != null && this.selected_folder.is_people_view
+                && this.search_text.length == 0)
+                show_people_messages ();
+            return Source.REMOVE;
+        });
+    }
+
+    /* Mail the People view looks at: every folder except junk, trash, drafts
+     * and the outbox, each message once even when Gmail labels repeat it. */
+    private GenericArray<Message> collect_people_source () {
+        var result = new GenericArray<Message> ();
+        var account = this.selected_account;
+        if (account == null)
+            return result;
+
+        var seen_ids = new HashTable<uint64?, uint8> (int64_hash, int64_equal);
+        var folders = folders_from_tree (false);
+        for (uint i = 0; i < folders.length; i++) {
+            var folder = folders[i];
+            switch (folder.kind) {
+                case FolderKind.JUNK:
+                case FolderKind.TRASH:
+                case FolderKind.DRAFTS:
+                case FolderKind.OUTBOX:
+                    continue;
+                default:
+                    break;
+            }
+            if (folder.is_gmail_namespace)
+                continue;
+            var cached = this.message_cache.get (message_cache_key (account, folder));
+            if (cached == null)
+                continue;
+            for (uint j = 0; j < cached.length; j++) {
+                var message = cached[j];
+                if (message.is_placeholder
+                    || this.hidden_uids.contains (hide_key (account, folder, message.uid)))
+                    continue;
+                if (message.msgid_hash != 0) {
+                    if (seen_ids.contains (message.msgid_hash))
+                        continue;
+                    seen_ids.set (message.msgid_hash, 1);
+                }
+                result.add (message);
+            }
+        }
+        return result;
+    }
+
+    private void rebuild_people_list () {
+        var account = this.selected_account;
+        if (!this.people_button.active || account == null)
+            return;
+
+        var index = new PeopleIndex (account);
+        var messages = collect_people_source ();
+        for (uint i = 0; i < messages.length; i++)
+            index.learn (messages[i]);
+
+        var people = new HashTable<string, Person> (str_hash, str_equal);
+        var all = ensure_people_all_folder ();
+        int all_unread = 0;
+        for (uint i = 0; i < messages.length; i++) {
+            var message = messages[i];
+            var outgoing = index.is_outgoing (message);
+            if (!outgoing && !message.seen)
+                all_unread++;
+            var counterparts = index.counterparts (message);
+            for (uint j = 0; j < counterparts.length; j++) {
+                var address = counterparts[j];
+                var person = people.get (address);
+                if (person == null) {
+                    person = new Person (address, person_folder (address));
+                    people.set (address, person);
+                }
+                person.total++;
+                if (!outgoing && !message.seen)
+                    person.unread++;
+                if (message.date > person.latest)
+                    person.latest = message.date;
+                /* A name from mail they sent wins over one from mail you sent. */
+                if (person.name.length == 0 || !outgoing) {
+                    var name = PeopleIndex.name_for (message, outgoing);
+                    if (name != null)
+                        person.name = name;
+                }
+            }
+        }
+        all.total = (int) messages.length;
+        all.unread = all_unread;
+
+        var sorted = new GenericArray<Person> ();
+        people.foreach ((address, person) => {
+            if (person.name.length == 0)
+                person.name = PeopleIndex.name_from_key (address) ?? "";
+            person.folder.name = person.display_name;
+            person.folder.total = person.total;
+            person.folder.unread = person.unread;
+            sorted.add (person);
+        });
+        sorted.sort ((a, b) => {
+            if (a.latest != b.latest)
+                return a.latest < b.latest ? 1 : -1;
+            return strcmp (a.display_name.collate_key (), b.display_name.collate_key ());
+        });
+
+        Gtk.ListBoxRow? old;
+        while ((old = this.people_list.get_row_at_index (0)) != null)
+            this.people_list.remove (old);
+        this.people_list.append (new PersonRow.all (all));
+        for (uint i = 0; i < sorted.length; i++) {
+            var row = new PersonRow (sorted[i]);
+            row.context_pressed.connect ((x, y) => popup_person_menu (row, x, y));
+            this.people_list.append (row);
+        }
+        highlight_selected_person ();
+    }
+
+    private void show_people_messages () {
+        var account = this.selected_account;
+        var folder = this.selected_folder;
+        if (account == null || folder == null || !folder.is_people_view)
+            return;
+
+        var address = folder.person_address;
+        var messages = collect_people_source ();
+        if (address != null) {
+            var index = new PeopleIndex (account);
+            for (uint i = 0; i < messages.length; i++)
+                index.learn (messages[i]);
+            var mine = new GenericArray<Message> ();
+            for (uint i = 0; i < messages.length; i++) {
+                if (index.involves (messages[i], address))
+                    mine.add (messages[i]);
+            }
+            messages = mine;
+        }
+        messages.sort ((a, b) => {
+            if (a.date < b.date)
+                return 1;
+            if (a.date > b.date)
+                return -1;
+            return 0;
+        });
+
+        int unread = 0;
+        for (uint i = 0; i < messages.length; i++) {
+            messages[i].show_folder = true;
+            if (!messages[i].seen && !messages[i].outgoing)
+                unread++;
+        }
+        folder.total = (int) messages.length;
+        folder.unread = unread;
+
+        if (messages.length == 0) {
+            this.message_store.remove_all ();
+            show_conversation_placeholder (
+                _("No Mail"),
+                _("Mail you exchange shows up here once its folders are loaded.")
+            );
+            update_folder_heading (folder, 0);
+            return;
+        }
+
+        GenericArray<Conversation> conversations;
+        if (this.conversation_view) {
+            conversations = Conversation.group (messages, related_thread_messages (messages));
+            for (uint i = 0; i < conversations.length; i++) {
+                conversations[i].list_folder = null;
+                for (uint j = 0; j < conversations[i].messages.length; j++)
+                    conversations[i].messages[j].show_folder = true;
+                conversations[i].refresh ();
+            }
+        } else {
+            conversations = Conversation.as_singles (messages);
+        }
+
+        var listed = listed_conversations (conversations);
+        update_folder_heading (folder, listed.length);
+        if (listed.length == 0) {
+            this.message_store.remove_all ();
+            show_conversation_placeholder (
+                _("No Unread Mail"),
+                _("Turn off the unread filter to see the rest of this view.")
+            );
+            return;
+        }
+
+        show_conversation_list (listed);
+    }
+
+    private void popup_person_menu (PersonRow row, double x, double y) {
+        var person = row.person;
+        if (person == null || !person.has_email)
+            return;
+
+        var group = new SimpleActionGroup ();
+        var write = new SimpleAction ("write-to-person", null);
+        write.activate.connect (() => {
+            on_compose_to (new Recipient () {
+                name = person.name,
+                email = person.address,
+            });
+        });
+        group.add_action (write);
+        var copy = new SimpleAction ("copy-person-address", null);
+        copy.activate.connect (() => {
+            get_clipboard ().set_text (person.address);
+            show_toast (_("Address copied"));
+        });
+        group.add_action (copy);
+
+        var menu = new Menu ();
+        var section = new Menu ();
+        section.append (_("Write Email"), "ctx.write-to-person");
+        section.append (_("Copy Address"), "ctx.copy-person-address");
+        menu.append_section (null, section);
+        popup_context_menu (row, menu, group, x, y);
+    }
+
     private GenericArray<Message> collect_flagged_messages () {
         var result = new GenericArray<Message> ();
         var account = this.selected_account;
@@ -4274,6 +4656,7 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void sync_bookmarks_folder () {
+        queue_people_refresh ();
         if (is_gmail_account ()) {
             var existing = bookmarks_row ();
             if (existing != null) {
@@ -4536,6 +4919,10 @@ public class Mail.Window : Adw.ApplicationWindow {
             n += message.from_blob.length;
         if (message.to_blob != null)
             n += message.to_blob.length;
+        if (message.from_address != null)
+            n += message.from_address.length;
+        if (message.recipient_addresses != null)
+            n += message.recipient_addresses.length;
         if (message.conversation_key != null)
             n += message.conversation_key.length;
         if (message.msgid_refs != null)
@@ -4800,6 +5187,10 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (conversation_key.length == 0)
             conversation_key = null;
         var refs_raw = parts.length > 10 ? parts[10] : "";
+        /* Columns 11 and 12 were added for the People view; older caches
+         * leave them out until the folder is written again. */
+        var from_address = parts.length > 11 ? header_cache_unescape (parts[11]) : "";
+        var recipient_addresses = parts.length > 12 ? header_cache_unescape (parts[12]) : "";
 
         var from_blob = new StringBuilder ();
         Utils.append_search_part (from_blob, from);
@@ -4836,6 +5227,8 @@ public class Mail.Window : Adw.ApplicationWindow {
             list_address = msg_outgoing && to.length > 0 ? to : from,
             from_blob = from_blob.str,
             to_blob = to_blob.str,
+            from_address = from_address.length > 0 ? from_address : null,
+            recipient_addresses = recipient_addresses.length > 0 ? recipient_addresses : null,
             search_blob = search.str,
         };
     }
@@ -4969,6 +5362,10 @@ public class Mail.Window : Adw.ApplicationWindow {
             builder.append (header_cache_escape (message.conversation_key));
             builder.append_c ('\t');
             builder.append (format_msgid_refs (message.msgid_refs));
+            builder.append_c ('\t');
+            builder.append (header_cache_escape (message.from_address));
+            builder.append_c ('\t');
+            builder.append (header_cache_escape (message.recipient_addresses));
             builder.append_c ('\n');
         }
 
@@ -10256,6 +10653,10 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
         if (folder.is_bookmarks_view) {
             show_bookmarked_messages ();
+            return;
+        }
+        if (folder.is_people_view) {
+            show_people_messages ();
             return;
         }
 

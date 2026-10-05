@@ -226,6 +226,12 @@ template $MailWindow: Adw.ApplicationWindow {
               tooltip-text: _("Toggle Sidebar");
             }
 
+            [end]
+            ToggleButton people_button {
+              icon-name: "system-users-symbolic";
+              tooltip-text: _("Show People");
+            }
+
             title-widget: Adw.WindowTitle folder_title {
               title: _("Folders");
             };
