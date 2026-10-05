@@ -26,6 +26,11 @@
       <summary>Show mail folders pane</summary>
       <description>Whether the mail folders pane is visible beside the message list.</description>
     </key>
+    <key name="show-people" type="b">
+      <default>false</default>
+      <summary>Show people</summary>
+      <description>Whether the folder pane lists the people you exchange mail with instead of folders.</description>
+    </key>
     <key name="folder-pane-width" type="i">
       <default>260</default>
       <summary>Folder pane width</summary>

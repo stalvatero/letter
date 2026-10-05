@@ -155,6 +155,9 @@ public class Mail.Folder : Object {
     public const uint FLAG_NOINFERIORS = 1 << 1;
     public const string BOOKMARKS_PATH = ":bookmarks";
     public const string OUTBOX_PATH = ":outbox";
+    /* People view: all correspondence, or one person by address. */
+    public const string PEOPLE_PATH = ":people";
+    public const string PERSON_PREFIX = ":person:";
 
     public string name { get; set; }
     public string full_name { get; set; }
@@ -279,6 +282,10 @@ public class Mail.Folder : Object {
                     return "mail-mark-junk-symbolic";
                 case FolderKind.OUTBOX:
                     return "mail-send-receive-symbolic";
+                case FolderKind.PEOPLE:
+                    return "mail-inbox-symbolic";
+                case FolderKind.PERSON:
+                    return "avatar-default-symbolic";
                 default:
                     return "folder-symbolic";
             }
@@ -340,7 +347,23 @@ public class Mail.Folder : Object {
 
     public bool is_virtual_view {
         get {
-            return this.full_name == BOOKMARKS_PATH || this.full_name == OUTBOX_PATH;
+            return this.full_name == BOOKMARKS_PATH || this.full_name == OUTBOX_PATH
+                || this.is_people_view;
+        }
+    }
+
+    public bool is_people_view {
+        get {
+            return this.full_name == PEOPLE_PATH || this.full_name.has_prefix (PERSON_PREFIX);
+        }
+    }
+
+    /* The address of a person view, null for the other folders. */
+    public string? person_address {
+        owned get {
+            if (!this.full_name.has_prefix (PERSON_PREFIX))
+                return null;
+            return this.full_name.substring (PERSON_PREFIX.length);
         }
     }
 
@@ -408,13 +431,19 @@ public enum Mail.FolderKind {
     ALL,
     STARRED,
     IMPORTANT,
-    SYSTEM;
+    SYSTEM,
+    PEOPLE,
+    PERSON;
 
     public static FolderKind from_flags (uint flags, string? name, string? full_name) {
         if (full_name == Folder.BOOKMARKS_PATH)
             return BOOKMARKS;
         if (full_name == Folder.OUTBOX_PATH)
             return OUTBOX;
+        if (full_name == Folder.PEOPLE_PATH)
+            return PEOPLE;
+        if (full_name != null && full_name.has_prefix (Folder.PERSON_PREFIX))
+            return PERSON;
 
         uint type = flags & Folder.TYPE_MASK;
         if (type == (1 << 10))
@@ -538,6 +567,10 @@ public class Mail.Message : Object {
     public string? cc_header { get; set; }
     public string? from_blob { get; set; }
     public string? to_blob { get; set; }
+    /* Lowercase addresses for the People view: the sender, and the To and
+     * Cc recipients separated by commas. */
+    public string? from_address { get; set; }
+    public string? recipient_addresses { get; set; }
     public string list_address { get; set; }
     public int64 date { get; set; }
     public bool seen { get; set; }
