@@ -118,9 +118,6 @@ public class Mail.Window : Adw.ApplicationWindow {
     private HashTable<string, GenericArray<Message>> people_mail;
     private uint people_source_stamp;
     private uint people_refresh_source;
-    private Cancellable? preview_fill_cancellable;
-    /* Rows past this rarely get looked at before the next list change. */
-    private const uint PREVIEW_FILL_LIMIT = 200;
     private Gtk.ListView message_list;
     private GLib.ListStore message_store;
     private Gtk.MultiSelection message_selection;
@@ -991,26 +988,6 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
 
-    /* Previews built from cached bodies are not in Camel's summary; keep them
-     * when a sync replaces the header list. */
-    private static void keep_previews (GenericArray<Message>? previous, GenericArray<Message> messages) {
-        if (previous == null)
-            return;
-        var by_uid = new HashTable<string, string> (str_hash, str_equal);
-        for (uint i = 0; i < previous.length; i++) {
-            var preview = previous[i].preview;
-            if (preview != null && preview.length > 0 && previous[i].uid != null)
-                by_uid.set (previous[i].uid, preview);
-        }
-        if (by_uid.size () == 0)
-            return;
-        for (uint i = 0; i < messages.length; i++) {
-            var message = messages[i];
-            if ((message.preview == null || message.preview.length == 0) && message.uid != null)
-                message.preview = by_uid.get (message.uid);
-        }
-    }
-
     private void on_preview_ready (Account account, Folder folder, string uid, string preview) {
         var message = find_cached_message (account, folder, uid);
         if (message == null || (message.preview != null && message.preview.length > 0))
@@ -1043,7 +1020,6 @@ public class Mail.Window : Adw.ApplicationWindow {
         /* Always drop locally-hidden (archived/moved pending flush) so Camel
          * summaries and disk header caches cannot resurrect them. */
         var visible = visible_messages (account, folder, messages);
-        keep_previews (previous, visible);
         /* Scale-based shrink guard. accept_server_shrink is a finished Gmail
          * Important refresh: that shorter list is the label, so it replaces
          * the cache. Every other large folder still keeps the prior list. */
@@ -4008,6 +3984,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 return;
             finished = true;
             Utils.sync_log ("startup sync finished");
+            store_missing_previews.begin (account, cancellable);
         } finally {
             this.startup_sync_active = false;
             this.mailbox_bootstrapping = false;
@@ -6211,63 +6188,51 @@ public class Mail.Window : Adw.ApplicationWindow {
             on_message_selection_changed ();
         if (keep_scroll)
             restore_list_scroll (scroll_y);
-        fill_missing_previews (conversations);
     }
 
-    /* Mail whose body was cached before previews were kept shows none until
-     * it is opened; make previews for the top of the list from the disk. */
-    private void fill_missing_previews (GenericArray<Conversation> conversations) {
-        if (this.preview_fill_cancellable != null)
-            this.preview_fill_cancellable.cancel ();
-        this.preview_fill_cancellable = null;
-        var account = this.selected_account;
-        if (account == null)
-            return;
-
-        var by_folder = new HashTable<string, GenericArray<string>> (str_hash, str_equal);
-        uint wanted = 0;
-        for (uint i = 0; i < conversations.length && wanted < PREVIEW_FILL_LIMIT; i++) {
-            var conversation = conversations[i];
-            if (conversation.preview != null && conversation.preview.length > 0)
+    /* Mail cached before previews were stored in Camel's summary: store
+     * them once per folder, then show them in one pass over its list. */
+    private async void store_missing_previews (Account account, Cancellable cancellable) {
+        var folders = folders_from_tree (false);
+        for (uint i = 0; i < folders.length; i++) {
+            var folder = folders[i];
+            if (folder.is_virtual_view)
                 continue;
-            var message = conversation.shown ?? conversation.latest;
-            if (message == null || message.uid == null)
-                continue;
-            var folder_name = message.folder_full_name ?? this.selected_folder?.full_name;
-            if (folder_name == null)
-                continue;
-            var uids = by_folder.get (folder_name);
-            if (uids == null) {
-                uids = new GenericArray<string> ();
-                by_folder.set (folder_name, uids);
+            HashTable<string, string>? stored = null;
+            try {
+                stored = yield this.mail_session.store_missing_previews (account, folder, cancellable);
+            } catch (Error e) {
+                if (e is IOError.CANCELLED)
+                    return;
+                debug ("Could not store previews of %s: %s", folder.name, e.message);
             }
-            uids.add (message.uid);
-            wanted++;
+            if (cancellable.is_cancelled () || !is_current_account (account))
+                return;
+            if (stored != null && stored.size () > 0)
+                apply_stored_previews (account, folder, stored);
         }
-        if (wanted == 0)
-            return;
+    }
 
-        var cancellable = new Cancellable ();
-        this.preview_fill_cancellable = cancellable;
-        foreach (var folder_name in by_folder.get_keys ()) {
-            var folder = folder_by_full_name (folder_name);
-            if (folder == null)
+    private void apply_stored_previews (Account account, Folder folder, HashTable<string, string> stored) {
+        var cached = this.message_cache.get (message_cache_key (account, folder));
+        if (cached == null)
+            return;
+        uint applied = 0;
+        for (uint i = 0; i < cached.length; i++) {
+            var message = cached[i];
+            if (message.uid == null || (message.preview != null && message.preview.length > 0))
                 continue;
-            this.mail_session.fill_previews_from_disk.begin (
-                account,
-                folder,
-                by_folder.get (folder_name),
-                cancellable,
-                (obj, res) => {
-                    try {
-                        this.mail_session.fill_previews_from_disk.end (res);
-                    } catch (Error e) {
-                        if (!(e is IOError.CANCELLED))
-                            debug ("Previews from disk: %s", e.message);
-                    }
-                }
-            );
+            var preview = stored.get (message.uid);
+            if (preview == null)
+                continue;
+            message.preview = preview;
+            applied++;
         }
+        if (applied == 0)
+            return;
+        queue_header_list_cache_save (account, folder, cached);
+        for (uint i = 0; i < this.message_store.get_n_items (); i++)
+            (this.message_store.get_item (i) as Conversation)?.refresh ();
     }
 
     private void restore_list_scroll (double y) {

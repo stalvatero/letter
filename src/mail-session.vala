@@ -1136,7 +1136,13 @@ public class Mail.MailSession : Camel.Session {
         return uids;
     }
 
-    public void index_cached_body (Account account, Folder folder, string uid, string? plain_text) {
+    private void index_cached_body (
+        Account account,
+        Folder folder,
+        Camel.Folder camel_folder,
+        string uid,
+        string? plain_text
+    ) {
         this.body_text_index.add (
             account.source_uid ?? account.uid,
             folder.full_name,
@@ -1144,8 +1150,107 @@ public class Mail.MailSession : Camel.Session {
             plain_text
         );
         var preview = Utils.preview_from_text (plain_text);
-        if (preview != null)
+        if (preview != null && store_preview (camel_folder, uid, preview))
             preview_ready (account, folder, uid, preview);
+    }
+
+    /* IMAP servers rarely send previews. One made from the body goes into
+     * Camel's summary, so every later header load already has it. */
+    private static bool store_preview (Camel.Folder camel_folder, string uid, string preview) {
+        var info = camel_folder.get_message_info (uid);
+        if (info == null)
+            return false;
+        var known = info.get_preview ();
+        if (known != null && known.length > 0)
+            return false;
+        info.set_preview (preview);
+        return true;
+    }
+
+    /* Bodies cached before previews were stored got none. Once per folder,
+     * make them from the bodies on disk (offline only). Returns uid → preview
+     * of the mail that got one; null when the folder was done before. */
+    public async HashTable<string, string>? store_missing_previews (
+        Account account,
+        Folder folder,
+        Cancellable? cancellable = null
+    ) throws Error {
+        ensure_previews_done_loaded ();
+        var done_key = prefetch_cursor_key (account, folder);
+        if (folder.is_virtual_view || this.previews_done.contains (done_key))
+            return null;
+
+        var camel_folder = yield open_camel_folder (account, folder, cancellable);
+        var stored = new HashTable<string, string> (str_hash, str_equal);
+        var uids = folder_list_uids (camel_folder);
+        for (uint i = 0; i < uids.length; i++) {
+            if (cancellable != null && cancellable.is_cancelled ())
+                return stored;
+            if (i % 64 == 63) {
+                Idle.add (store_missing_previews.callback, Priority.LOW);
+                yield;
+            }
+            var uid = uids[i];
+            var info = camel_folder.get_message_info (uid);
+            var known = info?.get_preview ();
+            if (info == null || (known != null && known.length > 0)
+                || !message_body_file_exists (camel_folder, uid))
+                continue;
+            var mime = message_from_local_cache (camel_folder, uid);
+            if (mime == null || MessageContent.mime_body_incomplete (mime)
+                || MessageContent.mime_unready_shell (mime))
+                continue;
+            var preview = Utils.preview_from_text (MessageContent.from_mime (uid, mime).plain_text);
+            if (preview == null)
+                continue;
+            info.set_preview (preview);
+            stored.set (uid, preview);
+            /* Parsing a body is the slow part: one per main loop turn. */
+            Idle.add (store_missing_previews.callback, Priority.LOW);
+            yield;
+        }
+
+        camel_folder.get_folder_summary ()?.save ();
+        this.previews_done.set (done_key, 1);
+        save_previews_done ();
+        Utils.sync_log ("previews stored “%s” +%u (of %u camel uids)".printf (
+            folder.name,
+            stored.size (),
+            uids.length
+        ));
+        return stored;
+    }
+
+    private HashTable<string, uint8>? previews_done;
+
+    private static string previews_done_file () {
+        return Path.build_filename (prefetch_cursor_cache_dir (), "previews");
+    }
+
+    private void ensure_previews_done_loaded () {
+        if (this.previews_done != null)
+            return;
+        this.previews_done = new HashTable<string, uint8> (str_hash, str_equal);
+        try {
+            var key = new KeyFile ();
+            key.load_from_file (previews_done_file (), KeyFileFlags.NONE);
+            foreach (var entry in key.get_keys ("done"))
+                this.previews_done.set (entry, 1);
+        } catch (Error e) {
+            /* Missing file: no folder done yet. */
+        }
+    }
+
+    private void save_previews_done () {
+        var key = new KeyFile ();
+        foreach (var entry in this.previews_done.get_keys ())
+            key.set_boolean ("done", entry, true);
+        try {
+            DirUtils.create_with_parents (prefetch_cursor_cache_dir (), 0700);
+            key.save_to_file (previews_done_file ());
+        } catch (Error e) {
+            debug ("Could not write stored previews: %s", e.message);
+        }
     }
 
     /* Index MIME already on disk that is not yet in BodyTextIndex (beyond tip
@@ -2658,7 +2763,7 @@ public class Mail.MailSession : Camel.Session {
         Utils.sync_log ("open body “%s” uid=%s from disk (no wait)".printf (folder.name, uid));
         this.pinned_body_key = key;
         remember_body_cache (key, fetched);
-        index_cached_body (account, folder, uid, fetched.plain_text);
+        index_cached_body (account, folder, camel_folder, uid, fetched.plain_text);
         return fetched;
     }
 
@@ -2831,7 +2936,7 @@ public class Mail.MailSession : Camel.Session {
         }
         this.pinned_body_key = key;
         remember_body_cache (key, fetched);
-        index_cached_body (account, folder, uid, fetched.plain_text);
+        index_cached_body (account, folder, camel_folder, uid, fetched.plain_text);
         release_transient_memory ();
         return fetched;
     }
@@ -6040,7 +6145,7 @@ public class Mail.MailSession : Camel.Session {
             && !MessageContent.mime_unready_shell (mime)) {
             var content = MessageContent.from_mime (uid, mime);
             remember_body_cache (key, content);
-            index_cached_body (account, folder, uid, content.plain_text);
+            index_cached_body (account, folder, camel_folder, uid, content.plain_text);
         }
     }
 
@@ -6058,39 +6163,7 @@ public class Mail.MailSession : Camel.Session {
         if (mime == null)
             return;
         var content = MessageContent.from_mime (uid, mime);
-        index_cached_body (account, folder, uid, content.plain_text);
-    }
-
-    /* Previews for mail whose body reached the disk before previews were
-     * kept: the body index only makes one the first time it sees a body.
-     * Offline only — a body that is not on disk is skipped. */
-    public async void fill_previews_from_disk (
-        Account account,
-        Folder folder,
-        GenericArray<string> uids,
-        Cancellable? cancellable = null
-    ) throws Error {
-        if (folder.is_virtual_view || uids.length == 0)
-            return;
-
-        var camel_folder = yield open_camel_folder (account, folder, cancellable);
-        for (uint i = 0; i < uids.length; i++) {
-            if (cancellable != null && cancellable.is_cancelled ())
-                return;
-            var uid = uids[i];
-            if (!message_body_file_exists (camel_folder, uid))
-                continue;
-            var mime = message_from_local_cache (camel_folder, uid);
-            if (mime == null || MessageContent.mime_body_incomplete (mime)
-                || MessageContent.mime_unready_shell (mime))
-                continue;
-            var preview = Utils.preview_from_text (MessageContent.from_mime (uid, mime).plain_text);
-            if (preview != null)
-                preview_ready (account, folder, uid, preview);
-            /* One body per main loop turn keeps the list responsive. */
-            Idle.add (fill_previews_from_disk.callback, Priority.LOW);
-            yield;
-        }
+        index_cached_body (account, folder, camel_folder, uid, content.plain_text);
     }
 
     private static bool is_missing_on_server (Error error) {
