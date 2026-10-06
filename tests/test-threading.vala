@@ -11,9 +11,38 @@ void main () {
     assert_count (linked_sent_extra (), 1, "extra with shared Message-ID joins");
     assert_count (placeholder_sent_copy (), 1, "local send matches the Sent copy");
     assert_count (two_real_sends (), 2, "two real sent messages stay apart");
+    trashed_mail_leaves_cross_folder_view ();
     assert_norm ("RDS Os 21 Deco lista pdv", "rds os 21 deco lista pdv");
     assert_norm ("Re:RDS Os 21 Deco lista pdv", "rds os 21 deco lista pdv");
     assert_norm ("R: Re:RDS Os 21 Deco lista pdv", "rds os 21 deco lista pdv");
+}
+
+/* The People view lists conversations across folders; mail moved to Trash
+ * from it must no longer count, so the emptied conversation is dropped. */
+void trashed_mail_leaves_cross_folder_view () {
+    var a = message ("inbox", "1", "Meeting", 11);
+    var b = message ("Sent", "2", "Re: Meeting", 22);
+    b.msgid_refs = { 11 };
+    var conversations = Mail.Conversation.group (primary (a, b), null);
+    assert_count (conversations, 1, "reply in Sent joins the thread");
+    var conversation = conversations[0];
+    conversation.list_folder = null;
+    var hidden = new HashTable<string, uint8> (str_hash, str_equal);
+    hidden.set ("Trash", 1);
+    conversation.hidden_folders = hidden;
+    if (conversation.listed_count != 2)
+        error ("both folders count before the move");
+
+    a.folder_full_name = "Trash";
+    if (conversation.listed_count != 1)
+        error ("mail in Trash no longer counts");
+    b.folder_full_name = "Trash";
+    if (conversation.listed_count != 0)
+        error ("a thread moved to Trash leaves the view");
+
+    conversation.hidden_folders = null;
+    if (conversation.listed_count != 2)
+        error ("without hidden folders every message counts");
 }
 
 GenericArray<Mail.Conversation> independent_same_subject () {
