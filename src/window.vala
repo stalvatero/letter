@@ -105,13 +105,12 @@ public class Mail.Window : Adw.ApplicationWindow {
     private Gtk.ListBox folder_list;
     private Gtk.Box people_box;
     private Gtk.SearchEntry people_filter;
-    private Gtk.ListBox people_list;
+    private Gtk.ListView people_list;
+    private PeopleModel people_model;
     private Folder? people_all_folder;
     private HashTable<string, Folder> person_folders;
     /* Kept between rebuilds so a sync step or a read flag updates the rows
      * in place instead of replacing the whole list. */
-    private HashTable<string, PersonRow> person_rows;
-    private PersonRow? people_all_row;
     /* The mail behind the People view and each person's share of it, so
      * switching people needs no pass over every folder. */
     private GenericArray<Message>? people_source;
@@ -450,16 +449,19 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.folder_list.add_controller (folder_keys);
 
         this.person_folders = new HashTable<string, Folder> (str_hash, str_equal);
-        this.person_rows = new HashTable<string, PersonRow> (str_hash, str_equal);
         this.people_mail = new HashTable<string, GenericArray<Message>> (str_hash, str_equal);
-        this.people_list = new Gtk.ListBox () {
-            selection_mode = Gtk.SelectionMode.SINGLE,
-            valign = Gtk.Align.START,
+        this.people_model = new PeopleModel ();
+        var people_factory = new Gtk.SignalListItemFactory ();
+        people_factory.setup.connect (on_person_item_setup);
+        people_factory.bind.connect (on_person_item_bind);
+        people_factory.unbind.connect (on_person_item_unbind);
+        this.people_list = new Gtk.ListView (this.people_model.selection, people_factory) {
             hexpand = true,
+            single_click_activate = false,
         };
         this.people_list.add_css_class ("navigation-sidebar");
         this.people_list.add_css_class ("folder-list");
-        this.people_list.row_activated.connect (on_person_activated);
+        this.people_list.activate.connect (on_person_activated);
         this.people_filter = new Gtk.SearchEntry () {
             placeholder_text = _("Filter People"),
             margin_start = 8,
@@ -467,23 +469,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             margin_top = 6,
             margin_bottom = 2,
         };
-        this.people_filter.search_changed.connect (() => this.people_list.invalidate_filter ());
-        this.people_list.set_filter_func ((row) => {
-            var person = (row as PersonRow)?.person;
-            if (person == null)
-                return true;
-            return person.matches (this.people_filter.text.strip ().down ());
-        });
-        this.people_list.set_sort_func ((a, b) => {
-            var first = (a as PersonRow)?.person;
-            var second = (b as PersonRow)?.person;
-            /* Only the All People row has no person; it stays on top. */
-            if (first == null)
-                return -1;
-            if (second == null)
-                return 1;
-            return Person.compare (first, second);
-        });
+        this.people_filter.search_changed.connect (on_people_filter_changed);
         this.people_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
         this.people_box.append (this.people_filter);
         this.people_box.append (new Gtk.ScrolledWindow () {
@@ -4414,16 +4400,13 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.people_refresh_source = 0;
         }
         this.person_folders.remove_all ();
-        this.person_rows.remove_all ();
         this.people_mail.remove_all ();
         this.people_source = null;
         this.people_source_stamp = 0;
-        this.people_all_row = null;
         this.people_all_folder = null;
         this.people_filter.text = "";
-        Gtk.ListBoxRow? row;
-        while ((row = this.people_list.get_row_at_index (0)) != null)
-            this.people_list.remove (row);
+        this.people_model.set_filter_text ("");
+        this.people_model.clear ();
     }
 
     private void open_people_view (Folder folder) {
@@ -4434,23 +4417,87 @@ public class Mail.Window : Adw.ApplicationWindow {
         highlight_selected_person ();
     }
 
-    private void on_person_activated (Gtk.ListBoxRow row) {
-        var person_row = row as PersonRow;
-        if (person_row != null)
-            open_folder (person_row.folder);
+    private void on_people_filter_changed () {
+        this.people_model.set_filter_text (this.people_filter.text);
+        highlight_selected_person ();
+    }
+
+    private void on_person_item_setup (Object object) {
+        var item = object as Gtk.ListItem;
+        if (item == null)
+            return;
+
+        var row = new PersonRow ();
+        /* Methods, not lambdas. A closure capturing the row (and its gesture)
+         * would keep every discarded list row alive. */
+        var click = new Gtk.GestureClick () {
+            button = Gdk.BUTTON_PRIMARY,
+        };
+        click.pressed.connect (on_person_primary_pressed);
+        row.add_controller (click);
+        var context_click = new Gtk.GestureClick () {
+            button = Gdk.BUTTON_SECONDARY,
+        };
+        context_click.pressed.connect (on_person_secondary_pressed);
+        row.add_controller (context_click);
+        item.child = row;
+    }
+
+    private void on_person_item_bind (Object object) {
+        var item = object as Gtk.ListItem;
+        var row = item != null ? item.child as PersonRow : null;
+        var person = item != null ? item.item as Person : null;
+        if (row != null && person != null)
+            row.bind (person);
+    }
+
+    private void on_person_item_unbind (Object object) {
+        var item = object as Gtk.ListItem;
+        var row = item != null ? item.child as PersonRow : null;
+        if (row != null)
+            row.unbind ();
+    }
+
+    /* A single click opens the person, like a row of the folder list; the
+     * keyboard opens with Enter through the list's activate. */
+    private void on_person_primary_pressed (Gtk.GestureClick click, int n_press, double x, double y) {
+        unowned PersonRow? row = click.widget as PersonRow;
+        if (row == null || n_press != 1)
+            return;
+        /* Opening may rebuild the list and recycle the row. The extra ref
+         * lasts until return. */
+        row.ref ();
+        var person = row.person;
+        if (person != null)
+            open_folder (person.folder);
+        row.unref ();
+    }
+
+    private void on_person_secondary_pressed (Gtk.GestureClick click, int n_press, double x, double y) {
+        unowned PersonRow? row = click.widget as PersonRow;
+        if (row == null)
+            return;
+        row.ref ();
+        click.set_state (Gtk.EventSequenceState.CLAIMED);
+        popup_person_menu (row, x, y);
+        row.unref ();
+    }
+
+    private void on_person_activated (uint position) {
+        var person = this.people_model.selection.get_item (position) as Person;
+        /* A double click comes here after its first press opened the person. */
+        if (person != null && person.folder != this.selected_folder)
+            open_folder (person.folder);
     }
 
     private void highlight_selected_person () {
         var folder = this.selected_folder;
-        PersonRow? row = null;
+        Person? person = null;
         if (folder != null && folder.is_people_view) {
             var address = folder.person_address;
-            row = address != null ? this.person_rows.get (address) : this.people_all_row;
+            person = address != null ? this.people_model.lookup (address) : this.people_model.all;
         }
-        if (row != null)
-            this.people_list.select_row (row);
-        else
-            this.people_list.unselect_all ();
+        this.people_model.select (person);
     }
 
     /* Header lists change in bursts during sync; rebuild once they settle. */
@@ -4533,32 +4580,36 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.people_source_stamp = stamp;
 
         var index = new PeopleIndex (account);
+        var t1 = Utils.sync_tick ();
         if (changed)
             group_people_mail (index, messages);
 
         /* Flags change far more often than the mail itself: recount from
          * each person's share instead of grouping again. */
+        var t2 = Utils.sync_tick ();
         count_unread (ensure_people_all_folder (), messages, index);
-        this.people_all_row.update ();
-        foreach (var row in this.person_rows.get_values ()) {
-            count_unread (row.folder, this.people_mail.get (row.person.address), index);
-            row.update ();
+        this.people_model.ensure_all (ensure_people_all_folder ());
+        foreach (var entry in this.people_mail.get_keys ()) {
+            var person = this.people_model.lookup (entry);
+            if (person != null)
+                count_unread (person.folder, this.people_mail.get (entry), index);
         }
-        if (changed)
-            this.people_list.invalidate_sort ();
         highlight_selected_person ();
-        Utils.sync_log ("people rebuild %u messages, %u people%s %s".printf (
+        Utils.sync_log ("people rebuild %u messages, %u people%s %s (collect %s, group %s, count %s)".printf (
             messages.length,
-            this.person_rows.size (),
+            this.people_model.size,
             changed ? "" : " (flags only)",
-            Utils.sync_ms (t0)
+            Utils.sync_ms (t0),
+            ms_between (t0, t1),
+            ms_between (t1, t2),
+            Utils.sync_ms (t2)
         ));
         return changed;
     }
 
     /* Splits the mail between the people it was exchanged with and updates
-     * the rows in place: replacing them all made the list slow and lost its
-     * scroll position. */
+     * the people in place, so only rows whose person changed are redrawn and
+     * the list keeps its scroll position. */
     private void group_people_mail (PeopleIndex index, GenericArray<Message> messages) {
         for (uint i = 0; i < messages.length; i++)
             index.learn (messages[i]);
@@ -4573,51 +4624,25 @@ public class Mail.Window : Adw.ApplicationWindow {
                 var address = counterparts[j];
                 var person = present.get (address);
                 if (person == null) {
-                    person = this.person_rows.get (address)?.person
+                    person = this.people_model.lookup (address)
                         ?? new Person (address, person_folder (address));
-                    person.name = "";
-                    person.latest = 0;
+                    person.begin_update ();
                     present.set (address, person);
                     mail.set (address, new GenericArray<Message> ());
                 }
                 mail.get (address).add (message);
-                if (message.date > person.latest)
-                    person.latest = message.date;
+                if (message.date > person.pending_latest)
+                    person.pending_latest = message.date;
                 /* A name from mail they sent wins over one from mail you sent. */
-                if (person.name.length == 0 || !outgoing) {
+                if (person.pending_name.length == 0 || !outgoing) {
                     var name = PeopleIndex.name_for (message, outgoing);
                     if (name != null)
-                        person.name = name;
+                        person.pending_name = name;
                 }
             }
         }
         this.people_mail = mail;
-
-        if (this.people_all_row == null) {
-            this.people_all_row = new PersonRow.all (ensure_people_all_folder ());
-            this.people_list.append (this.people_all_row);
-        }
-        var gone = new GenericArray<string> ();
-        foreach (var address in this.person_rows.get_keys ()) {
-            if (!present.contains (address))
-                gone.add (address);
-        }
-        for (uint i = 0; i < gone.length; i++) {
-            this.people_list.remove (this.person_rows.get (gone[i]));
-            this.person_rows.remove (gone[i]);
-        }
-        foreach (var person in present.get_values ()) {
-            if (person.name.length == 0)
-                person.name = PeopleIndex.name_from_key (person.address) ?? "";
-            person.update_sort_key ();
-            person.folder.name = person.display_name;
-            if (this.person_rows.contains (person.address))
-                continue;
-            var row = new PersonRow (person);
-            row.context_pressed.connect (popup_person_menu);
-            this.person_rows.set (person.address, row);
-            this.people_list.append (row);
-        }
+        this.people_model.update (present);
     }
 
     private static void count_unread (Folder folder, GenericArray<Message> messages, PeopleIndex index) {
@@ -4626,8 +4651,15 @@ public class Mail.Window : Adw.ApplicationWindow {
             if (!messages[i].seen && !index.is_outgoing (messages[i]))
                 unread++;
         }
-        folder.total = (int) messages.length;
-        folder.unread = unread;
+        /* Only a real change notifies the row that shows the folder. */
+        if (folder.total != (int) messages.length)
+            folder.total = (int) messages.length;
+        if (folder.unread != unread)
+            folder.unread = unread;
+    }
+
+    private static string ms_between (int64 start, int64 end) {
+        return "%.0f ms".printf ((end - start) / 1000.0);
     }
 
     /* The selected People view's mail, newest first, from the last rebuild
