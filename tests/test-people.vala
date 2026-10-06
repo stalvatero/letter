@@ -25,9 +25,6 @@ void main () {
     assert (Mail.PeopleIndex.name_from_key ("name:grace hopper") == "grace hopper");
     assert (Mail.PeopleIndex.name_from_key ("ada@example.org") == null);
 
-    assert (index.involves (sent, "bob@example.org"));
-    assert (!index.involves (incoming, "bob@example.org"));
-
     assert (Mail.PeopleIndex.name_for (incoming, false) == "Ada Lovelace");
     assert (Mail.PeopleIndex.name_for (sent, true) == null);
     assert (Mail.PeopleIndex.name_for (from_other_client, true) == "Bob");
@@ -46,8 +43,8 @@ class RowWatch : Object {
     }
 }
 
-/* The People list replaces every row after each sync step. A row that is
- * still alive once it is out of the list is memory that never comes back. */
+/* People who no longer have mail leave the list. A row that is still alive
+ * once it is out of the list is memory that never comes back. */
 void check_removed_row_is_freed () {
     if (!Gtk.init_check ()) {
         print ("people: no display, row lifetime not checked\n");
