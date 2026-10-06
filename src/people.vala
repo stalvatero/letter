@@ -8,8 +8,6 @@ public class Mail.Person : Object {
     public string address { get; construct; }
     public string name { get; set; default = ""; }
     public int64 latest { get; set; }
-    public int unread { get; set; }
-    public int total { get; set; }
 
     public Person (string address, Folder folder) {
         Object (address: address, folder: folder);
@@ -32,7 +30,11 @@ public class Mail.Person : Object {
 
     /* Collation key of the display name, made once per rebuild rather than
      * on every comparison of the sorted list. */
-    public string sort_key { get; set; default = ""; }
+    private string sort_key = "";
+
+    public void update_sort_key () {
+        this.sort_key = this.display_name.collate_key ();
+    }
 
     /* Most recent mail first, then by name. */
     public static int compare (Person a, Person b) {
@@ -59,10 +61,6 @@ public class Mail.PeopleIndex : Object {
     public PeopleIndex (Account account) {
         if (account.email != null && account.email.length > 0)
             this.own.set (account.email.down (), 1);
-    }
-
-    public bool is_own (string address) {
-        return this.own.contains (address);
     }
 
     public bool is_outgoing (Message message) {
@@ -103,15 +101,6 @@ public class Mail.PeopleIndex : Object {
         else if (message.from != null && message.from.length > 0)
             add_unique (result, key_for_name (message.from));
         return result;
-    }
-
-    public bool involves (Message message, string address) {
-        var people = counterparts (message);
-        for (uint i = 0; i < people.length; i++) {
-            if (people[i] == address)
-                return true;
-        }
-        return false;
     }
 
     /* A name for a person, from the mail they sent, or from mail sent only

@@ -2052,10 +2052,7 @@ public class Mail.MailSession : Camel.Session {
             to_blob = to_blob.str,
             list_address = list_address,
             from_address = Utils.address_keys (from_raw),
-            recipient_addresses = Utils.join_address_keys (
-                Utils.address_keys (to_raw),
-                Utils.address_keys (cc_raw)
-            ),
+            recipient_addresses = Utils.address_keys (to_raw, cc_raw),
             date = date,
             seen = (flags & Camel.MessageFlags.SEEN) != 0,
             flagged = flagged,
@@ -2123,10 +2120,7 @@ public class Mail.MailSession : Camel.Session {
             to_blob = to_blob.str,
             list_address = to_display,
             from_address = Utils.address_keys (from),
-            recipient_addresses = Utils.join_address_keys (
-                Utils.address_keys (to),
-                Utils.address_keys (cc)
-            ),
+            recipient_addresses = Utils.address_keys (to, cc),
             date = date,
             seen = true,
             has_attachment = mime.has_attachment (),
