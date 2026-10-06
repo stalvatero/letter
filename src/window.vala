@@ -116,6 +116,9 @@ public class Mail.Window : Adw.ApplicationWindow {
     private GenericArray<Message>? people_source;
     private HashTable<string, GenericArray<Message>> people_mail;
     private uint people_source_stamp;
+    /* Thread lookups for the People view, and what they were built from. */
+    private ThreadIndex? people_threads;
+    private uint people_threads_stamp;
     private uint people_refresh_source;
     /* Header caches edited in place, not replaced: lets a People rebuild
      * tell flag changes from mail that came or went without a pass over
@@ -165,6 +168,9 @@ public class Mail.Window : Adw.ApplicationWindow {
     private HashTable<string, GenericArray<Message>> message_cache;
     private HashTable<string, int64?> message_cache_touched;
     private HashTable<string, uint> header_cache_save_sources;
+    /* Writes of each header list on disk, by path, so lookups built from
+     * them can tell they changed. */
+    private static HashTable<string, uint>? header_list_cache_writes;
     private HashTable<string, GenericArray<Folder>> folder_tree_cache;
     private Gtk.PopoverMenu? context_menu;
     private SimpleActionGroup? context_actions;
@@ -4410,6 +4416,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.people_source = null;
         this.people_source_stamp = 0;
         this.people_cache_print = 0;
+        this.people_threads = null;
         this.people_all_folder = null;
         this.people_filter.text = "";
         this.people_model.set_filter_text ("");
@@ -4715,6 +4722,68 @@ public class Mail.Window : Adw.ApplicationWindow {
         return messages;
     }
 
+    /* related_thread_messages () for the People view: the same walk, but
+     * indexed once and kept until the headers behind it change, instead of
+     * two passes over every folder on each switch. */
+    private GenericArray<Message> people_related_messages (Account account, GenericArray<Message> hits) {
+        var folders = folders_from_tree ();
+        var scanned = new GenericArray<Folder> ();
+        var in_ram = new GenericArray<GenericArray<Message>?> ();
+        uint stamp = direct_hash (account);
+        for (uint i = 0; i < folders.length; i++) {
+            var folder = folders[i];
+            if (folder.kind == FolderKind.JUNK || folder.kind == FolderKind.TRASH
+                || folder.is_virtual_view)
+                continue;
+            /* The lists headers_for_folder_scan () would hand the walk. */
+            GenericArray<Message>? cached = this.message_cache.get (message_cache_key (account, folder));
+            if (cached != null && cached.length == 0)
+                cached = null;
+            scanned.add (folder);
+            in_ram.add (cached);
+            stamp = stamp * 31 + direct_hash (folder);
+            stamp = stamp * 31 + str_hash (folder.full_name);
+            if (cached == null) {
+                /* Disk lists change only through save_header_list_cache (),
+                 * which counts its writes, or when the account is reset. */
+                var path = MailSession.header_list_cache_file (
+                    account.source_uid ?? account.uid,
+                    folder.full_name
+                );
+                stamp = stamp * 31 + (FileUtils.test (path, FileTest.IS_REGULAR) ? 2 : 1);
+                if (header_list_cache_writes != null)
+                    stamp = stamp * 31 + header_list_cache_writes.get (path);
+                continue;
+            }
+            /* Moves and appends rename messages in place: a new UID or
+             * folder name is a new string. */
+            stamp = stamp * 31 + direct_hash (cached) + cached.length;
+            for (uint j = 0; j < cached.length; j++) {
+                var message = cached[j];
+                stamp = stamp * 31 + direct_hash (message);
+                stamp = stamp * 31 + direct_hash ((void*) message.uid);
+                stamp = stamp * 31 + direct_hash ((void*) message.folder_full_name);
+            }
+        }
+
+        if (this.people_threads == null || stamp != this.people_threads_stamp) {
+            var t0 = Utils.sync_tick ();
+            var lists = new GenericArray<GenericArray<Message>> ();
+            for (uint i = 0; i < scanned.length; i++) {
+                var list = in_ram[i] ?? load_header_list_cache (account, scanned[i]);
+                if (list != null)
+                    lists.add (list);
+            }
+            this.people_threads = new ThreadIndex (lists);
+            this.people_threads_stamp = stamp;
+            Utils.sync_log ("people threads indexed %u messages %s".printf (
+                this.people_threads.length,
+                Utils.sync_ms (t0)
+            ));
+        }
+        return this.people_threads.expand (hits);
+    }
+
     private void show_people_messages (bool keep_scroll = false) {
         var account = this.selected_account;
         var folder = this.selected_folder;
@@ -4737,8 +4806,13 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
 
         GenericArray<Conversation> conversations;
+        var related_ms = "-";
+        var t_group = Utils.sync_tick ();
         if (this.conversation_view) {
-            conversations = Conversation.group (messages, related_thread_messages (messages));
+            var related = people_related_messages (account, messages);
+            related_ms = Utils.sync_ms (t_group);
+            t_group = Utils.sync_tick ();
+            conversations = Conversation.group (messages, related);
             for (uint i = 0; i < conversations.length; i++) {
                 conversations[i].list_folder = null;
                 for (uint j = 0; j < conversations[i].messages.length; j++)
@@ -4748,7 +4822,9 @@ public class Mail.Window : Adw.ApplicationWindow {
         } else {
             conversations = Conversation.as_singles (messages);
         }
+        var group_ms = Utils.sync_ms (t_group);
 
+        var t_list = Utils.sync_tick ();
         var listed = listed_conversations (conversations);
         update_folder_heading (folder, listed.length);
         if (listed.length == 0) {
@@ -4761,11 +4837,14 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
 
         show_conversation_list (listed, keep_scroll);
-        Utils.sync_log ("people show “%s” %u messages, %u listed %s".printf (
+        Utils.sync_log ("people show “%s” %u messages, %u listed %s (related %s, group %s, list %s)".printf (
             folder.name,
             messages.length,
             listed.length,
-            Utils.sync_ms (t0)
+            Utils.sync_ms (t0),
+            related_ms,
+            group_ms,
+            Utils.sync_ms (t_list)
         ));
     }
 
@@ -5553,6 +5632,9 @@ public class Mail.Window : Adw.ApplicationWindow {
             builder.append_c ('\n');
         }
 
+        if (header_list_cache_writes == null)
+            header_list_cache_writes = new HashTable<string, uint> (str_hash, str_equal);
+        header_list_cache_writes.set (path, header_list_cache_writes.get (path) + 1);
         try {
             FileUtils.set_contents (path, builder.str);
             Utils.sync_log ("disk header cache wrote “%s” (%u headers)".printf (

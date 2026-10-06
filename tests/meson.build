@@ -91,3 +91,19 @@ test_important_cache = executable(
 )
 
 test('important-cache', test_important_cache)
+
+test_thread_index = executable(
+  'test-thread-index',
+  [
+    meson.project_source_root() / 'src' / 'account.vala',
+    meson.project_source_root() / 'src' / 'thread-index.vala',
+    'test-thread-index.vala',
+  ],
+  dependencies: [
+    glib_dep,
+    dependency('gobject-2.0'),
+  ],
+  include_directories: config_h_dir,
+)
+
+test('thread-index', test_thread_index)
