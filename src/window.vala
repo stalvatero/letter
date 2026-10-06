@@ -1807,6 +1807,13 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
 
         var folder = this.selected_folder;
+        /* The People view has its own debounced refresh, which keeps the
+         * scroll position; queueing a second render here doubled the work
+         * of every sync step and jumped the list back to the top. */
+        if (folder.is_people_view && this.people_button.active) {
+            queue_people_refresh ();
+            return;
+        }
         if (showing_this_folder (folder) && open_folder_list_is_large ()) {
             if (this.conversation_grouping
                 && this.conversation_grouping_folder == folder.full_name) {
@@ -10813,7 +10820,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
         }
         if (folder.is_people_view) {
-            show_people_messages ();
+            show_people_messages (true);
             return;
         }
 
