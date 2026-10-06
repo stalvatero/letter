@@ -2,6 +2,9 @@ public class Mail.Conversation : Object {
     public string id { get; private set; }
     public GenericArray<Message> messages { get; default = new GenericArray<Message> (); }
     public string? list_folder { get; set; }
+    /* For views across folders (no list_folder): mail moved into one of
+     * these, such as Trash, no longer belongs to the list. */
+    public HashTable<string, uint8>? hidden_folders { get; set; }
     public string subject { get; private set; default = ""; }
     public string participants { get; private set; default = ""; }
     public string? preview { get; private set; }
@@ -137,8 +140,10 @@ public class Mail.Conversation : Object {
     }
 
     public bool in_list_folder (Message message) {
-        if (this.list_folder == null || this.list_folder.length == 0)
-            return true;
+        if (this.list_folder == null || this.list_folder.length == 0) {
+            return this.hidden_folders == null
+                || !this.hidden_folders.contains (message.folder_full_name ?? "");
+        }
 
         return (message.folder_full_name ?? "") == this.list_folder;
     }
