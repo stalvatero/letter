@@ -31,6 +31,43 @@ void main () {
     assert (Mail.PeopleIndex.name_for (incoming, false) == "Ada Lovelace");
     assert (Mail.PeopleIndex.name_for (sent, true) == null);
     assert (Mail.PeopleIndex.name_for (from_other_client, true) == "Bob");
+
+    check_removed_row_is_freed ();
+}
+
+class RowWatch : Object {
+    public bool finalized;
+
+    public void on_finalized (Object row) {
+        this.finalized = true;
+    }
+
+    public void on_context_pressed (Mail.PersonRow row, double x, double y) {
+    }
+}
+
+/* The People list replaces every row after each sync step. A row that is
+ * still alive once it is out of the list is memory that never comes back. */
+void check_removed_row_is_freed () {
+    if (!Gtk.init_check ()) {
+        print ("people: no display, row lifetime not checked\n");
+        return;
+    }
+
+    var folder = new Mail.Folder () {
+        name = "Ada Lovelace",
+        full_name = Mail.Folder.PERSON_PREFIX + "ada@example.org",
+    };
+    var list = new Gtk.ListBox ();
+    var watch = new RowWatch ();
+    var row = new Mail.PersonRow (new Mail.Person ("ada@example.org", folder));
+    row.weak_ref (watch.on_finalized);
+    row.context_pressed.connect (watch.on_context_pressed);
+    list.append (row);
+    list.remove (row);
+    row = null;
+    if (!watch.finalized)
+        error ("a person row removed from the list is never freed");
 }
 
 Mail.Message message (string from, string? from_address, string to, string? recipients, bool outgoing) {
