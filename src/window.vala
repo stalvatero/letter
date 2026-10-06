@@ -4984,6 +4984,17 @@ public class Mail.Window : Adw.ApplicationWindow {
         });
     }
 
+    /* Where deleting or reporting spam moves mail from the People view. */
+    private HashTable<string, uint8> people_hidden_folders () {
+        var hidden = new HashTable<string, uint8> (str_hash, str_equal);
+        var folders = folders_from_tree (false);
+        for (uint i = 0; i < folders.length; i++) {
+            if (folders[i].kind == FolderKind.TRASH || folders[i].kind == FolderKind.JUNK)
+                hidden.set (folders[i].full_name, 1);
+        }
+        return hidden;
+    }
+
     /* Mail the People view looks at: every folder except junk, trash, drafts
      * and the outbox, each message once even when Gmail labels repeat it. */
     private GenericArray<Message> collect_people_source () {
@@ -5258,12 +5269,15 @@ public class Mail.Window : Adw.ApplicationWindow {
         var related_ms = "-";
         var t_group = Utils.sync_tick ();
         if (this.conversation_view) {
+            /* Mail moved to Trash from this view leaves its conversations. */
+            var hidden = people_hidden_folders ();
             var related = people_related_messages (account, messages);
             related_ms = Utils.sync_ms (t_group);
             t_group = Utils.sync_tick ();
             conversations = Conversation.group (messages, related);
             for (uint i = 0; i < conversations.length; i++) {
                 conversations[i].list_folder = null;
+                conversations[i].hidden_folders = hidden;
                 for (uint j = 0; j < conversations[i].messages.length; j++)
                     conversations[i].messages[j].show_folder = true;
                 conversations[i].refresh ();
@@ -10225,6 +10239,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                     continue;
                 cache.remove_index (i);
                 this.people_cache_edits++;
+                queue_people_refresh ();
                 break;
             }
         }
@@ -10259,6 +10274,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 continue;
             cache.remove_index (i);
             this.people_cache_edits++;
+            queue_people_refresh ();
             return;
         }
     }
@@ -10293,6 +10309,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
         cache.add (message);
         this.people_cache_edits++;
+        queue_people_refresh ();
     }
 
     private void remember_list_focus (Conversation conversation, uint position) {
