@@ -38,6 +38,7 @@ mail_sources = files(
   'body-index.vala',
   'notifier.vala',
   'conversation.vala',
+  'thread-index.vala',
   'message-reader.vala',
   'message-window.vala',
   'eml-viewer.vala',
