@@ -6067,6 +6067,38 @@ public class Mail.MailSession : Camel.Session {
         index_cached_body (account, folder, uid, content.plain_text);
     }
 
+    /* Previews for mail whose body reached the disk before previews were
+     * kept: the body index only makes one the first time it sees a body.
+     * Offline only — a body that is not on disk is skipped. */
+    public async void fill_previews_from_disk (
+        Account account,
+        Folder folder,
+        GenericArray<string> uids,
+        Cancellable? cancellable = null
+    ) throws Error {
+        if (folder.is_virtual_view || uids.length == 0)
+            return;
+
+        var camel_folder = yield open_camel_folder (account, folder, cancellable);
+        for (uint i = 0; i < uids.length; i++) {
+            if (cancellable != null && cancellable.is_cancelled ())
+                return;
+            var uid = uids[i];
+            if (!message_body_file_exists (camel_folder, uid))
+                continue;
+            var mime = message_from_local_cache (camel_folder, uid);
+            if (mime == null || MessageContent.mime_body_incomplete (mime)
+                || MessageContent.mime_unready_shell (mime))
+                continue;
+            var preview = Utils.preview_from_text (MessageContent.from_mime (uid, mime).plain_text);
+            if (preview != null)
+                preview_ready (account, folder, uid, preview);
+            /* One body per main loop turn keeps the list responsive. */
+            Idle.add (fill_previews_from_disk.callback, Priority.LOW);
+            yield;
+        }
+    }
+
     private static bool is_missing_on_server (Error error) {
         return error is IOError.NOT_FOUND
             || error_text_means_missing (error.message);

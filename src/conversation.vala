@@ -5,6 +5,8 @@ public class Mail.Conversation : Object {
     public string subject { get; private set; default = ""; }
     public string participants { get; private set; default = ""; }
     public string? preview { get; private set; }
+    /* The message the list row takes its subject and preview from. */
+    public Message? shown { get; private set; }
     public int64 date { get; private set; }
     public int unread { get; private set; }
     public bool has_attachment { get; private set; }
@@ -159,6 +161,7 @@ public class Mail.Conversation : Object {
         }
 
         var last = listed_last ?? this.latest;
+        this.shown = last;
         this.subject = last != null ? display_subject (last.subject) : _("(No subject)");
         this.preview = last != null ? last.preview : null;
         this.date = last != null ? last.date : 0;

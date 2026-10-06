@@ -108,7 +108,20 @@ public class Mail.Window : Adw.ApplicationWindow {
     private Gtk.ListBox people_list;
     private Folder? people_all_folder;
     private HashTable<string, Folder> person_folders;
+    /* Kept between rebuilds so a sync step or a read flag updates the rows
+     * in place instead of replacing the whole list. */
+    private HashTable<string, Person> people;
+    private HashTable<string, PersonRow> person_rows;
+    private PersonRow? people_all_row;
+    /* The mail behind the People view and each person's share of it, so
+     * switching people needs no pass over every folder. */
+    private GenericArray<Message>? people_source;
+    private HashTable<string, GenericArray<Message>> people_mail;
+    private uint people_source_stamp;
     private uint people_refresh_source;
+    private Cancellable? preview_fill_cancellable;
+    /* Rows past this rarely get looked at before the next list change. */
+    private const uint PREVIEW_FILL_LIMIT = 200;
     private Gtk.ListView message_list;
     private GLib.ListStore message_store;
     private Gtk.MultiSelection message_selection;
@@ -441,6 +454,9 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.folder_list.add_controller (folder_keys);
 
         this.person_folders = new HashTable<string, Folder> (str_hash, str_equal);
+        this.people = new HashTable<string, Person> (str_hash, str_equal);
+        this.person_rows = new HashTable<string, PersonRow> (str_hash, str_equal);
+        this.people_mail = new HashTable<string, GenericArray<Message>> (str_hash, str_equal);
         this.people_list = new Gtk.ListBox () {
             selection_mode = Gtk.SelectionMode.SINGLE,
             valign = Gtk.Align.START,
@@ -462,6 +478,13 @@ public class Mail.Window : Adw.ApplicationWindow {
             if (person == null)
                 return true;
             return person.matches (this.people_filter.text.strip ().down ());
+        });
+        this.people_list.set_sort_func ((a, b) => {
+            var first = (a as PersonRow)?.person;
+            var second = (b as PersonRow)?.person;
+            if (first == null || second == null)
+                return first == null ? (second == null ? 0 : -1) : 1;
+            return Person.compare (first, second);
         });
         this.people_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
         this.people_box.append (this.people_filter);
@@ -4421,6 +4444,12 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.people_refresh_source = 0;
         }
         this.person_folders.remove_all ();
+        this.people.remove_all ();
+        this.person_rows.remove_all ();
+        this.people_mail.remove_all ();
+        this.people_source = null;
+        this.people_source_stamp = 0;
+        this.people_all_row = null;
         this.people_all_folder = null;
         this.people_filter.text = "";
         Gtk.ListBoxRow? row;
@@ -4460,10 +4489,19 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
         this.people_refresh_source = Timeout.add (300, () => {
             this.people_refresh_source = 0;
-            rebuild_people_list ();
-            if (this.selected_folder != null && this.selected_folder.is_people_view
-                && this.search_text.length == 0)
-                show_people_messages ();
+            var changed = rebuild_people_list ();
+            var folder = this.selected_folder;
+            if (folder == null || !folder.is_people_view || this.search_text.length > 0)
+                return Source.REMOVE;
+            /* Rows follow flag changes on their own; like a folder, the list
+             * is only replaced when mail came or went, or the unread filter
+             * has to drop what was just read. */
+            if (changed || this.unread_only) {
+                show_people_messages (true);
+            } else {
+                count_people_messages (folder);
+                update_folder_heading (folder, this.message_store.get_n_items ());
+            }
             return Source.REMOVE;
         });
     }
@@ -4510,17 +4548,24 @@ public class Mail.Window : Adw.ApplicationWindow {
         return result;
     }
 
-    private void rebuild_people_list () {
+    /* Rebuilds the people and each one's share of the mail. Returns whether
+     * the mail behind the view changed, not only its flags. */
+    private bool rebuild_people_list () {
         var account = this.selected_account;
         if (!this.people_button.active || account == null)
-            return;
+            return false;
 
+        var t0 = Utils.sync_tick ();
         var index = new PeopleIndex (account);
         var messages = collect_people_source ();
-        for (uint i = 0; i < messages.length; i++)
+        uint stamp = messages.length;
+        for (uint i = 0; i < messages.length; i++) {
             index.learn (messages[i]);
+            stamp = stamp * 31 + direct_hash (messages[i]);
+        }
 
-        var people = new HashTable<string, Person> (str_hash, str_equal);
+        var present = new HashTable<string, Person> (str_hash, str_equal);
+        var mail = new HashTable<string, GenericArray<Message>> (str_hash, str_equal);
         var all = ensure_people_all_folder ();
         int all_unread = 0;
         for (uint i = 0; i < messages.length; i++) {
@@ -4531,11 +4576,21 @@ public class Mail.Window : Adw.ApplicationWindow {
             var counterparts = index.counterparts (message);
             for (uint j = 0; j < counterparts.length; j++) {
                 var address = counterparts[j];
-                var person = people.get (address);
+                var person = present.get (address);
                 if (person == null) {
-                    person = new Person (address, person_folder (address));
-                    people.set (address, person);
+                    person = this.people.get (address);
+                    if (person == null) {
+                        person = new Person (address, person_folder (address));
+                        this.people.set (address, person);
+                    }
+                    person.name = "";
+                    person.total = 0;
+                    person.unread = 0;
+                    person.latest = 0;
+                    present.set (address, person);
+                    mail.set (address, new GenericArray<Message> ());
                 }
+                mail.get (address).add (message);
                 person.total++;
                 if (!outgoing && !message.seen)
                     person.unread++;
@@ -4552,54 +4607,70 @@ public class Mail.Window : Adw.ApplicationWindow {
         all.total = (int) messages.length;
         all.unread = all_unread;
 
-        var sorted = new GenericArray<Person> ();
-        people.foreach ((address, person) => {
+        present.foreach ((address, person) => {
             if (person.name.length == 0)
                 person.name = PeopleIndex.name_from_key (address) ?? "";
+            person.sort_key = person.display_name.collate_key ();
             person.folder.name = person.display_name;
             person.folder.total = person.total;
             person.folder.unread = person.unread;
-            sorted.add (person);
-        });
-        sorted.sort ((a, b) => {
-            if (a.latest != b.latest)
-                return a.latest < b.latest ? 1 : -1;
-            return strcmp (a.display_name.collate_key (), b.display_name.collate_key ());
         });
 
-        Gtk.ListBoxRow? old;
-        while ((old = this.people_list.get_row_at_index (0)) != null)
-            this.people_list.remove (old);
-        this.people_list.append (new PersonRow.all (all));
-        /* The list is rebuilt after every header sync step. A lambda that
-         * captures the row it is connected to would keep each old row alive. */
-        for (uint i = 0; i < sorted.length; i++) {
-            var row = new PersonRow (sorted[i]);
+        /* Update rows in place: replacing them all after every sync step or
+         * read flag made the list slow and lost its scroll position. */
+        if (this.people_all_row == null) {
+            this.people_all_row = new PersonRow.all (all);
+            this.people_list.append (this.people_all_row);
+        }
+        this.people_all_row.update ();
+        var gone = new GenericArray<string> ();
+        foreach (var address in this.person_rows.get_keys ()) {
+            if (!present.contains (address))
+                gone.add (address);
+        }
+        for (uint i = 0; i < gone.length; i++) {
+            this.people_list.remove (this.person_rows.get (gone[i]));
+            this.person_rows.remove (gone[i]);
+            this.people.remove (gone[i]);
+        }
+        foreach (var person in present.get_values ()) {
+            var row = this.person_rows.get (person.address);
+            if (row != null) {
+                row.update ();
+                continue;
+            }
+            /* A method handler: a lambda capturing the row would keep it
+             * alive after it leaves the list. */
+            row = new PersonRow (person);
             row.context_pressed.connect (popup_person_menu);
+            this.person_rows.set (person.address, row);
             this.people_list.append (row);
         }
+        this.people_list.invalidate_sort ();
+
+        this.people_source = messages;
+        this.people_mail = mail;
+        var changed = stamp != this.people_source_stamp;
+        this.people_source_stamp = stamp;
         highlight_selected_person ();
+        Utils.sync_log ("people rebuild %u messages, %u people%s %s".printf (
+            messages.length,
+            present.size (),
+            changed ? "" : " (flags only)",
+            Utils.sync_ms (t0)
+        ));
+        return changed;
     }
 
-    private void show_people_messages () {
-        var account = this.selected_account;
-        var folder = this.selected_folder;
-        if (account == null || folder == null || !folder.is_people_view)
-            return;
-
-        var address = folder.person_address;
-        var messages = collect_people_source ();
-        if (address != null) {
-            var index = new PeopleIndex (account);
-            for (uint i = 0; i < messages.length; i++)
-                index.learn (messages[i]);
-            var mine = new GenericArray<Message> ();
-            for (uint i = 0; i < messages.length; i++) {
-                if (index.involves (messages[i], address))
-                    mine.add (messages[i]);
-            }
-            messages = mine;
-        }
+    /* The selected People view's mail, newest first, from the last rebuild
+     * instead of another pass over every folder. */
+    private GenericArray<Message> people_view_messages (Folder folder) {
+        if (this.people_source == null)
+            rebuild_people_list ();
+        var messages = new GenericArray<Message> ();
+        var source = people_view_source (folder);
+        for (uint i = 0; i < source.length; i++)
+            messages.add (source[i]);
         messages.sort ((a, b) => {
             if (a.date < b.date)
                 return 1;
@@ -4607,15 +4678,40 @@ public class Mail.Window : Adw.ApplicationWindow {
                 return -1;
             return 0;
         });
+        return messages;
+    }
 
+    private GenericArray<Message> people_view_source (Folder folder) {
+        var address = folder.person_address;
+        var source = address != null ? this.people_mail.get (address) : this.people_source;
+        return source ?? new GenericArray<Message> ();
+    }
+
+    private static void count_view_messages (Folder folder, GenericArray<Message> messages) {
         int unread = 0;
         for (uint i = 0; i < messages.length; i++) {
-            messages[i].show_folder = true;
             if (!messages[i].seen && !messages[i].outgoing)
                 unread++;
         }
         folder.total = (int) messages.length;
         folder.unread = unread;
+    }
+
+    private void count_people_messages (Folder folder) {
+        count_view_messages (folder, people_view_source (folder));
+    }
+
+    private void show_people_messages (bool keep_scroll = false) {
+        var account = this.selected_account;
+        var folder = this.selected_folder;
+        if (account == null || folder == null || !folder.is_people_view)
+            return;
+
+        var t0 = Utils.sync_tick ();
+        var messages = people_view_messages (folder);
+        for (uint i = 0; i < messages.length; i++)
+            messages[i].show_folder = true;
+        count_view_messages (folder, messages);
 
         if (messages.length == 0) {
             this.message_store.remove_all ();
@@ -4651,7 +4747,13 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
         }
 
-        show_conversation_list (listed);
+        show_conversation_list (listed, keep_scroll);
+        Utils.sync_log ("people show “%s” %u messages, %u listed %s".printf (
+            folder.name,
+            messages.length,
+            listed.length,
+            Utils.sync_ms (t0)
+        ));
     }
 
     private void popup_person_menu (PersonRow row, double x, double y) {
@@ -6149,6 +6251,63 @@ public class Mail.Window : Adw.ApplicationWindow {
             on_message_selection_changed ();
         if (keep_scroll)
             restore_list_scroll (scroll_y);
+        fill_missing_previews (conversations);
+    }
+
+    /* Mail whose body was cached before previews were kept shows none until
+     * it is opened; make previews for the top of the list from the disk. */
+    private void fill_missing_previews (GenericArray<Conversation> conversations) {
+        if (this.preview_fill_cancellable != null)
+            this.preview_fill_cancellable.cancel ();
+        this.preview_fill_cancellable = null;
+        var account = this.selected_account;
+        if (account == null)
+            return;
+
+        var by_folder = new HashTable<string, GenericArray<string>> (str_hash, str_equal);
+        uint wanted = 0;
+        for (uint i = 0; i < conversations.length && wanted < PREVIEW_FILL_LIMIT; i++) {
+            var conversation = conversations[i];
+            if (conversation.preview != null && conversation.preview.length > 0)
+                continue;
+            var message = conversation.shown ?? conversation.latest;
+            if (message == null || message.uid == null)
+                continue;
+            var folder_name = message.folder_full_name ?? this.selected_folder?.full_name;
+            if (folder_name == null)
+                continue;
+            var uids = by_folder.get (folder_name);
+            if (uids == null) {
+                uids = new GenericArray<string> ();
+                by_folder.set (folder_name, uids);
+            }
+            uids.add (message.uid);
+            wanted++;
+        }
+        if (wanted == 0)
+            return;
+
+        var cancellable = new Cancellable ();
+        this.preview_fill_cancellable = cancellable;
+        foreach (var folder_name in by_folder.get_keys ()) {
+            var folder = folder_by_full_name (folder_name);
+            if (folder == null || folder.is_virtual_view)
+                continue;
+            this.mail_session.fill_previews_from_disk.begin (
+                account,
+                folder,
+                by_folder.get (folder_name),
+                cancellable,
+                (obj, res) => {
+                    try {
+                        this.mail_session.fill_previews_from_disk.end (res);
+                    } catch (Error e) {
+                        if (!(e is IOError.CANCELLED))
+                            debug ("Previews from disk: %s", e.message);
+                    }
+                }
+            );
+        }
     }
 
     private void restore_list_scroll (double y) {
