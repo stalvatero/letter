@@ -29,7 +29,8 @@ void main () {
     assert (Mail.PeopleIndex.name_for (sent, true) == null);
     assert (Mail.PeopleIndex.name_for (from_other_client, true) == "Bob");
 
-    check_removed_row_is_freed ();
+    check_people_model ();
+    check_unbound_row_is_freed ();
 }
 
 class RowWatch : Object {
@@ -39,13 +40,107 @@ class RowWatch : Object {
         this.finalized = true;
     }
 
-    public void on_context_pressed (Mail.PersonRow row, double x, double y) {
+    public void on_changed (uint position, uint removed, uint added) {
+        this.changes++;
     }
+
+    public void on_notify (Object object, ParamSpec pspec) {
+        this.notifies++;
+    }
+
+    public uint changes;
+    public uint notifies;
 }
 
-/* People who no longer have mail leave the list. A row that is still alive
- * once it is out of the list is memory that never comes back. */
-void check_removed_row_is_freed () {
+Mail.Person person (Mail.PeopleModel model, string address, string name, int64 latest) {
+    var known = model.lookup (address);
+    var result = known ?? new Mail.Person (address, new Mail.Folder () {
+        full_name = Mail.Folder.PERSON_PREFIX + address,
+    });
+    result.begin_update ();
+    result.pending_name = name;
+    result.pending_latest = latest;
+    return result;
+}
+
+HashTable<string, Mail.Person> people (Mail.Person[] list) {
+    var result = new HashTable<string, Mail.Person> (str_hash, str_equal);
+    foreach (var item in list)
+        result.set (item.address, item);
+    return result;
+}
+
+void assert_order (Mail.PeopleModel model, string[] expected, string what) {
+    var model_items = model.selection.model;
+    var got = new StringBuilder ();
+    for (uint i = 0; i < model_items.get_n_items (); i++) {
+        var item = (Mail.Person) model_items.get_item (i);
+        got.append ((i > 0 ? ", " : "") + (item.is_all ? "all" : item.address));
+    }
+    var want = string.joinv (", ", expected);
+    if (got.str != want)
+        error ("%s: got [%s], expected [%s]", what, got.str, want);
+}
+
+/* The sidebar model: All People on top, then the most recent people, and a
+ * rebuild that changes nothing touches nothing. */
+void check_people_model () {
+    var model = new Mail.PeopleModel ();
+    model.ensure_all (new Mail.Folder () {
+        name = "All People",
+        full_name = Mail.Folder.PEOPLE_PATH,
+    });
+    model.update (people ({
+        person (model, "ada@example.org", "Ada", 1),
+        person (model, "bob@example.org", "Bob", 3),
+        person (model, "cy@example.org", "", 2),
+    }));
+    assert_order (model, { "all", "bob@example.org", "cy@example.org", "ada@example.org" }, "newest first, All People on top");
+    assert (model.lookup ("cy@example.org").display_name == "cy");
+
+    var watch = new RowWatch ();
+    model.selection.items_changed.connect (watch.on_changed);
+    var ada = model.lookup ("ada@example.org");
+    ada.notify.connect (watch.on_notify);
+    model.update (people ({
+        person (model, "ada@example.org", "Ada", 1),
+        person (model, "bob@example.org", "Bob", 3),
+        person (model, "cy@example.org", "", 2),
+    }));
+    if (watch.changes != 0 || watch.notifies != 0)
+        error ("an unchanged rebuild changed the list %u times and notified %u times", watch.changes, watch.notifies);
+
+    model.update (people ({
+        person (model, "ada@example.org", "Ada Lovelace", 5),
+        person (model, "bob@example.org", "Bob", 3),
+    }));
+    assert_order (model, { "all", "ada@example.org", "bob@example.org" }, "newer mail moves up, people without mail leave");
+    assert (watch.notifies > 0);
+    assert (model.size == 2);
+    assert (model.lookup ("cy@example.org") == null);
+
+    var bob = model.lookup ("bob@example.org");
+    model.select (bob);
+    assert (model.selection.selected == 2);
+    model.set_filter_text ("  LOVE ");
+    assert_order (model, { "all", "ada@example.org" }, "the filter matches names, ignoring case and spaces");
+    model.select (bob);
+    assert (model.selection.selected == Gtk.INVALID_LIST_POSITION);
+    model.set_filter_text ("bob@");
+    assert_order (model, { "all", "bob@example.org" }, "the filter matches addresses");
+    model.set_filter_text ("");
+    assert_order (model, { "all", "ada@example.org", "bob@example.org" }, "an empty filter shows everyone");
+
+    model.select (model.all);
+    assert (model.selection.selected == 0);
+    model.clear ();
+    assert (model.selection.model.get_n_items () == 0);
+    assert (model.all == null);
+}
+
+/* Rows are recycled; once unbound, a row must not be kept alive by the
+ * person or folder it showed. */
+void check_unbound_row_is_freed () {
     if (!Gtk.init_check ()) {
         print ("people: no display, row lifetime not checked\n");
         return;
@@ -55,16 +150,17 @@ void check_removed_row_is_freed () {
         name = "Ada Lovelace",
         full_name = Mail.Folder.PERSON_PREFIX + "ada@example.org",
     };
-    var list = new Gtk.ListBox ();
+    var ada = new Mail.Person ("ada@example.org", folder);
     var watch = new RowWatch ();
-    var row = new Mail.PersonRow (new Mail.Person ("ada@example.org", folder));
+    var row = new Mail.PersonRow ();
     row.weak_ref (watch.on_finalized);
-    row.context_pressed.connect (watch.on_context_pressed);
-    list.append (row);
-    list.remove (row);
+    row.bind (ada);
+    ada.name = "Ada";
+    folder.unread = 2;
+    row.unbind ();
     row = null;
     if (!watch.finalized)
-        error ("a person row removed from the list is never freed");
+        error ("an unbound person row is never freed");
 }
 
 Mail.Message message (string from, string? from_address, string to, string? recipients, bool outgoing) {
