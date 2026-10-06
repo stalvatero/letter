@@ -30,6 +30,17 @@ public class Mail.Person : Object {
         }
     }
 
+    /* Collation key of the display name, made once per rebuild rather than
+     * on every comparison of the sorted list. */
+    public string sort_key { get; set; default = ""; }
+
+    /* Most recent mail first, then by name. */
+    public static int compare (Person a, Person b) {
+        if (a.latest != b.latest)
+            return a.latest < b.latest ? 1 : -1;
+        return strcmp (a.sort_key, b.sort_key);
+    }
+
     public bool matches (string needle) {
         if (needle.length == 0)
             return true;
