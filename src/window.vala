@@ -124,6 +124,9 @@ public class Mail.Window : Adw.ApplicationWindow {
      * tell flag changes from mail that came or went without a pass over
      * every message. */
     private uint people_cache_edits;
+    /* While the header lists load from disk at startup, the People view
+     * shows the people saved last time instead of grouping a partial cache. */
+    private bool people_preloading;
     private uint people_cache_print;
     private int64 people_collected_at;
     private Gtk.ListView message_list;
@@ -3357,11 +3360,13 @@ public class Mail.Window : Adw.ApplicationWindow {
          * the folder tree was already cached. The first open is startup sync;
          * a click after that is folder sync. */
         this.folder_clicks_sync = false;
+        this.people_preloading = true;
         restore_folder_selection ();
         var token = show_sync_status (_("Loading local cache…"));
         try {
             yield preload_all_header_lists_from_disk (account, cancellable);
         } finally {
+            this.people_preloading = false;
             hide_sync_status (token);
         }
         /* Server work starts only after the cached tree and lists are shown. */
@@ -4611,6 +4616,10 @@ public class Mail.Window : Adw.ApplicationWindow {
         var account = this.selected_account;
         if (!this.people_button.active || account == null)
             return false;
+        if (this.people_preloading && this.people_source == null) {
+            restore_saved_people (account);
+            return false;
+        }
 
         var t0 = Utils.sync_tick ();
         /* Most rebuilds follow flag changes. Unless a header cache was
@@ -4649,6 +4658,8 @@ public class Mail.Window : Adw.ApplicationWindow {
             if (person != null)
                 count_unread (person.folder, this.people_mail.get (entry), index);
         }
+        if (changed)
+            save_people (account);
         highlight_selected_person ();
         Utils.sync_log ("people rebuild %u messages, %u people%s %s (%s, group %s, count %s)".printf (
             messages.length,
@@ -4660,6 +4671,85 @@ public class Mail.Window : Adw.ApplicationWindow {
             Utils.sync_ms (t2)
         ));
         return changed;
+    }
+
+    private static string saved_people_path (Account account) {
+        return Path.build_filename (
+            Environment.get_user_cache_dir (),
+            "letter",
+            "people",
+            Checksum.compute_for_string (ChecksumType.SHA1, account.source_uid ?? account.uid)
+        );
+    }
+
+    private static string people_field (string text) {
+        return text.replace ("\t", " ").replace ("\n", " ");
+    }
+
+    /* One line per person: address, latest date, unread, total, name. The
+     * All People counts come first, under the address "*". */
+    private void save_people (Account account) {
+        var all = ensure_people_all_folder ();
+        var text = new StringBuilder ();
+        text.append ("*\t0\t%d\t%d\t\n".printf (all.unread, all.total));
+        foreach (var address in this.people_mail.get_keys ()) {
+            var person = this.people_model.lookup (address);
+            if (person == null)
+                continue;
+            text.append ("%s\t%s\t%d\t%d\t%s\n".printf (
+                people_field (address),
+                person.latest.to_string (),
+                person.folder.unread,
+                person.folder.total,
+                people_field (person.name)
+            ));
+        }
+        var path = saved_people_path (account);
+        try {
+            DirUtils.create_with_parents (Path.get_dirname (path), 0700);
+            FileUtils.set_contents (path, text.str);
+        } catch (Error e) {
+            debug ("Could not save people: %s", e.message);
+        }
+    }
+
+    /* Shows the people saved by the last rebuild, so the list is there at
+     * once; the first rebuild after the caches are loaded updates it. */
+    private void restore_saved_people (Account account) {
+        if (this.people_model.size > 0)
+            return;
+        var t0 = Utils.sync_tick ();
+        string contents;
+        try {
+            if (!FileUtils.get_contents (saved_people_path (account), out contents))
+                return;
+        } catch (Error e) {
+            return;
+        }
+
+        var all = ensure_people_all_folder ();
+        var present = new HashTable<string, Person> (str_hash, str_equal);
+        foreach (var line in contents.split ("\n")) {
+            var fields = line.split ("\t", 5);
+            if (fields.length < 5 || fields[0].length == 0)
+                continue;
+            if (fields[0] == "*") {
+                all.unread = int.parse (fields[2]);
+                all.total = int.parse (fields[3]);
+                continue;
+            }
+            var person = new Person (fields[0], person_folder (fields[0]));
+            person.begin_update ();
+            person.pending_latest = int64.parse (fields[1]);
+            person.pending_name = fields[4];
+            person.folder.unread = int.parse (fields[2]);
+            person.folder.total = int.parse (fields[3]);
+            present.set (person.address, person);
+        }
+        this.people_model.ensure_all (all);
+        this.people_model.update (present);
+        highlight_selected_person ();
+        Utils.sync_log ("people restored %u saved %s".printf (present.size (), Utils.sync_ms (t0)));
     }
 
     /* Splits the mail between the people it was exchanged with and updates
@@ -4808,10 +4898,14 @@ public class Mail.Window : Adw.ApplicationWindow {
 
         if (messages.length == 0) {
             this.message_store.remove_all ();
-            show_conversation_placeholder (
-                _("No Mail"),
-                _("Mail you exchange shows up here once its folders are loaded.")
-            );
+            if (this.people_preloading) {
+                show_conversation_placeholder (_("Loading Mail…"), "");
+            } else {
+                show_conversation_placeholder (
+                    _("No Mail"),
+                    _("Mail you exchange shows up here once its folders are loaded.")
+                );
+            }
             update_folder_heading (folder, 0);
             return;
         }
