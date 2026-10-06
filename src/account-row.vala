@@ -62,12 +62,9 @@ public class Mail.FolderRow : Gtk.ListBoxRow {
         this.expander.add_css_class ("dim-label");
         var expander_click = new Gtk.GestureClick ();
         expander_click.set_propagation_phase (Gtk.PropagationPhase.CAPTURE);
-        expander_click.pressed.connect (() => {
-            if (!this.folder.has_children)
-                return;
-            expander_toggled ();
-            expander_click.set_state (Gtk.EventSequenceState.CLAIMED);
-        });
+        /* Gesture handlers are methods, not lambdas: a closure holding the
+         * gesture and the row would keep every replaced row alive. */
+        expander_click.pressed.connect (on_expander_pressed);
         this.expander.add_controller (expander_click);
         box.append (this.expander);
 
@@ -98,14 +95,23 @@ public class Mail.FolderRow : Gtk.ListBoxRow {
         var click = new Gtk.GestureClick () {
             button = Gdk.BUTTON_SECONDARY,
         };
-        click.pressed.connect ((n, x, y) => {
-            context_pressed (x, y);
-            click.set_state (Gtk.EventSequenceState.CLAIMED);
-        });
+        click.pressed.connect (on_secondary_pressed);
         add_controller (click);
 
         update_expander (this.folder.has_children, true);
         update_unread ();
+    }
+
+    private void on_expander_pressed (Gtk.GestureClick click, int n_press, double x, double y) {
+        if (!this.folder.has_children)
+            return;
+        expander_toggled ();
+        click.set_state (Gtk.EventSequenceState.CLAIMED);
+    }
+
+    private void on_secondary_pressed (Gtk.GestureClick click, int n_press, double x, double y) {
+        context_pressed (x, y);
+        click.set_state (Gtk.EventSequenceState.CLAIMED);
     }
 
     public void update_expander (bool has_children, bool expanded) {
@@ -176,12 +182,7 @@ public class Mail.MessageRow : Gtk.Box {
         this.unread_indicator.set_size_request (2, 28);
         var mark_click = new Gtk.GestureClick ();
         mark_click.set_propagation_phase (Gtk.PropagationPhase.CAPTURE);
-        mark_click.pressed.connect (() => {
-            if (this.conversation == null || this.conversation.seen)
-                return;
-            mark_read_clicked ();
-            mark_click.set_state (Gtk.EventSequenceState.CLAIMED);
-        });
+        mark_click.pressed.connect (on_mark_pressed);
         this.unread_indicator.add_controller (mark_click);
 
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 2) {
@@ -265,6 +266,14 @@ public class Mail.MessageRow : Gtk.Box {
         content.append (this.preview_label);
         append (this.unread_indicator);
         append (content);
+    }
+
+    /* A method handler, not a lambda, so the gesture does not keep the row alive. */
+    private void on_mark_pressed (Gtk.GestureClick click, int n_press, double x, double y) {
+        if (this.conversation == null || this.conversation.seen)
+            return;
+        mark_read_clicked ();
+        click.set_state (Gtk.EventSequenceState.CLAIMED);
     }
 
     public void bind (Conversation conversation, GenericArray<string>? highlights = null) {

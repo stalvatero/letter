@@ -33,3 +33,23 @@ test_threading = executable(
 )
 
 test('threading', test_threading)
+
+test_rows = executable(
+  'test-rows',
+  [
+    meson.project_source_root() / 'src' / 'account.vala',
+    meson.project_source_root() / 'src' / 'account-row.vala',
+    meson.project_source_root() / 'src' / 'conversation.vala',
+    'test-threading-stubs.vala',
+    'test-rows.vala',
+  ],
+  dependencies: [
+    glib_dep,
+    gtk_dep,
+    adw_dep,
+    dependency('gobject-2.0'),
+  ],
+  include_directories: config_h_dir,
+)
+
+test('rows', test_rows)

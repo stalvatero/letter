@@ -8531,8 +8531,10 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void connect_folder_row (FolderRow row) {
-        row.context_pressed.connect ((x, y) => popup_folder_menu (row, x, y));
-        row.expander_toggled.connect (() => toggle_folder_collapsed (row));
+        /* Methods take the row as the sender. A lambda capturing the row it is
+         * connected to would keep the row alive after the folder list is rebuilt. */
+        row.context_pressed.connect (popup_folder_menu);
+        row.expander_toggled.connect (toggle_folder_collapsed);
     }
 
     private bool on_folder_key_pressed (uint keyval) {
@@ -8665,26 +8667,30 @@ public class Mail.Window : Adw.ApplicationWindow {
             button = Gdk.BUTTON_PRIMARY,
         };
         open_click.set_propagation_phase (Gtk.PropagationPhase.CAPTURE);
+        /* The handlers hold the row and its gesture unowned: the row owns both,
+         * and owned references would keep every thread row ever shown alive. */
+        unowned ThreadRow thread_row = row;
+        unowned Gtk.GestureClick click = open_click;
         open_click.pressed.connect ((n) => {
             if (n != 2)
                 return;
-            if (!row.is_selected ()) {
-                this.thread_list.select_row (row);
-                on_thread_row_selected (row);
+            if (!thread_row.is_selected ()) {
+                this.thread_list.select_row (thread_row);
+                on_thread_row_selected (thread_row);
             }
-            if (!row.message.is_placeholder)
-                open_message_window.begin (row.message);
-            open_click.set_state (Gtk.EventSequenceState.CLAIMED);
+            if (!thread_row.message.is_placeholder)
+                open_message_window.begin (thread_row.message);
+            click.set_state (Gtk.EventSequenceState.CLAIMED);
         });
         row.add_controller (open_click);
         row.context_pressed.connect ((x, y) => {
-            if (!row.is_selected ())
-                this.thread_list.select_row (row);
-            on_thread_row_selected (row);
+            if (!thread_row.is_selected ())
+                this.thread_list.select_row (thread_row);
+            on_thread_row_selected (thread_row);
             if (is_thread_bulk ())
-                popup_bulk_message_menu (row, x, y);
+                popup_bulk_message_menu (thread_row, x, y);
             else
-                popup_message_menu (row, x, y, conversation, row.message);
+                popup_message_menu (thread_row, x, y, conversation, thread_row.message);
         });
     }
 

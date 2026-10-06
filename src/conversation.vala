@@ -807,12 +807,16 @@ public class Mail.ThreadRow : Gtk.ListBoxRow {
         var click = new Gtk.GestureClick () {
             button = Gdk.BUTTON_SECONDARY,
         };
-        click.pressed.connect ((n, x, y) => {
-            context_pressed (x, y);
-            click.set_state (Gtk.EventSequenceState.CLAIMED);
-        });
+        /* A method handler, not a lambda: a closure holding the gesture and
+         * the row would keep every replaced row alive. */
+        click.pressed.connect (on_secondary_pressed);
         add_controller (click);
         update ();
+    }
+
+    private void on_secondary_pressed (Gtk.GestureClick click, int n_press, double x, double y) {
+        context_pressed (x, y);
+        click.set_state (Gtk.EventSequenceState.CLAIMED);
     }
 
     public void update () {
