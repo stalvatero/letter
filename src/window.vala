@@ -4571,9 +4571,11 @@ public class Mail.Window : Adw.ApplicationWindow {
         while ((old = this.people_list.get_row_at_index (0)) != null)
             this.people_list.remove (old);
         this.people_list.append (new PersonRow.all (all));
+        /* The list is rebuilt after every header sync step. A lambda that
+         * captures the row it is connected to would keep each old row alive. */
         for (uint i = 0; i < sorted.length; i++) {
             var row = new PersonRow (sorted[i]);
-            row.context_pressed.connect ((x, y) => popup_person_menu (row, x, y));
+            row.context_pressed.connect (popup_person_menu);
             this.people_list.append (row);
         }
         highlight_selected_person ();

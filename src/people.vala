@@ -148,6 +148,7 @@ public class Mail.PersonRow : Gtk.ListBoxRow {
     private Adw.Avatar avatar;
     private Gtk.Label name_label;
     private Gtk.Label count_label;
+    private Gtk.GestureClick secondary_click;
 
     public PersonRow (Person person) {
         Object (person: person, folder: person.folder);
@@ -198,16 +199,20 @@ public class Mail.PersonRow : Gtk.ListBoxRow {
 
         this.child = box;
 
-        var click = new Gtk.GestureClick () {
+        /* A method handler, not a lambda: a closure holding the gesture and
+         * the row would keep every replaced row alive. */
+        this.secondary_click = new Gtk.GestureClick () {
             button = Gdk.BUTTON_SECONDARY,
         };
-        click.pressed.connect ((n, x, y) => {
-            context_pressed (x, y);
-            click.set_state (Gtk.EventSequenceState.CLAIMED);
-        });
-        add_controller (click);
+        this.secondary_click.pressed.connect (on_secondary_pressed);
+        add_controller (this.secondary_click);
 
         update ();
+    }
+
+    private void on_secondary_pressed (int n_press, double x, double y) {
+        context_pressed (x, y);
+        this.secondary_click.set_state (Gtk.EventSequenceState.CLAIMED);
     }
 
     public void update () {
