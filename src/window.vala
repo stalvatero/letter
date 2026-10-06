@@ -117,6 +117,12 @@ public class Mail.Window : Adw.ApplicationWindow {
     private HashTable<string, GenericArray<Message>> people_mail;
     private uint people_source_stamp;
     private uint people_refresh_source;
+    /* Header caches edited in place, not replaced: lets a People rebuild
+     * tell flag changes from mail that came or went without a pass over
+     * every message. */
+    private uint people_cache_edits;
+    private uint people_cache_print;
+    private int64 people_collected_at;
     private Gtk.ListView message_list;
     private GLib.ListStore message_store;
     private Gtk.MultiSelection message_selection;
@@ -4403,6 +4409,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.people_mail.remove_all ();
         this.people_source = null;
         this.people_source_stamp = 0;
+        this.people_cache_print = 0;
         this.people_all_folder = null;
         this.people_filter.text = "";
         this.people_model.set_filter_text ("");
@@ -4563,6 +4570,23 @@ public class Mail.Window : Adw.ApplicationWindow {
         return result;
     }
 
+    private const int64 PEOPLE_FULL_PASS_US = 30 * 1000000;
+
+    /* Changes when a header cache the People view reads is replaced, grows
+     * or shrinks, is edited in place, or mail is hidden or shown again. One
+     * step per folder, not per message. */
+    private uint people_cache_fingerprint (Account account) {
+        uint print = this.people_cache_edits * 31 + this.hidden_uids.size ();
+        var folders = folders_from_tree (false);
+        for (uint i = 0; i < folders.length; i++) {
+            var cached = this.message_cache.get (message_cache_key (account, folders[i]));
+            print = print * 31 + direct_hash (folders[i]);
+            print = print * 31 + direct_hash (cached);
+            print = print * 31 + (cached != null ? cached.length : 0);
+        }
+        return print;
+    }
+
     /* Rebuilds the people and each one's share of the mail. Returns whether
      * the mail behind the view changed, not only its flags. */
     private bool rebuild_people_list () {
@@ -4571,13 +4595,26 @@ public class Mail.Window : Adw.ApplicationWindow {
             return false;
 
         var t0 = Utils.sync_tick ();
-        var messages = collect_people_source ();
-        uint stamp = messages.length;
-        for (uint i = 0; i < messages.length; i++)
-            stamp = stamp * 31 + direct_hash (messages[i]);
-        var changed = this.people_source == null || stamp != this.people_source_stamp;
-        this.people_source = messages;
-        this.people_source_stamp = stamp;
+        /* Most rebuilds follow flag changes. Unless a header cache was
+         * replaced or edited, the mail is the same and only needs a recount;
+         * a full pass now and then covers an edit nobody counted. */
+        var print = people_cache_fingerprint (account);
+        var collect = this.people_source == null
+            || print != this.people_cache_print
+            || t0 - this.people_collected_at > PEOPLE_FULL_PASS_US;
+        var changed = false;
+        if (collect) {
+            var collected = collect_people_source ();
+            uint stamp = collected.length;
+            for (uint i = 0; i < collected.length; i++)
+                stamp = stamp * 31 + direct_hash (collected[i]);
+            changed = this.people_source == null || stamp != this.people_source_stamp;
+            this.people_source = collected;
+            this.people_source_stamp = stamp;
+            this.people_cache_print = print;
+            this.people_collected_at = t0;
+        }
+        var messages = this.people_source;
 
         var index = new PeopleIndex (account);
         var t1 = Utils.sync_tick ();
@@ -4595,12 +4632,12 @@ public class Mail.Window : Adw.ApplicationWindow {
                 count_unread (person.folder, this.people_mail.get (entry), index);
         }
         highlight_selected_person ();
-        Utils.sync_log ("people rebuild %u messages, %u people%s %s (collect %s, group %s, count %s)".printf (
+        Utils.sync_log ("people rebuild %u messages, %u people%s %s (%s, group %s, count %s)".printf (
             messages.length,
             this.people_model.size,
             changed ? "" : " (flags only)",
             Utils.sync_ms (t0),
-            ms_between (t0, t1),
+            collect ? "collect " + ms_between (t0, t1) : "unchanged " + ms_between (t0, t1),
             ms_between (t1, t2),
             Utils.sync_ms (t2)
         ));
@@ -6141,6 +6178,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         var known = snapshot_uids (cache);
 
         var added = this.mail_session.append_live_headers (account, folder, cache);
+        this.people_cache_edits++;
         if (created) {
             if (added == 0)
                 return;
@@ -6169,6 +6207,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 if (cache[j].uid != uid)
                     continue;
                 cache.remove_index (j);
+                this.people_cache_edits++;
                 break;
             }
             if (is_current_folder (folder))
@@ -7395,6 +7434,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 bump_folder_total (sent_folder);
             } else {
                 Conversation.prune_duplicate_sends (cache);
+                this.people_cache_edits++;
                 shown = existing;
             }
 
@@ -7881,8 +7921,10 @@ public class Mail.Window : Adw.ApplicationWindow {
             if (important) {
                 if (folder.kind == FolderKind.IMPORTANT)
                     continue;
-                if (find_important_uid (message) == null)
+                if (find_important_uid (message) == null) {
                     dest_cache.add (message);
+                    this.people_cache_edits++;
+                }
                 var uids = new GenericArray<string> ();
                 uids.add (message.uid);
                 var copies = new GenericArray<Message> ();
@@ -7899,6 +7941,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                         && !(message.msgid_hash != 0 && dest_cache[j].msgid_hash == message.msgid_hash))
                         continue;
                     dest_cache.remove_index (j);
+                    this.people_cache_edits++;
                     break;
                 }
                 var uids = new GenericArray<string> ();
@@ -8920,6 +8963,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 if (cache[i].uid != uid)
                     continue;
                 cache.remove_index (i);
+                this.people_cache_edits++;
                 break;
             }
         }
@@ -8953,6 +8997,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             if (cache[i].uid != uid)
                 continue;
             cache.remove_index (i);
+            this.people_cache_edits++;
             return;
         }
     }
@@ -8974,6 +9019,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 return;
         }
         cache.add (message);
+        this.people_cache_edits++;
     }
 
     private void remember_list_focus (Conversation conversation, uint position) {
