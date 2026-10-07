@@ -4976,13 +4976,53 @@ public class Mail.Window : Adw.ApplicationWindow {
             show_toast (_("Address copied"));
         });
         group.add_action (copy);
+        var trash = new SimpleAction ("trash-person-mail", null);
+        trash.set_enabled (this.people_mail.contains (person.address)
+            && find_folder_kind (FolderKind.TRASH) != null);
+        trash.activate.connect (() => confirm_trash_person_mail.begin (person));
+        group.add_action (trash);
 
         var menu = new Menu ();
         var section = new Menu ();
         section.append (_("Write Email"), "ctx.write-to-person");
         section.append (_("Copy Address"), "ctx.copy-person-address");
         menu.append_section (null, section);
+        var delete_section = new Menu ();
+        delete_section.append (_("Move All Messages to Trash"), "ctx.trash-person-mail");
+        menu.append_section (null, delete_section);
         popup_context_menu (row, menu, group, x, y);
+    }
+
+    /* Everything the person's view lists: their mail and yours to them. */
+    private async void confirm_trash_person_mail (Person person) {
+        var trash = find_folder_kind (FolderKind.TRASH);
+        var listed = this.people_mail.get (person.address);
+        if (trash == null || listed == null || listed.length == 0)
+            return;
+        /* The list is replaced while the dialog is open; keep this one. */
+        var messages = new GenericArray<Message> ();
+        for (uint i = 0; i < listed.length; i++)
+            messages.add (listed[i]);
+
+        var dialog = new Adw.AlertDialog (
+            ngettext (
+                "Move %u message with %s to Trash?",
+                "Move all %u messages with %s to Trash?",
+                messages.length
+            ).printf (messages.length, person.display_name),
+            _("This includes the mail you sent to them.")
+        );
+        dialog.add_response ("cancel", _("Cancel"));
+        dialog.add_response ("trash", _("Move to Trash"));
+        dialog.set_response_appearance ("trash", Adw.ResponseAppearance.DESTRUCTIVE);
+        dialog.default_response = "cancel";
+        dialog.close_response = "cancel";
+        if ((yield dialog.choose (this, null)) != "trash")
+            return;
+
+        if (this.selected_folder == person.folder)
+            drop_conversations (new GenericArray<Conversation> ());
+        transfer_messages (messages, trash, false, false, false);
     }
 
     private GenericArray<Message> collect_flagged_messages () {
@@ -8719,7 +8759,8 @@ public class Mail.Window : Adw.ApplicationWindow {
         GenericArray<Message> messages,
         Folder destination,
         bool archive_only,
-        bool from_thread
+        bool from_thread,
+        bool from_list = true
     ) {
         var account = this.selected_account;
         if (this.mail_session == null || account == null || messages.length == 0)
@@ -8772,9 +8813,11 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
 
         this.open_conversation?.refresh ();
-        if (from_thread)
+        /* Mail picked outside the message list (a person's menu) leaves its
+         * selection alone; the People refresh drops the rows. */
+        if (from_list && from_thread)
             finish_thread_bulk ();
-        else
+        else if (from_list)
             finish_conversation_bulk ();
 
         for (uint i = 0; i < groups.length; i++)
