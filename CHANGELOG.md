@@ -24,6 +24,7 @@ refactors unless they affect behaviour.
 
 - Enhance UI consistency and compactness across the application. Improved the layout of the account rail, window headers, and search fields for better coherence. 
 - Adjusted styles for toolbar buttons and search components to maintain uniform height and spacing.
+- Right click on an inline image and select 'Forward image' to  opens compose with that picture attached.
 
 ### Fixed
 
@@ -38,6 +39,7 @@ refactors unless they affect behaviour.
   instead of saying the message is still syncing.
 - Selected account rows no longer cover the separator next to the account
   pane.
+- Saving an inline image from the reader opens a file dialog. Copying the internal image address, and Copy Link with Highlight, are no longer offered.
 
 
 ## [1.0.0](https://github.com/stalvatero/letter/compare/v1.0.0-rc.5...v1.0.0) - 2026-10-05

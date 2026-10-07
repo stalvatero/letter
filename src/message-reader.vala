@@ -1,6 +1,7 @@
 public class Mail.MessageReader : Gtk.Box {
     public signal void invitation_respond (Invitation invitation, InvitationStatus status);
     public signal void compose_to (Recipient recipient);
+    public signal void forward_image (Attachment attachment);
 
     private const double ZOOM_MIN = 0.5;
     private const double ZOOM_MAX = 3.0;
@@ -54,6 +55,8 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
     private uint cover_epoch;
     private bool reader_gone;
     private SimpleAction view_image_action;
+    private SimpleAction save_image_action;
+    private SimpleAction forward_image_action;
     private string? context_image_uri;
     private MessageContent? current;
     private Account? mailbox;
@@ -191,6 +194,10 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
 
         this.view_image_action = new SimpleAction ("view-image", null);
         this.view_image_action.activate.connect (() => view_context_image.begin ());
+        this.save_image_action = new SimpleAction ("save-image", null);
+        this.save_image_action.activate.connect (() => save_context_image.begin ());
+        this.forward_image_action = new SimpleAction ("forward-image", null);
+        this.forward_image_action.activate.connect (() => forward_context_image.begin ());
         ensure_inline_image_scheme ();
         this.network_session = new WebKit.NetworkSession.ephemeral ();
         this.webview = create_reader_view ();
@@ -961,10 +968,16 @@ html { color-scheme: only light; }
     private bool on_context_menu (WebKit.ContextMenu menu, WebKit.HitTestResult hit) {
         this.context_image_uri = null;
         /* Reload would fetch the reader base URL and wipe the mail. Back,
-         * forward and stop are the same browser chrome. */
+         * forward and stop are the same browser chrome. letterimg: is not a
+         * real URL, so WebKit’s save/copy-address entries do nothing useful.
+         * “Copy Link with Highlight” needs a shareable page URL — drop it. */
         var insert_at = 0;
         for (int i = (int) menu.get_n_items () - 1; i >= 0; i--) {
             var item = menu.get_item_at_position (i);
+            if (is_copy_link_with_highlight (item)) {
+                menu.remove (item);
+                continue;
+            }
             var action = item.get_stock_action ();
             if (action == WebKit.ContextMenuAction.RELOAD
                 || action == WebKit.ContextMenuAction.GO_BACK
@@ -972,9 +985,12 @@ html { color-scheme: only light; }
                 || action == WebKit.ContextMenuAction.STOP
                 || action == WebKit.ContextMenuAction.OPEN_IMAGE_IN_NEW_WINDOW
                 || action == WebKit.ContextMenuAction.OPEN_FRAME_IN_NEW_WINDOW
-                || action == WebKit.ContextMenuAction.OPEN_LINK_IN_NEW_WINDOW) {
+                || action == WebKit.ContextMenuAction.OPEN_LINK_IN_NEW_WINDOW
+                || action == WebKit.ContextMenuAction.DOWNLOAD_IMAGE_TO_DISK
+                || action == WebKit.ContextMenuAction.COPY_IMAGE_URL_TO_CLIPBOARD) {
                 if (action == WebKit.ContextMenuAction.OPEN_IMAGE_IN_NEW_WINDOW
-                    || action == WebKit.ContextMenuAction.OPEN_FRAME_IN_NEW_WINDOW)
+                    || action == WebKit.ContextMenuAction.OPEN_FRAME_IN_NEW_WINDOW
+                    || action == WebKit.ContextMenuAction.DOWNLOAD_IMAGE_TO_DISK)
                     insert_at = i;
                 menu.remove (item);
             }
@@ -987,12 +1003,36 @@ html { color-scheme: only light; }
                 this.context_image_uri = uri;
         }
         if (this.context_image_uri != null) {
+            var at = insert_at.clamp (0, (int) menu.get_n_items ());
             menu.insert (
                 new WebKit.ContextMenuItem.from_gaction (this.view_image_action, _("View Image"), null),
-                insert_at.clamp (0, (int) menu.get_n_items ())
+                at
+            );
+            menu.insert (
+                new WebKit.ContextMenuItem.from_gaction (this.save_image_action, _("Save Image As…"), null),
+                at + 1
+            );
+            menu.insert (
+                new WebKit.ContextMenuItem.from_gaction (this.forward_image_action, _("Forward Image"), null),
+                at + 2
             );
         }
         return menu.get_n_items () == 0;
+    }
+
+    /* Present in WebKitGTK C API; missing from the Vala bindings. */
+    [CCode (cname = "webkit_context_menu_item_get_title")]
+    private static extern unowned string? context_menu_item_title (WebKit.ContextMenuItem item);
+
+    private static bool is_copy_link_with_highlight (WebKit.ContextMenuItem item) {
+        var title = context_menu_item_title (item);
+        if (title == null || title.length == 0)
+            return false;
+        var down = title.down ();
+        return down.contains ("link with highlight")
+            || down.contains ("testo evidenziato")
+            || down.contains ("link zum markierten")
+            || down.contains ("link do texto destacado");
     }
 
     private static void trim_context_separators (WebKit.ContextMenu menu) {
@@ -1017,6 +1057,47 @@ html { color-scheme: only light; }
             yield Utils.open_or_preview_image_uri (uri, get_root () as Gtk.Window);
         } catch (Error e) {
             warning ("Could not open image: %s", e.message);
+        }
+    }
+
+    private async void save_context_image () {
+        var uri = this.context_image_uri;
+        if (uri == null || uri.length == 0)
+            return;
+        try {
+            yield Utils.save_image_uri (uri, get_root () as Gtk.Window);
+        } catch (Error e) {
+            if (e is IOError.CANCELLED || e is Gtk.DialogError.DISMISSED)
+                return;
+            warning ("Could not save image: %s", e.message);
+            show_reader_toast (e.message);
+        }
+    }
+
+    private async void forward_context_image () {
+        var uri = this.context_image_uri;
+        if (uri == null || uri.length == 0)
+            return;
+        try {
+            var attachment = yield Utils.attachment_from_image_uri (uri);
+            forward_image (attachment);
+        } catch (Error e) {
+            warning ("Could not forward image: %s", e.message);
+            show_reader_toast (e.message);
+        }
+    }
+
+    private void show_reader_toast (string message) {
+        Gtk.Widget? widget = this;
+        while (widget != null) {
+            var overlay = widget as Adw.ToastOverlay;
+            if (overlay != null) {
+                overlay.add_toast (new Adw.Toast (message) {
+                    timeout = 4,
+                });
+                return;
+            }
+            widget = widget.get_parent ();
         }
     }
 }

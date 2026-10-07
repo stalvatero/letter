@@ -79,6 +79,7 @@ public class Mail.MessageWindow : Adw.ApplicationWindow {
         this.reader.invitation_respond.connect ((invitation, status) => {
             respond_invitation.begin (this.reader, invitation, status);
         });
+        this.reader.forward_image.connect (on_forward_image);
 
         var toolbar = new Adw.ToolbarView () {
             content = this.reader,
@@ -326,6 +327,21 @@ public class Mail.MessageWindow : Adw.ApplicationWindow {
             edit_draft ? this.message : null,
             edit_draft ? this.folder : null
         );
+        compose.present ();
+    }
+
+    private void on_forward_image (Attachment attachment) {
+        var app = get_application ();
+        if (app == null)
+            return;
+        if (Utils.sendable_account_count (this.store) == 0) {
+            toast (_("No account is configured to send mail."));
+            return;
+        }
+        var compose = new ComposeWindow (app, this.session, this.store, this.account);
+        var files = new GenericArray<Attachment> ();
+        files.add (attachment);
+        compose.attach_pending_files (files);
         compose.present ();
     }
 

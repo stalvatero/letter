@@ -1356,6 +1356,15 @@ msgstr "Salva tutti gli allegati"
 msgid "View Image"
 msgstr "Visualizza immagine"
 
+msgid "Save Image As…"
+msgstr "Salva immagine come…"
+
+msgid "Forward Image"
+msgstr "Inoltra immagine"
+
+msgid "Save Image"
+msgstr "Salva immagine"
+
 #: src/message-reader.vala:935
 msgid "Write to"
 msgstr "Scrivi a"

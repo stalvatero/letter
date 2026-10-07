@@ -618,6 +618,49 @@ namespace Mail.Utils {
         yield open_or_preview_file (file, parent, false);
     }
 
+    public static async void save_image_uri (string uri, Gtk.Window? parent) throws Error {
+        var source = yield file_from_image_uri (uri);
+        var dialog = new Gtk.FileDialog () {
+            title = _("Save Image"),
+            initial_name = source.get_basename (),
+            initial_folder = download_folder (),
+        };
+        var filters = new ListStore (typeof (Gtk.FileFilter));
+        var images = new Gtk.FileFilter () {
+            name = _("Images"),
+        };
+        images.add_mime_type ("image/*");
+        filters.append (images);
+        dialog.filters = filters;
+        dialog.default_filter = images;
+        var file = yield dialog.save (parent, null);
+        source.copy (file, FileCopyFlags.OVERWRITE);
+        remember_download_folder (file);
+    }
+
+    public static async Attachment attachment_from_image_uri (string uri) throws Error {
+        var file = yield file_from_image_uri (uri);
+        uint8[] contents;
+        string etag;
+        yield file.load_contents_async (null, out contents, out etag);
+        var mime = "image/png";
+        var inline_image = InlineImagePages.lookup (uri);
+        if (inline_image != null && inline_image.mime_type != null && inline_image.mime_type.length > 0)
+            mime = inline_image.mime_type;
+        else {
+            bool uncertain;
+            mime = ContentType.guess (file.get_basename (), contents, out uncertain);
+            if (mime == null || mime.length == 0 || mime == "application/octet-stream")
+                mime = "image/png";
+        }
+        return new Attachment () {
+            filename = file.get_basename (),
+            mime_type = mime,
+            data = new Bytes.take (contents),
+            file = file,
+        };
+    }
+
     public static async File file_from_image_uri (string uri) throws Error {
         if (uri.has_prefix ("data:"))
             return write_data_uri_image (uri);
