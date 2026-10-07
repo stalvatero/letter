@@ -1150,21 +1150,24 @@ public class Mail.MailSession : Camel.Session {
             plain_text
         );
         var preview = Utils.preview_from_text (plain_text);
-        if (preview != null && store_preview (camel_folder, uid, preview))
+        if (preview != null)
+            preview = store_preview (camel_folder, uid, preview);
+        if (preview != null)
             preview_ready (account, folder, uid, preview);
     }
 
     /* IMAP servers rarely send previews. One made from the body goes into
-     * Camel's summary, so every later header load already has it. */
-    private static bool store_preview (Camel.Folder camel_folder, string uid, string preview) {
+     * Camel's summary, so every later header load already has it. Returns
+     * the preview Camel now holds: the one it had wins. */
+    private static string? store_preview (Camel.Folder camel_folder, string uid, string preview) {
         var info = camel_folder.get_message_info (uid);
         if (info == null)
-            return false;
+            return null;
         var known = info.get_preview ();
         if (known != null && known.length > 0)
-            return false;
+            return known;
         info.set_preview (preview);
-        return true;
+        return preview;
     }
 
     /* Bodies cached before previews were stored got none. Once per folder,
@@ -1192,9 +1195,15 @@ public class Mail.MailSession : Camel.Session {
             }
             var uid = uids[i];
             var info = camel_folder.get_message_info (uid);
-            var known = info?.get_preview ();
-            if (info == null || (known != null && known.length > 0)
-                || !message_body_file_exists (camel_folder, uid))
+            if (info == null)
+                continue;
+            /* Letter's header list may still lack a preview Camel has. */
+            var known = info.get_preview ();
+            if (known != null && known.length > 0) {
+                stored.set (uid, known);
+                continue;
+            }
+            if (!message_body_file_exists (camel_folder, uid))
                 continue;
             var mime = message_from_local_cache (camel_folder, uid);
             if (mime == null || MessageContent.mime_body_incomplete (mime)
@@ -1224,7 +1233,8 @@ public class Mail.MailSession : Camel.Session {
     private HashTable<string, uint8>? previews_done;
 
     private static string previews_done_file () {
-        return Path.build_filename (prefetch_cursor_cache_dir (), "previews");
+        /* "previews" was written by a pass that skipped Camel's own previews. */
+        return Path.build_filename (prefetch_cursor_cache_dir (), "previews-2");
     }
 
     private void ensure_previews_done_loaded () {
@@ -2084,6 +2094,13 @@ public class Mail.MailSession : Camel.Session {
         Message message,
         Camel.MessageInfo info
     ) {
+        /* Rows from Letter's header list may predate the preview Camel has
+         * now; they are reused on merge, so take it here. */
+        if (message.preview == null || message.preview.length == 0) {
+            var preview = info.get_preview ();
+            if (preview != null && preview.length > 0)
+                message.preview = preview;
+        }
         var flags = info.get_flags ();
         message.seen = (flags & Camel.MessageFlags.SEEN) != 0;
         if (uses_outlook_flag_semantics (account)) {
