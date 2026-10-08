@@ -18,6 +18,7 @@ Feel free to try it out and enjoy the app's potential. All feedback is welcome.
 - Italian
 - German (translation by [Christian Lauinger](https://github.com/ChrisLauinger77))
 - Brazilian Portuguese (translation by [Thiago Haeitmann](https://github.com/ThiagoHaeitmann))
+- Greek (translation by [Ioannis Argyropoulos](https://github.com/Argy22))
 - More will come — translations via pull request are very welcome.
 
 
