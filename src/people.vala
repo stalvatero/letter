@@ -33,6 +33,29 @@ public class Mail.Person : Object {
     public string pending_name = "";
     public int64 pending_latest;
 
+    /* Names seen for this address while a rebuild gathers. A name the
+     * person sent from this address wins over one you addressed them by;
+     * names that cannot be the same person (a shared or group address)
+     * leave the address shown instead. */
+    private NameChoice from_them = new NameChoice ();
+    private NameChoice from_you = new NameChoice ();
+
+    /* Another person in the list has the same name: their rows show the
+     * address too, so they can be told apart. */
+    [CCode (notify = false)]
+    public bool shows_address {
+        get {
+            return this._shows_address;
+        }
+        set {
+            if (this._shows_address == value)
+                return;
+            this._shows_address = value;
+            notify_property ("shows-address");
+        }
+    }
+    private bool _shows_address;
+
     public Person (string address, Folder folder) {
         Object (address: address, folder: folder, is_all: false);
     }
@@ -51,10 +74,7 @@ public class Mail.Person : Object {
         owned get {
             if (this.is_all)
                 return this.folder.name;
-            if (this.name.length > 0)
-                return this.name;
-            var at = this.address.index_of_char ('@');
-            return at > 0 ? this.address.substring (0, at) : this.address;
+            return this.name.length > 0 ? this.name : this.address;
         }
     }
 
@@ -69,14 +89,24 @@ public class Mail.Person : Object {
     public void begin_update () {
         this.pending_name = "";
         this.pending_latest = 0;
+        this.from_them.reset ();
+        this.from_you.reset ();
+    }
+
+    /* Offers a name for this address, from mail they sent from it or from
+     * mail you sent to it alone. */
+    public void offer_name (string name, int64 date, bool sent_by_them) {
+        (sent_by_them ? this.from_them : this.from_you).offer (name, date);
+        if (this.from_them.offered)
+            this.pending_name = this.from_them.result;
+        else
+            this.pending_name = this.from_you.result;
     }
 
     /* Applies what a rebuild gathered. Returns whether the person's place
      * in the sorted list may have moved. */
     public bool commit_update () {
-        var name = this.pending_name.length > 0
-            ? this.pending_name
-            : PeopleIndex.name_from_key (this.address) ?? "";
+        var name = this.pending_name;
         var moved = false;
         if (name != this.name) {
             this.name = name;
@@ -107,6 +137,83 @@ public class Mail.Person : Object {
         if (needle.length == 0)
             return true;
         return this.folded_name.contains (needle) || this.address.contains (needle);
+    }
+}
+
+/* The name to show for one address. The newest name wins while all names
+ * seen could be the same person ("Ada Lovelace", "Lovelace, Ada", "Ada");
+ * names that cannot be, as on a group or shared address that many people
+ * write from, give no name at all. */
+private class Mail.NameChoice {
+    public bool offered;
+    public string result = "";
+    private int64 date;
+    private bool mixed;
+    private string[] words = {};
+
+    public void reset () {
+        this.offered = false;
+        this.result = "";
+        this.date = 0;
+        this.mixed = false;
+        this.words = {};
+    }
+
+    public void offer (string name, int64 date) {
+        /* Most mail repeats the name already chosen. */
+        if (this.offered && !this.mixed && name == this.result) {
+            if (date > this.date)
+                this.date = date;
+            return;
+        }
+        var words = name_words (name);
+        if (words.length == 0)
+            return;
+        if (!this.offered) {
+            this.offered = true;
+            this.words = words;
+            this.date = date;
+            this.result = name;
+            return;
+        }
+        if (this.mixed)
+            return;
+        if (!contains_all (this.words, words) && !contains_all (words, this.words)) {
+            this.mixed = true;
+            this.result = "";
+            return;
+        }
+        if (words.length > this.words.length)
+            this.words = words;
+        if (date >= this.date) {
+            this.date = date;
+            this.result = name;
+        }
+    }
+
+    private static string[] name_words (string name) {
+        string[] words = {};
+        var word = new StringBuilder ();
+        unichar c;
+        for (int i = 0; name.get_next_char (ref i, out c);) {
+            if (c.isalnum ()) {
+                word.append_unichar (c.tolower ());
+            } else if (word.len > 0) {
+                words += word.str;
+                word.truncate ();
+            }
+        }
+        if (word.len > 0)
+            words += word.str;
+        return words;
+    }
+
+    private static bool contains_all (string[] words, string[] wanted) {
+        foreach (var word in wanted) {
+            if (!(word in words))
+                return false;
+        }
+        return true;
     }
 }
 
@@ -180,6 +287,7 @@ public class Mail.PeopleModel : Object {
      * updated in place; the list is sorted again only when an order key
      * moved. */
     public void update (HashTable<string, Person> present) {
+        var removed = false;
         uint i = this.people_store.get_n_items ();
         while (i > 0) {
             if (present.contains (((Person) this.people_store.get_item (i - 1)).address)) {
@@ -191,6 +299,7 @@ public class Mail.PeopleModel : Object {
                 i--;
             for (uint j = i; j < end; j++)
                 this.by_address.remove (((Person) this.people_store.get_item (j)).address);
+            removed = true;
             this.people_store.splice (i, end - i, new Object[0]);
         }
 
@@ -209,12 +318,27 @@ public class Mail.PeopleModel : Object {
                 added.add (person);
             }
         }
+        if (renamed || added.length > 0 || removed)
+            mark_shared_names ();
         if (renamed && this.needle.length > 0)
             this.filter.changed (Gtk.FilterChange.DIFFERENT);
         if (moved)
             this.sorter.changed (Gtk.SorterChange.DIFFERENT);
         if (added.length > 0)
             this.people_store.splice (this.people_store.get_n_items (), 0, added.data);
+    }
+
+    /* People listed under the same name show their address as well. */
+    private void mark_shared_names () {
+        var counts = new HashTable<string, int> (str_hash, str_equal);
+        foreach (var person in this.by_address.get_values ()) {
+            if (person.name.length > 0) {
+                var key = person.name.casefold ();
+                counts.set (key, counts.get (key) + 1);
+            }
+        }
+        foreach (var person in this.by_address.get_values ())
+            person.shows_address = person.name.length > 0 && counts.get (person.name.casefold ()) > 1;
     }
 
     /* Where the person is in the list, or INVALID_LIST_POSITION when the
@@ -253,12 +377,7 @@ public class Mail.PeopleModel : Object {
 }
 
 public class Mail.PeopleIndex : Object {
-    /* Mail without stored addresses (header caches from before the People
-     * view) is keyed by display name until its folder is written again. */
-    private const string NAME_PREFIX = "name:";
-
     private HashTable<string, uint8> own = new HashTable<string, uint8> (str_hash, str_equal);
-    private HashTable<string, string> address_by_name = new HashTable<string, string> (str_hash, str_equal);
 
     public PeopleIndex (Account account) {
         if (account.email != null && account.email.length > 0)
@@ -271,66 +390,48 @@ public class Mail.PeopleIndex : Object {
         return message.from_address != null && this.own.contains (message.from_address);
     }
 
-    /* Learn which address goes with which name, so mail from older caches
-     * lands on the same person as mail with stored addresses. */
-    public void learn (Message message) {
-        if (message.from_address == null || message.from_address.length == 0)
-            return;
-        if (message.from == null || message.from.length == 0 || message.from.contains ("@"))
-            return;
-        var name = message.from.down ();
-        if (!this.address_by_name.contains (name))
-            this.address_by_name.set (name, message.from_address);
-    }
-
+    /* People are their addresses. Mail from header caches older than the
+     * People view has none stored and joins no one until its folder is
+     * written again: a display name alone does not say who someone is. */
     public GenericArray<string> counterparts (Message message) {
         var result = new GenericArray<string> ();
         if (is_outgoing (message)) {
-            if (message.recipient_addresses != null && message.recipient_addresses.length > 0) {
+            if (message.recipient_addresses != null) {
                 foreach (var address in message.recipient_addresses.split (",")) {
                     if (address.length > 0 && !this.own.contains (address))
                         add_unique (result, address);
                 }
-            } else if (message.to != null) {
-                foreach (var name in message.to.split (", "))
-                    add_unique (result, key_for_name (name));
             }
             return result;
         }
 
         if (message.from_address != null && message.from_address.length > 0)
             add_unique (result, message.from_address);
-        else if (message.from != null && message.from.length > 0)
-            add_unique (result, key_for_name (message.from));
         return result;
     }
 
-    /* A name for a person, from the mail they sent, or from mail sent only
-     * to them. */
-    public static string? name_for (Message message, bool outgoing) {
-        if (!outgoing) {
-            var from = message.from ?? "";
-            return from.length > 0 && !from.contains ("@") ? from : null;
+    /* The name a message gives the person at address, if it gives one for
+     * certain: the sender's own name on mail from that address, or the
+     * name you wrote to them by when they were the only recipient. Names
+     * relayed for someone else ("Ada via Team") belong to no address. */
+    public static string? name_for (Message message, string address, bool outgoing) {
+        string name;
+        if (outgoing) {
+            if (message.recipient_addresses != address)
+                return null;
+            name = message.to ?? "";
+        } else {
+            if (message.from_address != address)
+                return null;
+            name = message.from ?? "";
         }
-        var to = message.to ?? "";
-        if (to.length == 0 || to.contains (", ") || to.contains ("@"))
+        name = name.strip ();
+        if (name.length == 0 || name.contains ("@"))
             return null;
-        return to;
-    }
-
-    private string key_for_name (string raw) {
-        var name = raw.strip ();
-        var lower = name.down ();
-        if (lower.contains ("@") && !lower.contains (" "))
-            return lower;
-        var known = this.address_by_name.get (lower);
-        if (known != null)
-            return known;
-        return NAME_PREFIX + lower;
-    }
-
-    public static string? name_from_key (string address) {
-        return address.has_prefix (NAME_PREFIX) ? address.substring (NAME_PREFIX.length) : null;
+        var folded = name.down ();
+        if (folded.contains (" via ") || folded.contains (" on behalf of "))
+            return null;
+        return name;
     }
 
     private static void add_unique (GenericArray<string> list, string value) {
@@ -351,8 +452,10 @@ public class Mail.PersonRow : Gtk.Box {
     private Adw.Avatar avatar;
     private Gtk.Image icon;
     private Gtk.Label name_label;
+    private Gtk.Label address_label;
     private Gtk.Label count_label;
     private ulong name_handler;
+    private ulong address_handler;
     private ulong unread_handler;
 
     construct {
@@ -380,7 +483,21 @@ public class Mail.PersonRow : Gtk.Box {
             use_markup = false,
         };
         this.name_label.add_css_class ("folder-name");
-        append (this.name_label);
+        this.address_label = new Gtk.Label ("") {
+            xalign = 0,
+            ellipsize = Pango.EllipsizeMode.MIDDLE,
+            use_markup = false,
+            visible = false,
+        };
+        this.address_label.add_css_class ("caption");
+        this.address_label.add_css_class ("dim-label");
+        var labels = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
+            hexpand = true,
+            valign = Gtk.Align.CENTER,
+        };
+        labels.append (this.name_label);
+        labels.append (this.address_label);
+        append (labels);
 
         this.count_label = new Gtk.Label ("") {
             use_markup = false,
@@ -400,6 +517,7 @@ public class Mail.PersonRow : Gtk.Box {
         /* Methods, disconnected in unbind: a closure holding the row would
          * keep it alive as long as the person. */
         this.name_handler = person.notify["name"].connect (on_name_changed);
+        this.address_handler = person.notify["shows-address"].connect (on_name_changed);
         this.unread_handler = person.folder.notify["unread"].connect (on_unread_changed);
         update_name ();
         update_unread ();
@@ -409,8 +527,10 @@ public class Mail.PersonRow : Gtk.Box {
         if (this.person == null)
             return;
         SignalHandler.disconnect (this.person, this.name_handler);
+        SignalHandler.disconnect (this.person, this.address_handler);
         SignalHandler.disconnect (this.person.folder, this.unread_handler);
         this.name_handler = 0;
+        this.address_handler = 0;
         this.unread_handler = 0;
         this.person = null;
     }
@@ -426,6 +546,8 @@ public class Mail.PersonRow : Gtk.Box {
     private void update_name () {
         var name = this.person.display_name;
         this.name_label.label = name;
+        this.address_label.label = this.person.address;
+        this.address_label.visible = this.person.shows_address;
         if (!this.person.is_all)
             this.avatar.text = name;
         this.tooltip_text = this.person.has_email ? this.person.address : null;

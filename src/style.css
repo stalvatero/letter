@@ -224,7 +224,8 @@ headerbar button.compose-send {
 }
 
 headerbar button.unread-filter:checked,
-headerbar button.conversation-toggle:checked {
+headerbar button.conversation-toggle:checked,
+headerbar button.people-toggle:checked {
   background: color-mix(in srgb, var(--accent-bg-color) 28%, transparent);
   color: var(--accent-color);
 }

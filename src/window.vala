@@ -4403,7 +4403,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         var folder = this.person_folders.get (address);
         if (folder == null) {
             folder = new Folder () {
-                name = PeopleIndex.name_from_key (address) ?? address,
+                name = address,
                 full_name = Folder.PERSON_PREFIX + address,
             };
             this.person_folders.set (address, folder);
@@ -4678,7 +4678,9 @@ public class Mail.Window : Adw.ApplicationWindow {
             Environment.get_user_cache_dir (),
             "letter",
             "people",
-            Checksum.compute_for_string (ChecksumType.SHA1, account.source_uid ?? account.uid)
+            /* "-2": lists saved before names were tied to addresses
+             * may hold borrowed names. */
+            Checksum.compute_for_string (ChecksumType.SHA1, account.source_uid ?? account.uid) + "-2"
         );
     }
 
@@ -4756,9 +4758,6 @@ public class Mail.Window : Adw.ApplicationWindow {
      * the people in place, so only rows whose person changed are redrawn and
      * the list keeps its scroll position. */
     private void group_people_mail (PeopleIndex index, GenericArray<Message> messages) {
-        for (uint i = 0; i < messages.length; i++)
-            index.learn (messages[i]);
-
         var present = new HashTable<string, Person> (str_hash, str_equal);
         var mail = new HashTable<string, GenericArray<Message>> (str_hash, str_equal);
         for (uint i = 0; i < messages.length; i++) {
@@ -4778,12 +4777,9 @@ public class Mail.Window : Adw.ApplicationWindow {
                 mail.get (address).add (message);
                 if (message.date > person.pending_latest)
                     person.pending_latest = message.date;
-                /* A name from mail they sent wins over one from mail you sent. */
-                if (person.pending_name.length == 0 || !outgoing) {
-                    var name = PeopleIndex.name_for (message, outgoing);
-                    if (name != null)
-                        person.pending_name = name;
-                }
+                var name = PeopleIndex.name_for (message, address, outgoing);
+                if (name != null)
+                    person.offer_name (name, message.date, !outgoing);
             }
         }
         this.people_mail = mail;
