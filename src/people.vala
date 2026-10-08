@@ -463,11 +463,19 @@ public class Mail.PeopleIndex : Object {
     }
 }
 
+/* Where People rows find a photo for an address: the address book. */
+public interface Mail.PhotoSource : Object {
+    public signal void photos_changed ();
+
+    public abstract Gdk.Texture? photo_for (string email);
+}
+
 /* A row of the People sidebar. Rows are recycled by the list view: bind
  * hooks a row up to a person, unbind lets go of it again, so no person or
  * folder keeps a row it no longer shows alive. */
 public class Mail.PersonRow : Gtk.Box {
     public Person? person { get; private set; }
+    public PhotoSource? contacts { get; construct; }
 
     private Adw.Avatar avatar;
     private Gtk.Image icon;
@@ -476,6 +484,11 @@ public class Mail.PersonRow : Gtk.Box {
     private Gtk.Label count_label;
     private ulong name_handler;
     private ulong unread_handler;
+    private ulong photos_handler;
+
+    public PersonRow (PhotoSource? contacts = null) {
+        Object (contacts: contacts);
+    }
 
     construct {
         this.orientation = Gtk.Orientation.HORIZONTAL;
@@ -537,7 +550,10 @@ public class Mail.PersonRow : Gtk.Box {
          * keep it alive as long as the person. */
         this.name_handler = person.notify["name"].connect (on_name_changed);
         this.unread_handler = person.folder.notify["unread"].connect (on_unread_changed);
+        if (this.contacts != null)
+            this.photos_handler = this.contacts.photos_changed.connect (update_photo);
         update_name ();
+        update_photo ();
         update_unread ();
     }
 
@@ -546,8 +562,11 @@ public class Mail.PersonRow : Gtk.Box {
             return;
         SignalHandler.disconnect (this.person, this.name_handler);
         SignalHandler.disconnect (this.person.folder, this.unread_handler);
+        if (this.photos_handler != 0)
+            SignalHandler.disconnect (this.contacts, this.photos_handler);
         this.name_handler = 0;
         this.unread_handler = 0;
+        this.photos_handler = 0;
         this.person = null;
     }
 
@@ -571,7 +590,15 @@ public class Mail.PersonRow : Gtk.Box {
         this.tooltip_text = this.person.has_email ? this.person.address : null;
     }
 
-    private void update_unread () {
+    private void update_photo () {
+        if (this.person.is_all)
+            return;
+        this.avatar.custom_image = this.contacts != null && this.person.has_email
+            ? this.contacts.photo_for (this.person.address)
+            : null;
+    }
+
+        private void update_unread () {
         var unread = this.person.folder.unread;
         if (unread > 0)
             add_css_class ("unread");
