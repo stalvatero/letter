@@ -13,13 +13,17 @@ public class Mail.ContactHit : Object {
     }
 }
 
-public class Mail.ContactStore : Object {
+public class Mail.ContactStore : Object, PhotoSource {
     private E.SourceRegistry? registry;
     private GenericArray<E.BookClient> books = new GenericArray<E.BookClient> ();
     private bool books_ready;
     private bool books_loading;
     private HashTable<string, Collected> collected;
     private uint save_source;
+    /* Address book photos by lowercase address, loaded once with one query
+     * per book rather than one per person. */
+    private HashTable<string, Gdk.Texture>? photos;
+    private bool photos_loading;
 
     private class Collected {
         public string email = "";
@@ -107,6 +111,73 @@ public class Mail.ContactStore : Object {
         for (uint i = 0; i < limit; i++)
             trimmed.add (hits[i]);
         return trimmed;
+    }
+
+    /* The address book photo for an address. The first call starts loading
+     * them all and returns null; photos_changed follows once they are in. */
+    public Gdk.Texture? photo_for (string email) {
+        if (this.photos == null) {
+            load_photos.begin ();
+            return null;
+        }
+        return this.photos.get (email);
+    }
+
+    private async void load_photos () {
+        if (this.photos_loading || this.registry == null)
+            return;
+        this.photos_loading = true;
+        yield ensure_books (null);
+        var photos = new HashTable<string, Gdk.Texture> (str_hash, str_equal);
+        for (uint i = 0; i < this.books.length; i++) {
+            try {
+                SList<E.Contact>? listed = null;
+                yield this.books[i].get_contacts ("(exists \"photo\")", null, out listed);
+                foreach (var contact in listed) {
+                    var texture = contact != null ? photo_texture (contact) : null;
+                    if (texture == null)
+                        continue;
+                    string?[] emails = {
+                        contact.email_1,
+                        contact.email_2,
+                        contact.email_3,
+                        contact.email_4,
+                    };
+                    foreach (var raw in emails) {
+                        var email = Utils.sanitize_recipient_text (raw).down ();
+                        if (email.contains ("@") && !photos.contains (email))
+                            photos.set (email, texture);
+                    }
+                }
+            } catch (Error e) {
+                debug ("Address book photos: %s", e.message);
+            }
+            Idle.add (load_photos.callback);
+            yield;
+        }
+        this.photos = photos;
+        this.photos_loading = false;
+        photos_changed ();
+    }
+
+    private static Gdk.Texture? photo_texture (E.Contact contact) {
+        var photo = contact.photo;
+        if (photo == null)
+            return null;
+        try {
+            if (photo.type == E.ContactPhotoType.INLINED) {
+                unowned uint8[]? data = photo.get_inlined ();
+                if (data != null && data.length > 0)
+                    return Gdk.Texture.from_bytes (new Bytes (data));
+            } else {
+                var uri = photo.get_uri ();
+                if (uri != null && uri.has_prefix ("file:"))
+                    return Gdk.Texture.from_file (File.new_for_uri (uri));
+            }
+        } catch (Error e) {
+            debug ("Address book photo: %s", e.message);
+        }
+        return null;
     }
 
     public async bool has_book_email (string email, Cancellable? cancellable = null) {

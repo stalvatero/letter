@@ -21,6 +21,11 @@
       <summary>Show folder sidebar</summary>
       <description>Whether the folder sidebar is visible on wide layouts.</description>
     </key>
+    <key name="show-people" type="b">
+      <default>false</default>
+      <summary>Show people</summary>
+      <description>Whether the folder pane lists the people you exchange mail with instead of folders.</description>
+    </key>
     <key name="folder-pane-width" type="i">
       <default>280</default>
       <summary>Folder pane width</summary>
