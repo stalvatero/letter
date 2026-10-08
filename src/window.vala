@@ -307,6 +307,8 @@ public class Mail.Window : Adw.ApplicationWindow {
         apply_account_sidebar (this.sidebar_button.active);
         if (this.folder_split.collapsed)
             on_folder_split_collapsed ();
+        this.settings.changed["account-rail"].connect (apply_account_rail);
+        apply_account_rail ();
         this.content_split.position = this.settings.get_int ("folder-pane-width")
             .clamp (FOLDER_PANE_MIN, FOLDER_PANE_MAX);
         this.content_split.notify["position"].connect (on_folder_pane_resized);
@@ -2856,7 +2858,6 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void apply_account_sidebar (bool expanded) {
-        this.account_rail.visible = true;
         this.account_pane.visible = true;
         this.folder_split.show_sidebar = expanded;
         this.folder_split.min_sidebar_width = ACCOUNT_PANE_MIN;
@@ -2865,6 +2866,19 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.sidebar_button.tooltip_text = expanded
             ? _("Hide account list")
             : _("Show account list");
+        apply_account_rail ();
+    }
+
+    private void apply_account_rail () {
+        var mode = this.settings.get_string ("account-rail");
+        this.account_rail.remove_css_class ("rail-theme");
+        if (mode == "hide") {
+            this.account_rail.visible = false;
+            return;
+        }
+        this.account_rail.visible = true;
+        if (mode == "theme")
+            this.account_rail.add_css_class ("rail-theme");
     }
 
     private void on_folder_split_collapsed () {

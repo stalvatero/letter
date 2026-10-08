@@ -22,6 +22,13 @@
   padding: 0 4px 8px 4px;
 }
 
+/* Match Adw.HeaderBar inside flat ToolbarView (default): the bar is
+ * transparent, so the visible chrome is the window background — not
+ * --headerbar-bg-color (that is for raised toolbars). */
+.account-rail.rail-theme {
+  background: var(--window-bg-color);
+}
+
 .account-rail-add-slot {
   padding: 0;
 }
@@ -39,6 +46,10 @@
   color: var(--accent-fg-color);
 }
 
+.account-rail.rail-theme button {
+  color: var(--window-fg-color);
+}
+
 .account-rail-icon {
   padding: 2px;
   border-radius: 10px;
@@ -53,6 +64,11 @@
 .account-rail button:hover,
 .account-rail button:checked {
   background: color-mix(in srgb, var(--accent-fg-color) 22%, transparent);
+}
+
+.account-rail.rail-theme button:hover,
+.account-rail.rail-theme button:checked {
+  background: color-mix(in srgb, var(--window-fg-color) 12%, transparent);
 }
 
 .account-rail .account-offline {

@@ -56,6 +56,17 @@
     <category>Email</category>
   </categories>
   <releases>
+    <release version="1.5.0" type="stable" date="2026-10-08">
+      <description>
+        <p>
+          Appearance preferences for application theme, reading mode (light or
+          follow system, including dark adaptation for rich HTML), and the
+          accounts rail (accent, theme, or hidden). Greek translation. Split
+          headers when the reading pane is on the right, inline image save and
+          forward, and several sync and list fixes.
+        </p>
+      </description>
+    </release>
     <release version="1.0.0" type="stable" date="2026-10-05">
       <description>
         <p>

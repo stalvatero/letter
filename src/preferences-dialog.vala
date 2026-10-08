@@ -49,6 +49,88 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         integration.add (count_row (_("Calendars"), store.calendar_count));
         integration.add (count_row (_("Address books"), store.contact_count));
 
+        var appearance = new Adw.PreferencesGroup () {
+            title = _("Appearance"),
+        };
+        var theme_row = new Adw.ComboRow () {
+            title = _("Application theme"),
+            subtitle = _("Choose your personal experience."),
+            subtitle_lines = 2,
+            model = new Gtk.StringList ({
+                _("Follow system"),
+                _("Light"),
+                _("Dark"),
+            }),
+        };
+        var theme = this.settings.get_string ("color-scheme");
+        theme_row.selected = theme == "light" ? 1 : theme == "dark" ? 2 : 0;
+        theme_row.notify["selected"].connect (() => {
+            switch (theme_row.selected) {
+                case 1:
+                    this.settings.set_string ("color-scheme", "light");
+                    break;
+                case 2:
+                    this.settings.set_string ("color-scheme", "dark");
+                    break;
+                default:
+                    this.settings.set_string ("color-scheme", "default");
+                    break;
+            }
+        });
+        this.settings.changed["color-scheme"].connect (() => {
+            var next = this.settings.get_string ("color-scheme");
+            var want = next == "light" ? 1 : next == "dark" ? 2 : 0;
+            if (theme_row.selected != want)
+                theme_row.selected = want;
+        });
+        appearance.add (theme_row);
+
+        var body_bg_row = new Adw.ComboRow () {
+            title = _("Reading mode"),
+            subtitle = _("Choose the background colour of the message body."),
+            subtitle_lines = 2,
+            model = new Gtk.StringList ({
+                _("Always light"),
+                _("Follow system"),
+            }),
+        };
+        var body_bg = this.settings.get_string ("message-body-background");
+        body_bg_row.selected = body_bg == "follow-system" ? 1 : 0;
+        body_bg_row.notify["selected"].connect (() => {
+            this.settings.set_string (
+                "message-body-background",
+                body_bg_row.selected == 1 ? "follow-system" : "always-light"
+            );
+        });
+        appearance.add (body_bg_row);
+
+        var rail_row = new Adw.ComboRow () {
+            title = _("Accounts rail"),
+            subtitle = _("Customise the account sidebar."),
+            subtitle_lines = 2,
+            model = new Gtk.StringList ({
+                _("Default"),
+                _("Theme colour"),
+                _("Hide"),
+            }),
+        };
+        var rail = this.settings.get_string ("account-rail");
+        rail_row.selected = rail == "theme" ? 1 : rail == "hide" ? 2 : 0;
+        rail_row.notify["selected"].connect (() => {
+            switch (rail_row.selected) {
+                case 1:
+                    this.settings.set_string ("account-rail", "theme");
+                    break;
+                case 2:
+                    this.settings.set_string ("account-rail", "hide");
+                    break;
+                default:
+                    this.settings.set_string ("account-rail", "default");
+                    break;
+            }
+        });
+        appearance.add (rail_row);
+
         var reading = new Adw.PreferencesGroup () {
             title = _("Reading"),
         };
@@ -115,25 +197,6 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
             this.settings.set_boolean ("conversation-view", conversation_row.active);
         });
         reading.add (conversation_row);
-
-        var body_bg_row = new Adw.ComboRow () {
-            title = _("Reading mode"),
-            subtitle = _("Choose the background colour of the message body."),
-            subtitle_lines = 2,
-            model = new Gtk.StringList ({
-                _("Always light"),
-                _("Follow system"),
-            }),
-        };
-        var body_bg = this.settings.get_string ("message-body-background");
-        body_bg_row.selected = body_bg == "follow-system" ? 1 : 0;
-        body_bg_row.notify["selected"].connect (() => {
-            this.settings.set_string (
-                "message-body-background",
-                body_bg_row.selected == 1 ? "follow-system" : "always-light"
-            );
-        });
-        reading.add (body_bg_row);
 
         var notifications = new Adw.PreferencesGroup () {
             title = _("Notifications"),
@@ -287,6 +350,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
             wrap_policy = Adw.WrapPolicy.NATURAL,
         };
         add_section_chip (chips, _("GNOME integration"), integration);
+        add_section_chip (chips, _("Appearance"), appearance);
         add_section_chip (chips, _("Reading"), reading);
         add_section_chip (chips, _("Notifications"), notifications);
         add_section_chip (chips, _("Synchronization"), sync);
@@ -299,6 +363,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         nav.add (chips);
         page.add (nav);
         page.add (integration);
+        page.add (appearance);
         page.add (reading);
         page.add (notifications);
         page.add (sync);

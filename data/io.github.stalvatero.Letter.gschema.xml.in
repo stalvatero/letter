@@ -43,8 +43,18 @@
         <choice value="dark"/>
       </choices>
       <default>'default'</default>
-      <summary>Color scheme</summary>
-      <description>Application color scheme: follow the system, light, or dark.</description>
+      <summary>Application theme</summary>
+      <description>Application appearance: follow the system, light, or dark.</description>
+    </key>
+    <key name="account-rail" type="s">
+      <choices>
+        <choice value="default"/>
+        <choice value="theme"/>
+        <choice value="hide"/>
+      </choices>
+      <default>'default'</default>
+      <summary>Accounts rail</summary>
+      <description>Accounts rail style: accent colour (default), match the window/header chrome, or hide the rail.</description>
     </key>
     <key name="reader-zoom" type="d">
       <default>1.0</default>

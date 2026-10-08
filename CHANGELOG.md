@@ -7,7 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 How we maintain it:
 
-- During development, add bullets under **[Unreleased](https://github.com/stalvatero/letter/compare/v1.0.0...HEAD)**.
+- During development, add bullets under **[Unreleased](https://github.com/stalvatero/letter/compare/v1.5.0...HEAD)**.
 - On each release (rc or stable), rename that section to the version + date, and
 copy a short summary into `data/io.github.stalvatero.Letter.metainfo.xml.in.in`
 (`<releases>`, leave msgstr empty in po files — keep release notes in English)
@@ -17,27 +17,33 @@ refactors unless they affect behaviour.
 
 
 
-## [Unreleased](https://github.com/stalvatero/letter/compare/v1.0.0...HEAD)
+## [Unreleased](https://github.com/stalvatero/letter/compare/v1.5.0...HEAD)
+
+
+## [1.5.0](https://github.com/stalvatero/letter/compare/v1.0.0...v1.5.0) - 2026-10-08
 
 
 ### Added
 
 - Greek translation by [Ioannis Argyropoulos](https://github.com/Argy22).
+- Preferences → **Appearance**: application theme (follow system / light /
+  dark, synced with the main-menu theme buttons), **Reading mode** for the
+  message body, and **Accounts rail** (accent by default, match the window
+  theme, or hide).
 
 ### Changed
 
-- Enhance UI consistency and compactness across the application. Improved the layout of the account rail, window headers, and search fields for better coherence. 
-- Adjusted styles for toolbar buttons and search components to maintain uniform height and spacing.
-- Right click on an inline image and select 'Forward image' to  opens compose with that picture attached.
+- Tighter account rail, window headers, and search field layout.
+- Right-click an inline image for **Forward image** (opens compose with that
+  picture attached) or **Save Image As…**.
 - With the reading pane on the right, the message list and reader each have
   their own header so the separator runs the full height. Bottom and hidden
   reading pane keep a single shared header.
 - Removed the search-results banner and Close Search button; clear search from
   the search field or Escape instead.
-- Preferences → Reading adds **Reading mode**: always-light message bodies
-  (default), or follow the system appearance. When the desktop is dark, plain
-  text and rich HTML use a dark canvas: near-black text is lightened and
-  near-white backgrounds are darkened; coloured bands stay as authored.
+- **Reading mode** (always light, or follow system): when the desktop is dark,
+  plain text and rich HTML use a dark canvas — near-black text is lightened
+  and near-white backgrounds are darkened; coloured bands stay as authored.
 
 ### Fixed
 
@@ -52,7 +58,8 @@ refactors unless they affect behaviour.
   instead of saying the message is still syncing.
 - Selected account rows no longer cover the separator next to the account
   pane.
-- Saving an inline image from the reader opens a file dialog. Copying the internal image address, and Copy Link with Highlight, are no longer offered.
+- Saving an inline image from the reader opens a file dialog. Copying the
+  internal image address, and Copy Link with Highlight, are no longer offered.
 
 
 ## [1.0.0](https://github.com/stalvatero/letter/compare/v1.0.0-rc.5...v1.0.0) - 2026-10-05

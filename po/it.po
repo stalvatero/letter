@@ -1903,6 +1903,21 @@ msgstr "Conversazioni"
 msgid "Group related messages into threads."
 msgstr "Raggruppa i messaggi correlati in conversazioni."
 
+msgid "Appearance"
+msgstr "Aspetto"
+
+msgid "Application theme"
+msgstr "Tema applicazione"
+
+msgid "Choose your personal experience."
+msgstr "Scegli la tua esperienza personale."
+
+msgid "Light"
+msgstr "Chiaro"
+
+msgid "Dark"
+msgstr "Scuro"
+
 msgid "Reading mode"
 msgstr "Modalità di lettura"
 
@@ -1914,6 +1929,18 @@ msgstr "Sempre chiara"
 
 msgid "Follow system"
 msgstr "Segui sistema"
+
+msgid "Accounts rail"
+msgstr "Barra account"
+
+msgid "Customise the account sidebar."
+msgstr "Personalizza la barra laterale degli account."
+
+msgid "Theme colour"
+msgstr "Colore tema"
+
+msgid "Hide"
+msgstr "Nascondi"
 
 #: src/preferences-dialog.vala:120 src/preferences-dialog.vala:123
 #: src/preferences-dialog.vala:272
