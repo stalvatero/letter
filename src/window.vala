@@ -4446,7 +4446,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (item == null)
             return;
 
-        var row = new PersonRow ();
+        var row = new PersonRow ((get_application () as Application)?.contacts);
         /* Methods, not lambdas. A closure capturing the row (and its gesture)
          * would keep every discarded list row alive. */
         var click = new Gtk.GestureClick () {
