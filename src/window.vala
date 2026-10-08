@@ -4403,7 +4403,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         var folder = this.person_folders.get (address);
         if (folder == null) {
             folder = new Folder () {
-                name = address,
+                name = PeopleIndex.name_from_key (address) ?? address,
                 full_name = Folder.PERSON_PREFIX + address,
             };
             this.person_folders.set (address, folder);
@@ -4633,8 +4633,13 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (collect) {
             var collected = collect_people_source ();
             uint stamp = collected.length;
-            for (uint i = 0; i < collected.length; i++)
+            /* Addresses are filled into rows from older caches in place:
+             * a row that gained them is a change too. */
+            for (uint i = 0; i < collected.length; i++) {
+                var address = collected[i].from_address;
                 stamp = stamp * 31 + direct_hash (collected[i]);
+                stamp = stamp * 2 + (address != null && address.length > 0 ? 1 : 0);
+            }
             changed = this.people_source == null || stamp != this.people_source_stamp;
             this.people_source = collected;
             this.people_source_stamp = stamp;
@@ -4758,6 +4763,9 @@ public class Mail.Window : Adw.ApplicationWindow {
      * the people in place, so only rows whose person changed are redrawn and
      * the list keeps its scroll position. */
     private void group_people_mail (PeopleIndex index, GenericArray<Message> messages) {
+        for (uint i = 0; i < messages.length; i++)
+            index.learn (messages[i]);
+
         var present = new HashTable<string, Person> (str_hash, str_equal);
         var mail = new HashTable<string, GenericArray<Message>> (str_hash, str_equal);
         for (uint i = 0; i < messages.length; i++) {

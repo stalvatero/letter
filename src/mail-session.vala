@@ -2094,8 +2094,13 @@ public class Mail.MailSession : Camel.Session {
         Message message,
         Camel.MessageInfo info
     ) {
-        /* Rows from Letter's header list may predate the preview Camel has
-         * now; they are reused on merge, so take it here. */
+        /* Rows from Letter's header list may predate the addresses and the
+         * preview Camel has now; they are reused on merge, so take them
+         * here. */
+        if (message.from_address == null || message.from_address.length == 0)
+            message.from_address = Utils.address_keys (info.get_from ());
+        if (message.recipient_addresses == null || message.recipient_addresses.length == 0)
+            message.recipient_addresses = Utils.address_keys (info.get_to (), info.get_cc ());
         if (message.preview == null || message.preview.length == 0) {
             var preview = info.get_preview ();
             if (preview != null && preview.length > 0)
