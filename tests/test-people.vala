@@ -82,6 +82,12 @@ void assert_name (Mail.Person person, string expected, string what) {
         error ("%s: got \"%s\", expected \"%s\"", what, person.display_name, expected);
 }
 
+class NoPhotos : Object, Mail.PhotoSource {
+    public Gdk.Texture? photo_for (string email) {
+        return null;
+    }
+}
+
 class RowWatch : Object {
     public bool finalized;
 
@@ -200,12 +206,14 @@ void check_unbound_row_is_freed () {
         full_name = Mail.Folder.PERSON_PREFIX + "ada@example.org",
     };
     var ada = new Mail.Person ("ada@example.org", folder);
+    var photos = new NoPhotos ();
     var watch = new RowWatch ();
-    var row = new Mail.PersonRow ();
+    var row = new Mail.PersonRow (photos);
     row.weak_ref (watch.on_finalized);
     row.bind (ada);
     ada.name = "Ada";
     folder.unread = 2;
+    photos.photos_changed ();
     row.unbind ();
     row = null;
     if (!watch.finalized)
