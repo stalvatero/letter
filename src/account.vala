@@ -241,7 +241,7 @@ public class Mail.Folder : Object {
                 case FolderKind.OUTBOX:
                     return "mail-send-receive-symbolic";
                 case FolderKind.PEOPLE:
-                    return "mail-inbox-symbolic";
+                    return "system-users-symbolic";
                 case FolderKind.PERSON:
                     return "avatar-default-symbolic";
                 default:

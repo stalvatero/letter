@@ -230,6 +230,10 @@ template $MailWindow: Adw.ApplicationWindow {
             ToggleButton people_button {
               icon-name: "system-users-symbolic";
               tooltip-text: _("Show People");
+
+              styles [
+                "people-toggle",
+              ]
             }
 
             title-widget: Adw.WindowTitle folder_title {

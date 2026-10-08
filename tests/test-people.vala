@@ -11,26 +11,63 @@ void main () {
     var old_sent = message ("Me", null, "Ada Lovelace", null, true);
 
     var index = new Mail.PeopleIndex (account);
-    index.learn (incoming);
-    index.learn (old_cache);
-
     assert_people (index.counterparts (incoming), { "ada@example.org" }, "incoming mail belongs to its sender, not to Cc");
     assert_people (index.counterparts (sent), { "ada@example.org", "bob@example.org" }, "sent mail belongs to each recipient");
     assert_people (index.counterparts (from_other_client), { "bob@example.org" }, "mail from your own address counts as sent");
-    assert_people (index.counterparts (old_cache), { "ada@example.org" }, "names from old caches map to learned addresses");
-    assert_people (index.counterparts (old_sent), { "ada@example.org" }, "recipient names from old caches map too");
+    assert_people (index.counterparts (old_cache), {}, "a name without an address is nobody yet");
+    assert_people (index.counterparts (old_sent), {}, "recipient names without addresses are nobody yet");
 
-    var unknown = message ("Grace Hopper", null, "Me", null, false);
-    assert_people (index.counterparts (unknown), { "name:grace hopper" }, "unknown names keep a name key");
-    assert (Mail.PeopleIndex.name_from_key ("name:grace hopper") == "grace hopper");
-    assert (Mail.PeopleIndex.name_from_key ("ada@example.org") == null);
-
-    assert (Mail.PeopleIndex.name_for (incoming, false) == "Ada Lovelace");
-    assert (Mail.PeopleIndex.name_for (sent, true) == null);
-    assert (Mail.PeopleIndex.name_for (from_other_client, true) == "Bob");
-
+    check_names ();
     check_people_model ();
     check_unbound_row_is_freed ();
+}
+
+/* Names come only from mail tied to the address, and a shared address
+ * whose mail carries several people's names shows the address. */
+void check_names () {
+    var incoming = message ("Ada Lovelace", "ada@example.org", "Me", "me@example.org", false);
+    assert (Mail.PeopleIndex.name_for (incoming, "ada@example.org", false) == "Ada Lovelace");
+    assert (Mail.PeopleIndex.name_for (incoming, "team@example.org", false) == null);
+
+    /* You wrote to Mario with a group on Cc: the group is not Mario. */
+    var with_cc = message ("Me", "me@example.org", "Mario Nardiello", "mario@example.org,team@example.org", true);
+    assert (Mail.PeopleIndex.name_for (with_cc, "team@example.org", true) == null);
+    assert (Mail.PeopleIndex.name_for (with_cc, "mario@example.org", true) == null);
+    var alone = message ("Me", "me@example.org", "Mario Nardiello", "mario@example.org", true);
+    assert (Mail.PeopleIndex.name_for (alone, "mario@example.org", true) == "Mario Nardiello");
+
+    var relayed = message ("Mario Nardiello via Team", "team@example.org", "Me", "me@example.org", false);
+    assert (Mail.PeopleIndex.name_for (relayed, "team@example.org", false) == null);
+    var surname_first = message ("Nardiello, Mario", "mario@example.org", "Me", "me@example.org", false);
+    assert (Mail.PeopleIndex.name_for (surname_first, "mario@example.org", false) == "Nardiello, Mario");
+
+    var mario = new Mail.Person ("mario@example.org", new Mail.Folder ());
+    mario.begin_update ();
+    mario.offer_name ("Mario", 1, false);
+    mario.offer_name ("Nardiello, Mario", 2, true);
+    mario.offer_name ("Mario Nardiello", 3, true);
+    mario.offer_name ("Mario N.", 4, false);
+    mario.commit_update ();
+    assert_name (mario, "Mario Nardiello", "the newest of one person's own names wins over yours");
+
+    var team = new Mail.Person ("team@example.org", new Mail.Folder ());
+    team.begin_update ();
+    team.offer_name ("Mario Nardiello", 1, true);
+    team.offer_name ("Grace Hopper", 2, true);
+    team.offer_name ("Mario Nardiello", 3, true);
+    team.offer_name ("Team", 4, false);
+    team.commit_update ();
+    assert_name (team, "team@example.org", "an address many people write from shows the address");
+
+    var quiet = new Mail.Person ("noreply@example.org", new Mail.Folder ());
+    quiet.begin_update ();
+    quiet.commit_update ();
+    assert_name (quiet, "noreply@example.org", "no name shows the whole address");
+}
+
+void assert_name (Mail.Person person, string expected, string what) {
+    if (person.display_name != expected)
+        error ("%s: got \"%s\", expected \"%s\"", what, person.display_name, expected);
 }
 
 class RowWatch : Object {
@@ -96,7 +133,7 @@ void check_people_model () {
         person (model, "cy@example.org", "", 2),
     }));
     assert_order (model, { "all", "bob@example.org", "cy@example.org", "ada@example.org" }, "newest first, All People on top");
-    assert (model.lookup ("cy@example.org").display_name == "cy");
+    assert (model.lookup ("cy@example.org").display_name == "cy@example.org");
 
     var watch = new RowWatch ();
     model.selection.items_changed.connect (watch.on_changed);
@@ -130,6 +167,20 @@ void check_people_model () {
     assert_order (model, { "all", "bob@example.org" }, "the filter matches addresses");
     model.set_filter_text ("");
     assert_order (model, { "all", "ada@example.org", "bob@example.org" }, "an empty filter shows everyone");
+
+    model.update (people ({
+        person (model, "ada@example.org", "Ada Lovelace", 5),
+        person (model, "bob@example.org", "Bob", 3),
+        person (model, "ada@work.example.org", "ada lovelace", 4),
+    }));
+    assert (model.lookup ("ada@example.org").shows_address);
+    assert (model.lookup ("ada@work.example.org").shows_address);
+    assert (!model.lookup ("bob@example.org").shows_address);
+    model.update (people ({
+        person (model, "ada@example.org", "Ada Lovelace", 5),
+        person (model, "bob@example.org", "Bob", 3),
+    }));
+    assert (!model.lookup ("ada@example.org").shows_address);
 
     model.select (model.all);
     assert (model.selection.selected == 0);
