@@ -106,7 +106,9 @@ public class Mail.Person : Object {
     /* Applies what a rebuild gathered. Returns whether the person's place
      * in the sorted list may have moved. */
     public bool commit_update () {
-        var name = this.pending_name;
+        var name = this.pending_name.length > 0
+            ? this.pending_name
+            : PeopleIndex.name_from_key (this.address) ?? "";
         var moved = false;
         if (name != this.name) {
             this.name = name;
@@ -377,7 +379,14 @@ public class Mail.PeopleModel : Object {
 }
 
 public class Mail.PeopleIndex : Object {
+    /* Mail without stored addresses (header caches that are not written
+     * again yet) is keyed by display name. */
+    private const string NAME_PREFIX = "name:";
+
     private HashTable<string, uint8> own = new HashTable<string, uint8> (str_hash, str_equal);
+    /* The one address each sender name was seen with; "" once it was seen
+     * with several, as on group and shared addresses. */
+    private HashTable<string, string> address_by_name = new HashTable<string, string> (str_hash, str_equal);
 
     public PeopleIndex (Account account) {
         if (account.email != null && account.email.length > 0)
@@ -390,16 +399,36 @@ public class Mail.PeopleIndex : Object {
         return message.from_address != null && this.own.contains (message.from_address);
     }
 
-    /* People are their addresses. Mail from header caches older than the
-     * People view has none stored and joins no one until its folder is
-     * written again: a display name alone does not say who someone is. */
+    /* Learn which address goes with which name, so mail without stored
+     * addresses lands on that person, unless the name is not theirs alone. */
+    public void learn (Message message) {
+        if (message.from_address == null || message.from_address.length == 0)
+            return;
+        if (message.from == null || message.from.length == 0 || message.from.contains ("@"))
+            return;
+        var name = message.from.strip ().down ();
+        var known = this.address_by_name.get (name);
+        if (known == null)
+            this.address_by_name.set (name, message.from_address);
+        else if (known != message.from_address)
+            this.address_by_name.set (name, "");
+    }
+
+    /* People are their addresses; every message belongs to someone. Mail
+     * without stored addresses goes to the one address its name was seen
+     * with, or to a person of that name alone. */
     public GenericArray<string> counterparts (Message message) {
         var result = new GenericArray<string> ();
         if (is_outgoing (message)) {
-            if (message.recipient_addresses != null) {
+            if (message.recipient_addresses != null && message.recipient_addresses.length > 0) {
                 foreach (var address in message.recipient_addresses.split (",")) {
                     if (address.length > 0 && !this.own.contains (address))
                         add_unique (result, address);
+                }
+            } else if (message.to != null) {
+                foreach (var name in message.to.split (", ")) {
+                    if (name.strip ().length > 0)
+                        add_unique (result, key_for_name (name));
                 }
             }
             return result;
@@ -407,7 +436,23 @@ public class Mail.PeopleIndex : Object {
 
         if (message.from_address != null && message.from_address.length > 0)
             add_unique (result, message.from_address);
+        else if (message.from != null && message.from.length > 0)
+            add_unique (result, key_for_name (message.from));
         return result;
+    }
+
+    private string key_for_name (string raw) {
+        var lower = raw.strip ().down ();
+        if (lower.contains ("@") && !lower.contains (" "))
+            return lower;
+        var known = this.address_by_name.get (lower);
+        if (known != null && known.length > 0)
+            return known;
+        return NAME_PREFIX + lower;
+    }
+
+    public static string? name_from_key (string address) {
+        return address.has_prefix (NAME_PREFIX) ? address.substring (NAME_PREFIX.length) : null;
     }
 
     /* The name a message gives the person at address, if it gives one for
@@ -417,11 +462,15 @@ public class Mail.PeopleIndex : Object {
     public static string? name_for (Message message, string address, bool outgoing) {
         string name;
         if (outgoing) {
-            if (message.recipient_addresses != address)
+            if (message.recipient_addresses != null && message.recipient_addresses.length > 0
+                ? message.recipient_addresses != address
+                : name_key (message.to) != address)
                 return null;
             name = message.to ?? "";
         } else {
-            if (message.from_address != address)
+            if (message.from_address != null && message.from_address.length > 0
+                ? message.from_address != address
+                : name_key (message.from) != address)
                 return null;
             name = message.from ?? "";
         }
@@ -432,6 +481,10 @@ public class Mail.PeopleIndex : Object {
         if (folded.contains (" via ") || folded.contains (" on behalf of "))
             return null;
         return name;
+    }
+
+    private static string name_key (string? name) {
+        return NAME_PREFIX + (name ?? "").strip ().down ();
     }
 
     private static void add_unique (GenericArray<string> list, string value) {

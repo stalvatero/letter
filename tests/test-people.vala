@@ -11,11 +11,23 @@ void main () {
     var old_sent = message ("Me", null, "Ada Lovelace", null, true);
 
     var index = new Mail.PeopleIndex (account);
+    index.learn (incoming);
+    index.learn (old_cache);
     assert_people (index.counterparts (incoming), { "ada@example.org" }, "incoming mail belongs to its sender, not to Cc");
     assert_people (index.counterparts (sent), { "ada@example.org", "bob@example.org" }, "sent mail belongs to each recipient");
     assert_people (index.counterparts (from_other_client), { "bob@example.org" }, "mail from your own address counts as sent");
-    assert_people (index.counterparts (old_cache), {}, "a name without an address is nobody yet");
-    assert_people (index.counterparts (old_sent), {}, "recipient names without addresses are nobody yet");
+    assert_people (index.counterparts (old_cache), { "ada@example.org" }, "names from old caches map to the address seen with them");
+    assert_people (index.counterparts (old_sent), { "ada@example.org" }, "recipient names from old caches map too");
+
+    var unknown = message ("Grace Hopper", null, "Me", null, false);
+    assert_people (index.counterparts (unknown), { "name:grace hopper" }, "mail without an address still has a person");
+    assert (Mail.PeopleIndex.name_for (unknown, "name:grace hopper", false) == "Grace Hopper");
+
+    /* A name seen on several addresses is nobody's alone. */
+    index.learn (message ("Mario Nardiello", "mario@example.org", "Me", "me@example.org", false));
+    index.learn (message ("Mario Nardiello", "team@example.org", "Me", "me@example.org", false));
+    var old_mario = message ("Mario Nardiello", null, "Me", null, false);
+    assert_people (index.counterparts (old_mario), { "name:mario nardiello" }, "a shared name maps to no address");
 
     check_names ();
     check_people_model ();
