@@ -180,20 +180,6 @@ void check_people_model () {
     model.set_filter_text ("");
     assert_order (model, { "all", "ada@example.org", "bob@example.org" }, "an empty filter shows everyone");
 
-    model.update (people ({
-        person (model, "ada@example.org", "Ada Lovelace", 5),
-        person (model, "bob@example.org", "Bob", 3),
-        person (model, "ada@work.example.org", "ada lovelace", 4),
-    }));
-    assert (model.lookup ("ada@example.org").shows_address);
-    assert (model.lookup ("ada@work.example.org").shows_address);
-    assert (!model.lookup ("bob@example.org").shows_address);
-    model.update (people ({
-        person (model, "ada@example.org", "Ada Lovelace", 5),
-        person (model, "bob@example.org", "Bob", 3),
-    }));
-    assert (!model.lookup ("ada@example.org").shows_address);
-
     model.select (model.all);
     assert (model.selection.selected == 0);
     model.clear ();

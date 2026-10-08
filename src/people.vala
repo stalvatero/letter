@@ -40,22 +40,6 @@ public class Mail.Person : Object {
     private NameChoice from_them = new NameChoice ();
     private NameChoice from_you = new NameChoice ();
 
-    /* Another person in the list has the same name: their rows show the
-     * address too, so they can be told apart. */
-    [CCode (notify = false)]
-    public bool shows_address {
-        get {
-            return this._shows_address;
-        }
-        set {
-            if (this._shows_address == value)
-                return;
-            this._shows_address = value;
-            notify_property ("shows-address");
-        }
-    }
-    private bool _shows_address;
-
     public Person (string address, Folder folder) {
         Object (address: address, folder: folder, is_all: false);
     }
@@ -289,7 +273,6 @@ public class Mail.PeopleModel : Object {
      * updated in place; the list is sorted again only when an order key
      * moved. */
     public void update (HashTable<string, Person> present) {
-        var removed = false;
         uint i = this.people_store.get_n_items ();
         while (i > 0) {
             if (present.contains (((Person) this.people_store.get_item (i - 1)).address)) {
@@ -301,7 +284,6 @@ public class Mail.PeopleModel : Object {
                 i--;
             for (uint j = i; j < end; j++)
                 this.by_address.remove (((Person) this.people_store.get_item (j)).address);
-            removed = true;
             this.people_store.splice (i, end - i, new Object[0]);
         }
 
@@ -320,27 +302,12 @@ public class Mail.PeopleModel : Object {
                 added.add (person);
             }
         }
-        if (renamed || added.length > 0 || removed)
-            mark_shared_names ();
         if (renamed && this.needle.length > 0)
             this.filter.changed (Gtk.FilterChange.DIFFERENT);
         if (moved)
             this.sorter.changed (Gtk.SorterChange.DIFFERENT);
         if (added.length > 0)
             this.people_store.splice (this.people_store.get_n_items (), 0, added.data);
-    }
-
-    /* People listed under the same name show their address as well. */
-    private void mark_shared_names () {
-        var counts = new HashTable<string, int> (str_hash, str_equal);
-        foreach (var person in this.by_address.get_values ()) {
-            if (person.name.length > 0) {
-                var key = person.name.casefold ();
-                counts.set (key, counts.get (key) + 1);
-            }
-        }
-        foreach (var person in this.by_address.get_values ())
-            person.shows_address = person.name.length > 0 && counts.get (person.name.casefold ()) > 1;
     }
 
     /* Where the person is in the list, or INVALID_LIST_POSITION when the
@@ -508,7 +475,6 @@ public class Mail.PersonRow : Gtk.Box {
     private Gtk.Label address_label;
     private Gtk.Label count_label;
     private ulong name_handler;
-    private ulong address_handler;
     private ulong unread_handler;
 
     construct {
@@ -570,7 +536,6 @@ public class Mail.PersonRow : Gtk.Box {
         /* Methods, disconnected in unbind: a closure holding the row would
          * keep it alive as long as the person. */
         this.name_handler = person.notify["name"].connect (on_name_changed);
-        this.address_handler = person.notify["shows-address"].connect (on_name_changed);
         this.unread_handler = person.folder.notify["unread"].connect (on_unread_changed);
         update_name ();
         update_unread ();
@@ -580,10 +545,8 @@ public class Mail.PersonRow : Gtk.Box {
         if (this.person == null)
             return;
         SignalHandler.disconnect (this.person, this.name_handler);
-        SignalHandler.disconnect (this.person, this.address_handler);
         SignalHandler.disconnect (this.person.folder, this.unread_handler);
         this.name_handler = 0;
-        this.address_handler = 0;
         this.unread_handler = 0;
         this.person = null;
     }
@@ -599,8 +562,10 @@ public class Mail.PersonRow : Gtk.Box {
     private void update_name () {
         var name = this.person.display_name;
         this.name_label.label = name;
+        /* The address under the name says which address the row is; a row
+         * without a name already shows it as the name. */
         this.address_label.label = this.person.address;
-        this.address_label.visible = this.person.shows_address;
+        this.address_label.visible = this.person.name.length > 0 && this.person.has_email;
         if (!this.person.is_all)
             this.avatar.text = name;
         this.tooltip_text = this.person.has_email ? this.person.address : null;
