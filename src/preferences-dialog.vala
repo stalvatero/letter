@@ -116,6 +116,25 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         });
         reading.add (conversation_row);
 
+        var body_bg_row = new Adw.ComboRow () {
+            title = _("Reading mode"),
+            subtitle = _("Choose the background colour of the message body."),
+            subtitle_lines = 2,
+            model = new Gtk.StringList ({
+                _("Always light"),
+                _("Follow system"),
+            }),
+        };
+        var body_bg = this.settings.get_string ("message-body-background");
+        body_bg_row.selected = body_bg == "follow-system" ? 1 : 0;
+        body_bg_row.notify["selected"].connect (() => {
+            this.settings.set_string (
+                "message-body-background",
+                body_bg_row.selected == 1 ? "follow-system" : "always-light"
+            );
+        });
+        reading.add (body_bg_row);
+
         var notifications = new Adw.PreferencesGroup () {
             title = _("Notifications"),
         };

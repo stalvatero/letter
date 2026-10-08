@@ -7520,6 +7520,8 @@ public class Mail.MessageContent : Object {
     public int64 date { get; set; }
     public string html { get; set; }
     public string? plain_text { get; set; }
+    /* True when the body came from a text/html part (not text_to_html). */
+    public bool rich_html { get; set; }
     /* letterimg: token. Zero when this message has no inline images. */
     public uint64 inline_token { get; set; }
     public GenericArray<InlineImage>? inline_images { get; set; }
@@ -7768,14 +7770,17 @@ public class Mail.MessageContent : Object {
         if (images.length > 0)
             inline_token = InlineImagePages.reserve ();
         string body;
-        if (html != null && html.strip ().length > 0)
+        var rich_html = false;
+        if (html != null && html.strip ().length > 0) {
             body = rewrite_cids (html, images, inline_token);
-        else if (text != null && text.strip ().length > 0)
+            rich_html = true;
+        } else if (text != null && text.strip ().length > 0) {
             body = text_to_html (text);
-        else if (invitation != null)
+        } else if (invitation != null) {
             body = text_to_html (invitation.fallback_text ());
-        else
+        } else {
             body = text_to_html (_("This message has no readable content."));
+        }
 
         var content = new MessageContent () {
             uid = uid,
@@ -7791,6 +7796,7 @@ public class Mail.MessageContent : Object {
             date = date,
             html = body,
             plain_text = text,
+            rich_html = rich_html,
             inline_token = inline_token,
             inline_images = images.length > 0 ? images : null,
             has_remote_images = Utils.html_has_remote_images (body),

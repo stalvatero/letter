@@ -21,27 +21,6 @@ public class Mail.MessageReader : Gtk.Box {
     private Gtk.Box priority_badge;
     private Adw.Banner trust_banner;
     private InvitationBar invitation_bar;
-    private const string BLANK_HTML = """
-<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-html, body { margin: 0; height: 100%; background: #ffffff; }
-</style></head><body></body></html>
-""";
-    /* Drawn inside the living surface. A GTK spinner would sit under the
-     * GPU plane and could not cover it. */
-    private const string WAITING_HTML = """
-<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-html, body { margin: 0; height: 100%; background: #ffffff; }
-.spin {
-  width: 28px; height: 28px; box-sizing: border-box;
-  border: 2.5px solid rgba(34, 34, 34, 0.14);
-  border-top-color: rgba(34, 34, 34, 0.55);
-  border-radius: 50%;
-  position: absolute; left: 50%; top: 38%; margin-left: -14px;
-  animation: letter-spin 0.7s linear infinite;
-}
-@keyframes letter-spin { to { transform: rotate(360deg); } }
-</style></head><body><div class="spin"></div></body></html>
-""";
 
     private WebKit.NetworkSession network_session;
     private static bool inline_scheme_ready;
@@ -75,6 +54,9 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
         hexpand = true;
         vexpand = true;
         this.settings = new Settings (Config.APP_ID);
+        this.settings.changed["message-body-background"].connect (on_body_background_changed);
+        Adw.StyleManager.get_default ().notify["dark"].connect (on_body_background_changed);
+        sync_body_chrome_class ();
 
         var header = new Gtk.Box (Gtk.Orientation.VERTICAL, 2) {
             hexpand = true,
@@ -217,7 +199,68 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
         overlay.child = this.webview;
         overlay.add_overlay (this.white_cover);
         append (overlay);
-        load_reader_html (BLANK_HTML, false);
+        load_reader_html (blank_html (), false);
+    }
+
+    private bool body_follow_dark () {
+        return this.settings.get_string ("message-body-background") == "follow-system"
+            && Adw.StyleManager.get_default ().dark;
+    }
+
+    private void sync_body_chrome_class () {
+        if (body_follow_dark ())
+            add_css_class ("body-follow-dark");
+        else
+            remove_css_class ("body-follow-dark");
+        update_webview_background ();
+    }
+
+    private void update_webview_background () {
+        if (this.webview == null)
+            return;
+        var rgba = Gdk.RGBA ();
+        rgba.parse (body_follow_dark () ? "#1e1e1e" : "#ffffff");
+        this.webview.set_background_color (rgba);
+    }
+
+    private void on_body_background_changed () {
+        sync_body_chrome_class ();
+        if (this.current != null)
+            load_body_html (this.current.html);
+        else
+            load_reader_html (blank_html (), false);
+    }
+
+    private string blank_html () {
+        var bg = body_follow_dark () ? "#1e1e1e" : "#ffffff";
+        return """
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+html, body { margin: 0; height: 100%; background: %s; }
+</style></head><body></body></html>
+""".printf (bg);
+    }
+
+    /* Drawn inside the living surface. A GTK spinner would sit under the
+     * GPU plane and could not cover it. */
+    private string waiting_html () {
+        var dark = body_follow_dark ();
+        var bg = dark ? "#1e1e1e" : "#ffffff";
+        var ring = dark ? "rgba(238, 238, 238, 0.14)" : "rgba(34, 34, 34, 0.14)";
+        var tip = dark ? "rgba(238, 238, 238, 0.55)" : "rgba(34, 34, 34, 0.55)";
+        return """
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+html, body { margin: 0; height: 100%; background: %s; }
+.spin {
+  width: 28px; height: 28px; box-sizing: border-box;
+  border: 2.5px solid %s;
+  border-top-color: %s;
+  border-radius: 50%;
+  position: absolute; left: 50%; top: 38%; margin-left: -14px;
+  animation: letter-spin 0.7s linear infinite;
+}
+@keyframes letter-spin { to { transform: rotate(360deg); } }
+</style></head><body><div class="spin"></div></body></html>
+""".printf (bg, ring, tip);
     }
 
     /* Covers the previous mail immediately. The web view stays mapped;
@@ -353,7 +396,7 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
             this.from_label.label = "";
             this.date_label.label = "";
         }
-        load_reader_html (message != null ? WAITING_HTML : BLANK_HTML, false);
+        load_reader_html (message != null ? waiting_html () : blank_html (), false);
     }
 
     public void show_content (MessageContent content, bool outgoing = false) {
@@ -448,7 +491,9 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
 
     private WebKit.WebView create_reader_view () {
         var settings = new WebKit.Settings () {
-            enable_javascript = false,
+            /* Engine on so we can lift dark-on-dark text after load.
+             * Markup stays off: <script> in mail never runs. */
+            enable_javascript = true,
             enable_javascript_markup = false,
             javascript_can_open_windows_automatically = false,
             javascript_can_access_clipboard = false,
@@ -485,8 +530,9 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
         view.decide_policy.connect (on_decide_policy);
         view.context_menu.connect (on_context_menu);
         var rgba = Gdk.RGBA ();
-        rgba.parse ("#ffffff");
+        rgba.parse (body_follow_dark () ? "#1e1e1e" : "#ffffff");
         view.set_background_color (rgba);
+        view.realize.connect (update_webview_background);
         add_zoom_scroll (view);
         var zoom = this.settings.get_double ("reader-zoom").clamp (ZOOM_MIN, ZOOM_MAX);
         if (Math.fabs (zoom - 1.0) < 0.03)
@@ -594,7 +640,244 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
     }
 
     private void load_body_html (string html) {
-        load_reader_html (html_with_print_chrome (this.current, html), true);
+        var body = html;
+        if (body_follow_dark ())
+            body = adapt_html_for_dark_canvas (body);
+        load_reader_html (html_with_print_chrome (this.current, body), true);
+    }
+
+    /* Dark-follow reading: near-white newsletter canvases → dark, near-black
+     * text → light. Coloured bands (brand blues/oranges) stay as authored. */
+    private static string adapt_html_for_dark_canvas (string html) {
+        var result = rewrite_light_backgrounds (html);
+        return lift_dark_text_colors (result);
+    }
+
+    private static string rewrite_light_backgrounds (string html) {
+        var result = html;
+        try {
+            var bg_re = new Regex (
+                "background-color\\s*:\\s*([^;\"'\\}]+)",
+                RegexCompileFlags.CASELESS
+            );
+            result = bg_re.replace_eval (result, -1, 0, 0, (match, builder) => {
+                var raw = match.fetch (1) ?? "";
+                var important = Regex.match_simple ("!important", raw, RegexCompileFlags.CASELESS);
+                var value = raw.replace ("!important", "").strip ();
+                if (!css_background_is_light (value)) {
+                    builder.append (match.fetch (0) ?? "");
+                    return false;
+                }
+                builder.append ("background-color:");
+                builder.append (important ? "#1e1e1e !important" : "#1e1e1e");
+                return false;
+            });
+        } catch (RegexError e) {
+            warning ("Could not adapt light CSS backgrounds: %s", e.message);
+        }
+        try {
+            /* Solid-colour shorthand only — leave background:url(...) alone. */
+            var shorthand = new Regex (
+                "background\\s*:\\s*([^;\"'\\}]+)",
+                RegexCompileFlags.CASELESS
+            );
+            result = shorthand.replace_eval (result, -1, 0, 0, (match, builder) => {
+                var raw = match.fetch (1) ?? "";
+                var value = raw.replace ("!important", "").strip ();
+                if (Regex.match_simple ("url\\s*\\(", value, RegexCompileFlags.CASELESS)
+                    || !css_background_is_light (first_css_color_token (value))) {
+                    builder.append (match.fetch (0) ?? "");
+                    return false;
+                }
+                var important = Regex.match_simple ("!important", raw, RegexCompileFlags.CASELESS);
+                builder.append ("background:");
+                builder.append (important ? "#1e1e1e !important" : "#1e1e1e");
+                return false;
+            });
+        } catch (RegexError e) {
+            warning ("Could not adapt light background shorthand: %s", e.message);
+        }
+        try {
+            var attr_re = new Regex (
+                "\\bbgcolor\\s*=\\s*(\"?)([^\"'\\s>]+)\\1",
+                RegexCompileFlags.CASELESS
+            );
+            result = attr_re.replace_eval (result, -1, 0, 0, (match, builder) => {
+                var quote = match.fetch (1) ?? "";
+                var value = match.fetch (2) ?? "";
+                if (!css_background_is_light (value)) {
+                    builder.append (match.fetch (0) ?? "");
+                    return false;
+                }
+                builder.append ("bgcolor=");
+                builder.append (quote);
+                builder.append ("#1e1e1e");
+                builder.append (quote);
+                return false;
+            });
+        } catch (RegexError e) {
+            warning ("Could not adapt bgcolor attributes: %s", e.message);
+        }
+        return result;
+    }
+
+    /* Outlook / Word HTML often sets style="color:black" (named), which stays
+     * black on our dark canvas. Rewrite dark foreground colours in the markup
+     * before WebKit paints — does not need JavaScript. */
+    private static string lift_dark_text_colors (string html) {
+        var result = html;
+        try {
+            var style_re = new Regex (
+                "(?<!background-)(?<!border-)(?<!outline-)color\\s*:\\s*([^;\"'\\}]+)",
+                RegexCompileFlags.CASELESS
+            );
+            result = style_re.replace_eval (result, -1, 0, 0, (match, builder) => {
+                var raw = match.fetch (1) ?? "";
+                var important = Regex.match_simple ("!important", raw, RegexCompileFlags.CASELESS);
+                var value = raw.replace ("!important", "").strip ();
+                if (!css_foreground_is_dark (value)) {
+                    builder.append (match.fetch (0) ?? "");
+                    return false;
+                }
+                builder.append ("color:");
+                builder.append (important ? "#eeeeee !important" : "#eeeeee");
+                return false;
+            });
+        } catch (RegexError e) {
+            warning ("Could not lift dark CSS colours: %s", e.message);
+        }
+        try {
+            var attr_re = new Regex (
+                "\\bcolor\\s*=\\s*(\"?)([^\"'\\s>]+)\\1",
+                RegexCompileFlags.CASELESS
+            );
+            result = attr_re.replace_eval (result, -1, 0, 0, (match, builder) => {
+                var quote = match.fetch (1) ?? "";
+                var value = match.fetch (2) ?? "";
+                if (!css_foreground_is_dark (value)) {
+                    builder.append (match.fetch (0) ?? "");
+                    return false;
+                }
+                builder.append ("color=");
+                builder.append (quote);
+                builder.append ("#eeeeee");
+                builder.append (quote);
+                return false;
+            });
+        } catch (RegexError e) {
+            warning ("Could not lift dark colour attributes: %s", e.message);
+        }
+        return result;
+    }
+
+    private static string first_css_color_token (string raw) {
+        var value = raw.strip ();
+        var space = value.index_of_char (' ');
+        if (space > 0)
+            value = value.substring (0, space);
+        return value;
+    }
+
+    private static bool css_background_is_light (string raw) {
+        var value = raw.strip ().down ();
+        if (value.length == 0)
+            return false;
+        if (value.has_prefix ("#") == false && !value.has_prefix ("rgb")
+            && value[0] != '#' && value.get_char (0).isalnum ()) {
+            /* bgcolor="ffffff" without hash */
+            if (value.length == 3 || value.length == 6) {
+                bool hexish = true;
+                for (int i = 0; i < value.length; i++) {
+                    var c = value[i];
+                    if (!c.isxdigit ()) {
+                        hexish = false;
+                        break;
+                    }
+                }
+                if (hexish)
+                    value = "#" + value;
+            }
+        }
+        if (value == "white" || value == "canvas")
+            return true;
+        if (value.has_prefix ("#")) {
+            int r, g, b;
+            if (!parse_html_hex_color (value, out r, out g, out b))
+                return false;
+            return relative_luminance (r, g, b) >= 230.0 && near_gray (r, g, b);
+        }
+        if (value.has_prefix ("rgb")) {
+            int r, g, b;
+            if (!parse_css_rgb_color (value, out r, out g, out b))
+                return false;
+            return relative_luminance (r, g, b) >= 230.0 && near_gray (r, g, b);
+        }
+        return false;
+    }
+
+    private static bool near_gray (int r, int g, int b) {
+        return int.max (r, int.max (g, b)) - int.min (r, int.min (g, b)) < 40;
+    }
+
+    private static bool css_foreground_is_dark (string raw) {
+        var value = raw.strip ().down ();
+        if (value.length == 0)
+            return false;
+        if (value == "black" || value == "windowtext" || value == "currentcolor"
+            || value == "text" || value == "canvastext")
+            return true;
+        if (value.has_prefix ("#")) {
+            int r, g, b;
+            if (!parse_html_hex_color (value, out r, out g, out b))
+                return false;
+            return relative_luminance (r, g, b) < 160.0;
+        }
+        if (value.has_prefix ("rgb")) {
+            int r, g, b;
+            if (!parse_css_rgb_color (value, out r, out g, out b))
+                return false;
+            return relative_luminance (r, g, b) < 160.0;
+        }
+        return false;
+    }
+
+    private static double relative_luminance (int r, int g, int b) {
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    private static bool parse_html_hex_color (string value, out int r, out int g, out int b) {
+        r = g = b = 0;
+        var hex = value.substring (1).strip ();
+        if (hex.length == 3) {
+            hex = "%c%c%c%c%c%c".printf (
+                hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]
+            );
+        }
+        if (hex.length != 6)
+            return false;
+        uint64 n = 0;
+        if (!uint64.try_parse (hex, out n, null, 16))
+            return false;
+        r = (int) ((n >> 16) & 0xff);
+        g = (int) ((n >> 8) & 0xff);
+        b = (int) (n & 0xff);
+        return true;
+    }
+
+    private static bool parse_css_rgb_color (string value, out int r, out int g, out int b) {
+        r = g = b = 0;
+        try {
+            var re = new Regex ("rgba?\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)");
+            MatchInfo info;
+            if (!re.match (value, 0, out info))
+                return false;
+            r = int.parse (info.fetch (1));
+            g = int.parse (info.fetch (2));
+            b = int.parse (info.fetch (3));
+            return true;
+        } catch (RegexError e) {
+            return false;
+        }
     }
 
     /* becomes_ready: a real message (or its error page). The waiting page
@@ -622,6 +905,8 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
             }
             if (this.expect_document)
                 this.document_ready = true;
+            if (this.expect_document && body_follow_dark ())
+                fix_dark_on_dark_text.begin (view, epoch);
             release_white_after_paint (cover, epoch);
         });
         this.body_failed_id = view.load_failed.connect ((event, uri, error) => {
@@ -653,17 +938,118 @@ html, body { margin: 0; height: 100%; background: #ffffff; }
         });
     }
 
-    private string html_with_print_chrome (MessageContent? content, string html) {
-        if (content == null)
-            return html;
+    /* Dark text (incl. Outlook navy) on our dark canvas is unreadable.
+     * Bright brand colours and light-on-dark text are left alone. */
+    private async void fix_dark_on_dark_text (WebKit.WebView view, uint epoch) {
+        const string js = """
+(() => {
+  const PAGE = [0x1e, 0x1e, 0x1e];
+  const LIGHT = '#eeeeee';
+  const LINK = '#8cb4ff';
+  const parse = (c) => {
+    if (!c || c === 'transparent')
+      return null;
+    const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?/);
+    if (!m)
+      return null;
+    if (m[4] !== undefined && Number(m[4]) <= 0.01)
+      return null;
+    return [Number(m[1]), Number(m[2]), Number(m[3])];
+  };
+  const lum = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const contrast = (a, b) => {
+    const L1 = lum(a[0], a[1], a[2]) / 255;
+    const L2 = lum(b[0], b[1], b[2]) / 255;
+    const hi = Math.max(L1, L2);
+    const lo = Math.min(L1, L2);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const bgOf = (el) => {
+    let n = el;
+    while (n && n !== document.documentElement) {
+      const bg = parse(getComputedStyle(n).backgroundColor);
+      if (bg)
+        return bg;
+      n = n.parentElement;
+    }
+    return PAGE;
+  };
+  if (!document.body)
+    return;
+  document.body.querySelectorAll('*').forEach((el) => {
+    if (el.closest && el.closest('.mail-print-header'))
+      return;
+    const cs = getComputedStyle(el);
+    const fg = parse(cs.color);
+    const bg = bgOf(el);
+    if (!fg)
+      return;
+    const fgL = lum(fg[0], fg[1], fg[2]);
+    const bgL = lum(bg[0], bg[1], bg[2]);
+    /* Light text on a light newsletter canvas → darken the canvas. */
+    if (fgL >= 200 && bgL >= 230) {
+      el.style.setProperty('background-color', '#1e1e1e', 'important');
+      return;
+    }
+    if (fgL >= 165)
+      return;
+    if (bgL >= 170)
+      return;
+    if (contrast(fg, bg) >= 3.2)
+      return;
+    const link = el.tagName === 'A' || (el.closest && el.closest('a'));
+    el.style.setProperty('color', link ? LINK : LIGHT, 'important');
+  });
+})();
+""";
+        try {
+            yield view.evaluate_javascript (js, -1, null, null, null);
+        } catch (Error e) {
+            if (epoch != this.html_epoch)
+                return;
+            warning ("Could not adapt message colours for dark reading: %s", e.message);
+        }
+    }
 
-        var style = """<style>
+    private string reader_screen_style (bool rich_html) {
+        if (!body_follow_dark ()) {
+            return """
 html { color-scheme: only light; }
 @media screen {
   .mail-print-header { display: none !important; }
   .mail-compose { padding: 0 !important; }
   html, body { background: #ffffff; color: #222222; }
 }
+""";
+        }
+        if (rich_html) {
+            /* Dark canvas defaults. Near-black inline greys are lifted after
+             * load (fix_dark_on_dark_text); intentional hues stay. */
+            return """
+html { color-scheme: dark light; }
+@media screen {
+  .mail-print-header { display: none !important; }
+  .mail-compose { padding: 0 !important; }
+  html, body { background: #1e1e1e !important; color: #eeeeee !important; }
+}
+""";
+        }
+        return """
+html { color-scheme: dark; }
+@media screen {
+  .mail-print-header { display: none !important; }
+  .mail-compose { padding: 0 !important; }
+  html, body { background: #1e1e1e !important; color: #eeeeee !important; }
+}
+""";
+    }
+
+    private string html_with_print_chrome (MessageContent? content, string html) {
+        if (content == null)
+            return html;
+
+        var style = "<style>\n%s".printf (reader_screen_style (content.rich_html));
+        style += """
 @media print {
   .mail-print-header, .mail-print-header * {
     all: unset !important;

@@ -107,6 +107,15 @@
       <summary>Conversation view</summary>
       <description>Group messages that belong to the same thread into a single row.</description>
     </key>
+    <key name="message-body-background" type="s">
+      <choices>
+        <choice value="always-light"/>
+        <choice value="follow-system"/>
+      </choices>
+      <default>'always-light'</default>
+      <summary>Reading mode</summary>
+      <description>Background for the message body: always light, or follow the system light/dark appearance. Rich HTML keeps its own colours.</description>
+    </key>
     <key name="notifications" type="b">
       <default>true</default>
       <summary>Desktop notifications</summary>

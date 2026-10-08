@@ -273,127 +273,204 @@ template $MailWindow: Adw.ApplicationWindow {
           }
         };
 
-        end-child: Adw.ToolbarView {
-          [top]
-          Adw.HeaderBar conversation_header {
-            styles [
-              "letter-toolbar",
-            ]
+        /* Unified shell (bottom / hidden reading pane) keeps one header above
+         * the list+reader paned. Split shell (right) puts a header in each
+         * pane so the handle cuts through the chrome. Widgets are reparented
+         * in apply_reading_pane(). */
+        end-child: Gtk.Box mail_area {
+          orientation: horizontal;
+          hexpand: true;
+          vexpand: true;
 
-            [start]
-            Button compose_button {
-              tooltip-text: _("New Message");
-              action-name: "win.compose";
+          Adw.ToolbarView unified_mail {
+            hexpand: true;
+            vexpand: true;
 
+            [top]
+            Adw.HeaderBar conversation_header {
               styles [
-                "suggested-action",
-                "pill",
-                "compose-button",
+                "letter-toolbar",
               ]
 
-              Box {
-                spacing: 4;
+              [start]
+              Button compose_button {
+                tooltip-text: _("New Message");
+                action-name: "win.compose";
+
+                styles [
+                  "suggested-action",
+                  "pill",
+                  "compose-button",
+                ]
+
+                Box {
+                  spacing: 4;
+                  valign: center;
+
+                  Image {
+                    icon-name: "mail-message-new-symbolic";
+                  }
+
+                  Label compose_label {
+                    label: _("New");
+                  }
+                }
+              }
+
+              [start]
+              ToggleButton unread_filter_button {
+                icon-name: "mail-unread-symbolic";
+                tooltip-text: _("Show unread only");
+
+                styles [
+                  "unread-filter",
+                ]
+              }
+
+              [start]
+              ToggleButton conversation_button {
+                icon-name: "view-list-symbolic";
+                tooltip-text: _("Group by conversation");
+
+                styles [
+                  "conversation-toggle",
+                ]
+              }
+
+              [start]
+              $MailSearchField message_search {
+                placeholder-text: _("Search");
+                width-request: 220;
+                hexpand: true;
                 valign: center;
+              }
 
-                Image {
-                  icon-name: "mail-message-new-symbolic";
-                }
+              title-widget: Adw.WindowTitle conversation_title {
+                title: _("Letter");
+              };
 
-                Label compose_label {
-                  label: _("New");
-                }
+              [end]
+              MenuButton menu_button {
+                icon-name: "open-menu-symbolic";
+                tooltip-text: _("Main Menu");
+                primary: true;
+                menu-model: primary_menu;
+              }
+
+              [end]
+              Adw.Spinner conversation_sync_spinner {
+                visible: false;
+                tooltip-text: _("Updating…");
+                width-request: 16;
+                height-request: 16;
+
+                styles [
+                  "sync-spinner",
+                ]
               }
             }
 
-            [start]
-            ToggleButton unread_filter_button {
-              icon-name: "mail-unread-symbolic";
-              tooltip-text: _("Show unread only");
+            content: Gtk.Paned message_split {
+              wide-handle: true;
+              position: 360;
+              resize-start-child: false;
+              shrink-start-child: false;
 
-              styles [
-                "unread-filter",
-              ]
-            }
+              start-child: Adw.Bin list_bin {
+                width-request: 260;
 
-            [start]
-            ToggleButton conversation_button {
-              icon-name: "view-list-symbolic";
-              tooltip-text: _("Group by conversation");
+                child: Adw.StatusPage conversation_page {
+                  icon-name: "mail-unread-symbolic";
+                  title: _("Select a Folder");
+                  description: _("Messages from the selected folder will appear here.");
+                  valign: center;
 
-              styles [
-                "conversation-toggle",
-              ]
-            }
+                  styles [
+                    "status-body",
+                  ]
+                };
+              };
 
-            [start]
-            $MailSearchField message_search {
-              placeholder-text: _("Search");
-              width-request: 220;
-              hexpand: true;
-              valign: center;
-            }
+              end-child: Adw.Bin reader_bin {
+                width-request: 280;
 
-            title-widget: Adw.WindowTitle conversation_title {
-              title: _("Letter");
+                child: Adw.StatusPage reader_page {
+                  icon-name: "mail-unread-symbolic";
+                  title: _("Select a Message");
+                  description: _("Choose a message from the list to read it.");
+                  valign: center;
+
+                  styles [
+                    "status-body",
+                  ]
+                };
+              };
             };
-
-            [end]
-            MenuButton menu_button {
-              icon-name: "open-menu-symbolic";
-              tooltip-text: _("Main Menu");
-              primary: true;
-              menu-model: primary_menu;
-            }
-
-            [end]
-            Adw.Spinner conversation_sync_spinner {
-              visible: false;
-              tooltip-text: _("Updating…");
-              width-request: 16;
-              height-request: 16;
-
-              styles [
-                "sync-spinner",
-              ]
-            }
           }
 
-          content: Gtk.Paned message_split {
+          Gtk.Paned split_mail {
+            visible: false;
+            hexpand: true;
+            vexpand: true;
             wide-handle: true;
             position: 360;
             resize-start-child: false;
             shrink-start-child: false;
 
-            start-child: Adw.Bin list_bin {
+            styles [
+              "split-mail",
+            ]
+
+            start-child: Adw.ToolbarView list_mail {
+              hexpand: true;
+              vexpand: true;
               width-request: 260;
 
-              child: Adw.StatusPage conversation_page {
-                icon-name: "mail-unread-symbolic";
-                title: _("Select a Folder");
-                description: _("Messages from the selected folder will appear here.");
-                valign: center;
+              styles [
+                "list-mail-pane",
+              ]
+
+              [top]
+              Adw.HeaderBar list_header {
+                show-start-title-buttons: false;
+                show-end-title-buttons: false;
 
                 styles [
-                  "status-body",
+                  "letter-toolbar",
                 ]
+              }
+
+              content: Adw.Bin list_mail_slot {
+                hexpand: true;
+                vexpand: true;
               };
             };
 
-            end-child: Adw.Bin reader_bin {
+            end-child: Adw.ToolbarView reader_mail {
+              hexpand: true;
+              vexpand: true;
               width-request: 280;
 
-              child: Adw.StatusPage reader_page {
-                icon-name: "mail-unread-symbolic";
-                title: _("Select a Message");
-                description: _("Choose a message from the list to read it.");
-                valign: center;
+              [top]
+              Adw.HeaderBar reader_header {
+                show-start-title-buttons: false;
 
                 styles [
-                  "status-body",
+                  "letter-toolbar",
+                  "reader-header",
                 ]
+
+                /* Empty title so the window name does not sit after Search. */
+                title-widget: Box {
+                };
+              }
+
+              content: Adw.Bin reader_mail_slot {
+                hexpand: true;
+                vexpand: true;
               };
             };
-          };
+          }
         };
       };
     }

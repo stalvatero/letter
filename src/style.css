@@ -12,6 +12,11 @@
   border-right: 1px solid var(--border-color);
 }
 
+/* Split reading-pane right: keep a gap before the main menu. */
+.reader-header .mail-search-field {
+  margin-end: 8px;
+}
+
 .account-rail {
   background: var(--accent-bg-color);
   padding: 0 4px 8px 4px;
@@ -336,28 +341,6 @@ headerbar button.conversation-toggle:checked {
   opacity: 0.38;
 }
 
-.search-banner {
-  padding: 6px 10px;
-  background: color-mix(in srgb, var(--accent-bg-color) 16%, var(--view-bg-color));
-  border-bottom: 1px solid color-mix(in srgb, var(--accent-bg-color) 22%, var(--border-color));
-}
-
-.search-banner label {
-  font-weight: 600;
-  color: var(--view-fg-color);
-}
-
-.search-banner button {
-  color: var(--accent-color);
-  background: color-mix(in srgb, var(--accent-bg-color) 28%, var(--view-bg-color));
-  border-radius: 999px;
-  padding: 2px 10px;
-}
-
-.search-banner button:hover {
-  background: color-mix(in srgb, var(--accent-bg-color) 40%, var(--view-bg-color));
-}
-
 .search-deeper-bar {
   padding: 8px 0 4px 0;
   background: color-mix(in srgb, var(--accent-bg-color) 16%, var(--view-bg-color));
@@ -396,8 +379,18 @@ headerbar button.conversation-toggle:checked {
   background: #ffffff;
 }
 
+.message-reader.body-follow-dark .message-body-stack,
+.message-reader.body-follow-dark .message-body-placeholder,
+.message-reader.body-follow-dark .message-body {
+  background: #1e1e1e;
+}
+
 .message-body-placeholder image.spinner {
   color: alpha(#222222, 0.38);
+}
+
+.message-reader.body-follow-dark .message-body-placeholder image.spinner {
+  color: alpha(#eeeeee, 0.38);
 }
 
 .compose-body,
@@ -409,6 +402,11 @@ headerbar button.conversation-toggle:checked {
 webview.message-body {
   background: #ffffff;
   background-color: #ffffff;
+}
+
+.message-reader.body-follow-dark webview.message-body {
+  background: #1e1e1e;
+  background-color: #1e1e1e;
 }
 
 .invitation-bar {

@@ -1903,6 +1903,18 @@ msgstr "Conversazioni"
 msgid "Group related messages into threads."
 msgstr "Raggruppa i messaggi correlati in conversazioni."
 
+msgid "Reading mode"
+msgstr "Modalità di lettura"
+
+msgid "Choose the background colour of the message body."
+msgstr "Scegli il colore di sfondo del corpo dei messaggi."
+
+msgid "Always light"
+msgstr "Sempre chiara"
+
+msgid "Follow system"
+msgstr "Segui sistema"
+
 #: src/preferences-dialog.vala:120 src/preferences-dialog.vala:123
 #: src/preferences-dialog.vala:272
 msgid "Notifications"

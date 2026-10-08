@@ -20,11 +20,24 @@ refactors unless they affect behaviour.
 ## [Unreleased](https://github.com/stalvatero/letter/compare/v1.0.0...HEAD)
 
 
+### Added
+
+- Greek translation by [Ioannis Argyropoulos](https://github.com/Argy22).
+
 ### Changed
 
 - Enhance UI consistency and compactness across the application. Improved the layout of the account rail, window headers, and search fields for better coherence. 
 - Adjusted styles for toolbar buttons and search components to maintain uniform height and spacing.
 - Right click on an inline image and select 'Forward image' to  opens compose with that picture attached.
+- With the reading pane on the right, the message list and reader each have
+  their own header so the separator runs the full height. Bottom and hidden
+  reading pane keep a single shared header.
+- Removed the search-results banner and Close Search button; clear search from
+  the search field or Escape instead.
+- Preferences → Reading adds **Reading mode**: always-light message bodies
+  (default), or follow the system appearance. When the desktop is dark, plain
+  text and rich HTML use a dark canvas: near-black text is lightened and
+  near-white backgrounds are darkened; coloured bands stay as authored.
 
 ### Fixed
 
