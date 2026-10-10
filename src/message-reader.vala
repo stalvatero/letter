@@ -413,13 +413,12 @@ html, body { margin: 0; height: 100%; background: %s; }
             && Utils.mailbox_uses_org_trust (this.mailbox)
             && this.contacts != null;
         var needs_trust = content.has_remote_images && !trusted && !check_book;
-        var allow_remote = trusted || !content.has_remote_images;
         var same_body = this.document_ready
             && this.current != null
             && this.current.uid == content.uid
             && this.trust_banner.revealed == needs_trust
             && this.webview != null
-            && this.load_remote_images == allow_remote;
+            && this.load_remote_images == trusted;
 
         this.current = content;
         this.trust_epoch++;
@@ -432,7 +431,7 @@ html, body { margin: 0; height: 100%; background: %s; }
         this.header_actions.visible = this.allow_header_actions;
 
         this.trust_banner.revealed = needs_trust;
-        this.load_remote_images = allow_remote;
+        this.load_remote_images = trusted;
         bind_attachments (content.attachments);
         this.invitation_bar.bind (content.invitation);
         if (!same_body)
@@ -643,7 +642,9 @@ html, body { margin: 0; height: 100%; background: %s; }
         var body = html;
         if (body_follow_dark ())
             body = adapt_html_for_dark_canvas (body);
-        load_reader_html (html_with_print_chrome (this.current, body), true);
+        var page = html_with_print_chrome (this.current, body);
+        var policy = Utils.content_policy_meta (this.load_remote_images);
+        load_reader_html (Utils.insert_after_doctype (page, policy), true);
     }
 
     /* Dark-follow reading: near-white newsletter canvases → dark, near-black
@@ -1124,23 +1125,18 @@ html { color-scheme: dark; }
   }
 }
 </style>""";
-        /* auto-load stays on so letterimg: inline images still arrive.
-         * This policy is what keeps http images out until the sender is trusted. */
-        var head = style;
-        if (!this.load_remote_images)
-            head = "<meta http-equiv=\"Content-Security-Policy\" content=\"img-src letterimg: data: blob:;\">" + style;
         var chrome = print_header_markup (content);
         var body = html;
         var lower = body.down ();
         if (!lower.contains ("<html")) {
             return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">%s</head><body>%s%s</body></html>".printf (
-                head,
+                style,
                 chrome,
                 body
             );
         }
 
-        body = insert_after_open_tag (body, "head", head);
+        body = insert_after_open_tag (body, "head", style);
         body = insert_after_open_tag (body, "body", chrome);
         return body;
     }
@@ -1335,10 +1331,15 @@ html { color-scheme: dark; }
             return false;
 
         var action = navigation.get_navigation_action ();
-        if (action.get_navigation_type () != WebKit.NavigationType.LINK_CLICKED)
-            return false;
-
         var uri = action.get_request ().get_uri ();
+        /* A message must not navigate itself, e.g. with <meta http-equiv="refresh">. */
+        if (action.get_navigation_type () != WebKit.NavigationType.LINK_CLICKED) {
+            if (uri == InlineImagePages.DOCUMENT)
+                return false;
+            decision.ignore ();
+            return true;
+        }
+
         if (uri != null && uri.length > 0) {
             try {
                 AppInfo.launch_default_for_uri (uri, null);

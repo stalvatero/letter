@@ -197,12 +197,23 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
             && this.signature_index <= this.signatures.length)
             initial_signature = this.signatures[this.signature_index - 1].compose_html ();
 
+        var own_signatures_html = new StringBuilder ();
+        foreach (var signature in this.signatures)
+            own_signatures_html.append (signature.compose_html ());
         this.body_view = new ComposeHtmlView (
             quoted,
             forward_quote,
             !this.focus_to_field,
             edit_body,
-            initial_signature
+            initial_signature,
+            null,
+            Utils.compose_content_policy_meta (
+                settings,
+                quoted,
+                selected,
+                selected != null ? session.get_identity (selected) : null,
+                own_signatures_html.str
+            )
         );
         this.body_view.files_dropped.connect ((files) => handle_dropped_files.begin (files));
         this.body_view.content_changed.connect (() => {
@@ -1818,7 +1829,8 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         bool focus_editor = true,
         bool resend = false,
         string signature_html = "",
-        string? initial_html = null
+        string? initial_html = null,
+        string content_policy_meta = Utils.content_policy_meta (true)
     ) {
         Object (orientation: Gtk.Orientation.VERTICAL, spacing: 0);
         hexpand = true;
@@ -1885,7 +1897,14 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         this.stack.add_named (this.webview, "body");
         append (this.stack);
         this.webview.load_html (
-            build_document (quoted, forward_quote, resend, signature_html, initial_html),
+            build_document (
+                quoted,
+                forward_quote,
+                resend,
+                signature_html,
+                initial_html,
+                content_policy_meta
+            ),
             "about:blank"
         );
         this.web_renderer_used = true;
@@ -2964,7 +2983,8 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         bool forward_quote,
         bool resend,
         string signature_html,
-        string? initial_html
+        string? initial_html,
+        string content_policy_meta
     ) {
         var editor = new StringBuilder ();
         if (initial_html != null) {
@@ -3003,6 +3023,7 @@ public class Mail.ComposeHtmlView : Gtk.Box {
 
         var html = new StringBuilder ();
         html.append ("<!DOCTYPE html><html><head><meta charset=\"utf-8\">");
+        html.append (content_policy_meta);
         html.append (compose_style (false));
         html.append ("</head><body><div id=\"editor\" contenteditable=\"true\" spellcheck=\"true\"");
         var lang = html_spell_lang ();

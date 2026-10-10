@@ -19,6 +19,13 @@ refactors unless they affect behaviour.
 
 ## [Unreleased](https://github.com/stalvatero/letter/compare/v1.5.0...HEAD)
 
+### Fixed
+
+- Mail from senders you have not trusted no longer loads anything from the
+  network. Remote stylesheets, fonts, audio, video, frames and page redirects
+  were still loaded and could tell the sender the message was opened.
+  Replies and forwards to such mail no longer load its remote images.
+
 
 ## [1.5.0](https://github.com/stalvatero/letter/compare/v1.0.0...v1.5.0) - 2026-10-08
 

@@ -27,7 +27,6 @@ mail_resources = gnome.compile_resources(
 
 mail_sources = files(
   'config.vapi',
-  'main.vala',
   'application.vala',
   'window.vala',
   'account.vala',
@@ -65,7 +64,7 @@ mail_sources = files(
 
 executable(
   meson.project_name(),
-  mail_sources,
+  mail_sources + files('main.vala'),
   mail_resources,
   dependencies: mail_deps,
   include_directories: config_h_dir,

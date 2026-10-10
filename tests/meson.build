@@ -73,3 +73,25 @@ test_important_cache = executable(
 )
 
 test('important-cache', test_important_cache)
+
+in_memory_settings_env = environment({
+  'GSETTINGS_BACKEND': 'memory',
+  'GSETTINGS_SCHEMA_DIR': meson.project_build_root() / 'data',
+})
+
+foreach name : ['content-policy', 'remote-content']
+  test(
+    name,
+    executable(
+      'test-' + name,
+      mail_sources + files('test-' + name + '.vala'),
+      mail_resources,
+      dependencies: mail_deps,
+      include_directories: config_h_dir,
+      vala_args: [
+        '--gresourcesdir', meson.project_build_root() / 'src',
+      ],
+    ),
+    env: in_memory_settings_env,
+  )
+endforeach
