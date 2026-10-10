@@ -1700,6 +1700,80 @@ namespace Mail.Utils {
             || down.contains ("url('http");
     }
 
+    private const string URL_WITHOUT_QUERY_OR_POLICY_SEPARATORS = "https?://[^\"'\\s>?#;,]+";
+
+    /* Keeps mail HTML off the network unless remote content is allowed.
+     * Inline letterimg: images always load. */
+    public static string content_policy_meta (bool allow_remote, string[] own_images = {}) {
+        var remote = allow_remote ? " *" : "";
+        var images = "letterimg: data: blob:" + remote;
+        foreach (var image in own_images)
+            images += " " + image;
+        string[] directives = {
+            "default-src 'none'",
+            "img-src " + images,
+            "style-src 'unsafe-inline'" + remote,
+            "font-src data:" + remote,
+            "media-src data: blob:" + remote,
+            "connect-src data: blob:",
+            "form-action 'none'",
+            "base-uri 'none'",
+        };
+        return "<meta http-equiv=\"Content-Security-Policy\" content=\"%s\">".printf (
+            string.joinv ("; ", directives)
+        );
+    }
+
+    /* The quoted message follows the reader's trust rule. The user's own
+     * signature images always load. */
+    public static string compose_content_policy_meta (
+        Settings settings,
+        MessageContent? quoted,
+        Account? account,
+        Identity? identity,
+        string own_signatures_html
+    ) {
+        if (quoted == null || quoted_sender_trusted (settings, quoted, account, identity))
+            return content_policy_meta (true);
+
+        return content_policy_meta (false, html_remote_image_sources (own_signatures_html));
+    }
+
+    /* Mail may have no <head>. Right after the doctype the policy still lands
+     * in the head and the page keeps standards mode. */
+    public static string insert_after_doctype (string html, string insert) {
+        var doctype_end = 0;
+        if (html.chug ().down ().has_prefix ("<!doctype"))
+            doctype_end = html.index_of (">") + 1;
+        return html.substring (0, doctype_end) + insert + html.substring (doctype_end);
+    }
+
+    private static bool quoted_sender_trusted (
+        Settings settings,
+        MessageContent quoted,
+        Account? account,
+        Identity? identity
+    ) {
+        var sender = quoted.from_email ?? email_from_header (quoted.from);
+        return remote_content_allowed (settings, sender, account, identity, false);
+    }
+
+    public static string[] html_remote_image_sources (string html) {
+        string[] sources = {};
+        try {
+            var img_src = new Regex (
+                "<img\\b[^>]*?\\bsrc\\s*=\\s*[\"']?(" + URL_WITHOUT_QUERY_OR_POLICY_SEPARATORS + ")",
+                RegexCompileFlags.CASELESS
+            );
+            MatchInfo match;
+            for (img_src.match (html, 0, out match); match.matches (); match.next ())
+                sources += match.fetch (1);
+        } catch (Error e) {
+        }
+
+        return sources;
+    }
+
     public static bool is_trusted_sender (Settings settings, string? email) {
         var needle = normalize_email (email);
         if (needle == null)
