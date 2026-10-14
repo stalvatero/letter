@@ -447,6 +447,20 @@ public class Mail.PeopleIndex : Object {
         return NAME_PREFIX + lower;
     }
 
+    /* Tells mail that came or went from mail whose flags changed: each
+     * message counts, and so does a row that gained its addresses from an
+     * older cache in place. Odd factors only, as an even one shifts earlier
+     * mail out of the stamp. */
+    public static uint mail_stamp (GenericArray<Message> messages) {
+        uint stamp = messages.length;
+        for (uint i = 0; i < messages.length; i++) {
+            var address = messages[i].from_address;
+            stamp = stamp * 31 + direct_hash (messages[i]);
+            stamp = stamp * 31 + (address != null && address.length > 0 ? 1 : 0);
+        }
+        return stamp;
+    }
+
     public static string? name_from_key (string address) {
         return address.has_prefix (NAME_PREFIX) ? address.substring (NAME_PREFIX.length) : null;
     }

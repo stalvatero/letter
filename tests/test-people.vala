@@ -33,6 +33,7 @@ void main () {
     check_contacts ();
     check_names ();
     check_people_model ();
+    check_mail_stamp ();
     check_unbound_row_is_freed ();
 }
 
@@ -282,6 +283,31 @@ void check_unbound_row_is_freed () {
     row = null;
     if (!watch.finalized)
         error ("an unbound person row is never freed");
+}
+
+/* Deleting any message changes the stamp, not only one of the last. */
+void check_mail_stamp () {
+    var mail = new GenericArray<Mail.Message> ();
+    for (int i = 0; i < 200; i++) {
+        var address = "person%d@example.org".printf (i);
+        mail.add (message ("Person %d".printf (i), address, "Me", "me@example.org", false));
+    }
+    var before = Mail.PeopleIndex.mail_stamp (mail);
+    for (uint i = 0; i < mail.length; i += 37) {
+        var fewer = new GenericArray<Mail.Message> ();
+        for (uint j = 0; j < mail.length; j++) {
+            if (j != i)
+                fewer.add (mail[j]);
+        }
+        /* The same count with another message in its place. */
+        fewer.add (message ("Late", "late@example.org", "Me", "me@example.org", false));
+        assert (Mail.PeopleIndex.mail_stamp (fewer) != before);
+    }
+    var old_row = message ("Person 0", null, "Me", null, false);
+    mail[0] = old_row;
+    var without = Mail.PeopleIndex.mail_stamp (mail);
+    old_row.from_address = "person0@example.org";
+    assert (Mail.PeopleIndex.mail_stamp (mail) != without);
 }
 
 Mail.Message message (string from, string? from_address, string to, string? recipients, bool outgoing) {
