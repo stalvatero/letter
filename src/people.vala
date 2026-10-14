@@ -351,27 +351,44 @@ public class Mail.PeopleIndex : Object {
     private const string NAME_PREFIX = "name:";
 
     private HashTable<string, uint8> own = new HashTable<string, uint8> (str_hash, str_equal);
+    private ContactSource? contacts;
     /* The one address each sender name was seen with; "" once it was seen
      * with several, as on group and shared addresses. */
     private HashTable<string, string> address_by_name = new HashTable<string, string> (str_hash, str_equal);
 
     /* Your own addresses are never people: the account's, its identity's
-     * aliases, and every address your sent mail went out from. */
-    public PeopleIndex (Account account, string[] aliases = {}) {
+     * aliases, and every address your sent mail went out from. A person is
+     * an address, or every address of one contact in the address book. */
+    public PeopleIndex (Account account, string[] aliases = {}, ContactSource? contacts = null) {
+        this.contacts = contacts;
         add_own (account.email);
         foreach (var alias in aliases)
             add_own (alias);
     }
 
+    /* A contact that holds one of your addresses is you, too. */
     private void add_own (string? address) {
-        if (address != null && address.strip ().length > 0)
-            this.own.set (address.strip ().down (), 1);
+        if (address == null || address.strip ().length == 0)
+            return;
+        var folded = address.strip ().down ();
+        this.own.set (folded, 1);
+        this.own.set (person_key (folded), 1);
+    }
+
+    private bool is_own (string address) {
+        return this.own.contains (address) || this.own.contains (person_key (address));
+    }
+
+    /* The person an address belongs to: its contact's key, or itself. */
+    public string person_key (string address) {
+        var key = this.contacts != null ? this.contacts.contact_key_for (address) : null;
+        return key ?? address;
     }
 
     public bool is_outgoing (Message message) {
         if (message.outgoing)
             return true;
-        return message.from_address != null && this.own.contains (message.from_address);
+        return message.from_address != null && is_own (message.from_address);
     }
 
     /* Learn which address goes with which name, so mail without stored
@@ -401,8 +418,8 @@ public class Mail.PeopleIndex : Object {
         if (is_outgoing (message)) {
             if (message.recipient_addresses != null && message.recipient_addresses.length > 0) {
                 foreach (var address in message.recipient_addresses.split (",")) {
-                    if (address.length > 0 && !this.own.contains (address))
-                        add_unique (result, address);
+                    if (address.length > 0 && !is_own (address))
+                        add_unique (result, person_key (address));
                 }
             } else if (message.to != null) {
                 foreach (var name in message.to.split (", ")) {
@@ -414,7 +431,7 @@ public class Mail.PeopleIndex : Object {
         }
 
         if (message.from_address != null && message.from_address.length > 0)
-            add_unique (result, message.from_address);
+            add_unique (result, person_key (message.from_address));
         else if (message.from != null && message.from.length > 0)
             add_unique (result, key_for_name (message.from));
         return result;
@@ -423,10 +440,10 @@ public class Mail.PeopleIndex : Object {
     private string key_for_name (string raw) {
         var lower = raw.strip ().down ();
         if (lower.contains ("@") && !lower.contains (" "))
-            return lower;
+            return person_key (lower);
         var known = this.address_by_name.get (lower);
         if (known != null && known.length > 0)
-            return known;
+            return person_key (known);
         return NAME_PREFIX + lower;
     }
 
@@ -434,22 +451,22 @@ public class Mail.PeopleIndex : Object {
         return address.has_prefix (NAME_PREFIX) ? address.substring (NAME_PREFIX.length) : null;
     }
 
-    /* The name a message gives the person at address, if it gives one for
-     * certain: the sender's own name on mail from that address, or the
-     * name you wrote to them by when they were the only recipient. Names
-     * relayed for someone else ("Ada via Team") belong to no address. */
-    public static string? name_for (Message message, string address, bool outgoing) {
+    /* The name a message gives the person, if it gives one for certain: the
+     * sender's own name on mail from one of their addresses, or the name you
+     * wrote to them by when they were the only recipient. Names relayed for
+     * someone else ("Ada via Team") belong to no address. */
+    public string? name_for (Message message, string person, bool outgoing) {
         string name;
         if (outgoing) {
             if (message.recipient_addresses != null && message.recipient_addresses.length > 0
-                ? message.recipient_addresses != address
-                : name_key (message.to) != address)
+                ? person_key (message.recipient_addresses) != person
+                : name_key (message.to) != person)
                 return null;
             name = message.to ?? "";
         } else {
             if (message.from_address != null && message.from_address.length > 0
-                ? message.from_address != address
-                : name_key (message.from) != address)
+                ? person_key (message.from_address) != person
+                : name_key (message.from) != person)
                 return null;
             name = message.from ?? "";
         }
@@ -475,11 +492,16 @@ public class Mail.PeopleIndex : Object {
     }
 }
 
-/* Where People rows find a photo for an address: the address book. */
-public interface Mail.PhotoSource : Object {
-    public signal void photos_changed ();
+/* What the address book knows about an address: its photo, and which
+ * contact it belongs to. */
+public interface Mail.ContactSource : Object {
+    public signal void contacts_changed ();
 
     public abstract Gdk.Texture? photo_for (string email);
+
+    /* The key all addresses of one contact share, or null when the address
+     * is the only one its contact has, or in no contact at all. */
+    public abstract string? contact_key_for (string email);
 }
 
 /* A row of the People sidebar. Rows are recycled by the list view: bind
@@ -487,7 +509,7 @@ public interface Mail.PhotoSource : Object {
  * folder keeps a row it no longer shows alive. */
 public class Mail.PersonRow : Gtk.Box {
     public Person? person { get; private set; }
-    public PhotoSource? contacts { get; construct; }
+    public ContactSource? contacts { get; construct; }
 
     private Adw.Avatar avatar;
     private Gtk.Image icon;
@@ -498,7 +520,7 @@ public class Mail.PersonRow : Gtk.Box {
     private ulong unread_handler;
     private ulong photos_handler;
 
-    public PersonRow (PhotoSource? contacts = null) {
+    public PersonRow (ContactSource? contacts = null) {
         Object (contacts: contacts);
     }
 
@@ -563,7 +585,7 @@ public class Mail.PersonRow : Gtk.Box {
         this.name_handler = person.notify["name"].connect (on_name_changed);
         this.unread_handler = person.folder.notify["unread"].connect (on_unread_changed);
         if (this.contacts != null)
-            this.photos_handler = this.contacts.photos_changed.connect (update_photo);
+            this.photos_handler = this.contacts.contacts_changed.connect (update_photo);
         update_name ();
         update_photo ();
         update_unread ();
