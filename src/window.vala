@@ -4673,14 +4673,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         var changed = false;
         if (collect) {
             var collected = collect_people_source ();
-            uint stamp = collected.length;
-            /* Addresses are filled into rows from older caches in place:
-             * a row that gained them is a change too. */
-            for (uint i = 0; i < collected.length; i++) {
-                var address = collected[i].from_address;
-                stamp = stamp * 31 + direct_hash (collected[i]);
-                stamp = stamp * 2 + (address != null && address.length > 0 ? 1 : 0);
-            }
+            var stamp = PeopleIndex.mail_stamp (collected);
             changed = this.people_source == null || stamp != this.people_source_stamp;
             this.people_source = collected;
             this.people_source_stamp = stamp;
@@ -4871,10 +4864,15 @@ public class Mail.Window : Adw.ApplicationWindow {
             rebuild_people_list ();
         var address = folder.person_address;
         var source = address != null ? this.people_mail.get (address) : this.people_source;
+        /* Mail moved to Trash or Junk since the last rebuild leaves the
+         * view at once, in the conversation and the message list alike. */
+        var hidden = people_hidden_folders ();
         var messages = new GenericArray<Message> ();
         if (source != null) {
-            for (uint i = 0; i < source.length; i++)
-                messages.add (source[i]);
+            for (uint i = 0; i < source.length; i++) {
+                if (!hidden.contains (source[i].folder_full_name ?? ""))
+                    messages.add (source[i]);
+            }
         }
         sort_messages_by_date (messages);
         return messages;
