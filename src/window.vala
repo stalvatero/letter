@@ -375,6 +375,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.header_count_high_water = new HashTable<string, uint> (str_hash, str_equal);
         this.message_reader = new MessageReader ();
         this.message_reader.set_contacts (app.contacts);
+        app.contacts.contacts_changed.connect (on_contacts_changed);
         this.message_reader.invitation_respond.connect ((invitation, status) => {
             respond_invitation.begin (invitation, status);
         });
@@ -4442,6 +4443,15 @@ public class Mail.Window : Adw.ApplicationWindow {
         return folder;
     }
 
+    /* Addresses of one contact are one person: group the mail again once
+     * the address book is in. */
+    private void on_contacts_changed () {
+        if (this.people_source == null)
+            return;
+        this.people_source = null;
+        queue_people_refresh ();
+    }
+
     private void clear_people () {
         if (this.people_refresh_source != 0) {
             Source.remove (this.people_refresh_source);
@@ -4710,13 +4720,15 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private PeopleIndex people_index (Account account) {
+        var contacts = (get_application () as Application)?.contacts;
         var identity = this.mail_session != null ? this.mail_session.get_identity (account) : null;
-        if (identity == null)
-            return new PeopleIndex (account);
-        string[] own = { identity.address };
-        foreach (var alias in identity.aliases)
-            own += alias;
-        return new PeopleIndex (account, own);
+        string[] own = {};
+        if (identity != null) {
+            own += identity.address;
+            foreach (var alias in identity.aliases)
+                own += alias;
+        }
+        return new PeopleIndex (account, own, contacts);
     }
 
     private static string saved_people_path (Account account) {
@@ -4826,7 +4838,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 mail.get (address).add (message);
                 if (message.date > person.pending_latest)
                     person.pending_latest = message.date;
-                var name = PeopleIndex.name_for (message, address, outgoing);
+                var name = index.name_for (message, address, outgoing);
                 if (name != null)
                     person.offer_name (name, message.date, !outgoing);
             }
@@ -11302,6 +11314,9 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.mail_session.draft_removed.disconnect (on_draft_removed);
             this.mail_session.transfer_failed.disconnect (on_transfer_failed);
         }
+        var app = get_application () as Application;
+        if (app != null)
+            app.contacts.contacts_changed.disconnect (on_contacts_changed);
     }
 }
 

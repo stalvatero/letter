@@ -13,17 +13,18 @@ public class Mail.ContactHit : Object {
     }
 }
 
-public class Mail.ContactStore : Object, PhotoSource {
+public class Mail.ContactStore : Object, ContactSource {
     private E.SourceRegistry? registry;
     private GenericArray<E.BookClient> books = new GenericArray<E.BookClient> ();
     private bool books_ready;
     private bool books_loading;
     private HashTable<string, Collected> collected;
     private uint save_source;
-    /* Address book photos by lowercase address, loaded once with one query
-     * per book rather than one per person. */
+    /* Address book photos and contact keys by lowercase address, loaded
+     * once with one query per book rather than one per person. */
     private HashTable<string, Gdk.Texture>? photos;
-    private bool photos_loading;
+    private HashTable<string, string>? contact_keys;
+    private bool contacts_loading;
 
     private class Collected {
         public string email = "";
@@ -114,50 +115,86 @@ public class Mail.ContactStore : Object, PhotoSource {
     }
 
     /* The address book photo for an address. The first call starts loading
-     * them all and returns null; photos_changed follows once they are in. */
+     * the address book and returns null; contacts_changed follows once it
+     * is in. */
     public Gdk.Texture? photo_for (string email) {
         if (this.photos == null) {
-            load_photos.begin ();
+            load_contacts.begin ();
             return null;
         }
         return this.photos.get (email);
     }
 
-    private async void load_photos () {
-        if (this.photos_loading || this.registry == null)
+    /* A contact with several addresses is one person: each of them maps to
+     * the contact's first address. Loads like photo_for. */
+    public string? contact_key_for (string email) {
+        if (this.contact_keys == null) {
+            load_contacts.begin ();
+            return null;
+        }
+        return this.contact_keys.get (email);
+    }
+
+    private async void load_contacts () {
+        if (this.contacts_loading || this.registry == null)
             return;
-        this.photos_loading = true;
+        this.contacts_loading = true;
         yield ensure_books (null);
         var photos = new HashTable<string, Gdk.Texture> (str_hash, str_equal);
+        var keys = new HashTable<string, string> (str_hash, str_equal);
+        var seen = new HashTable<string, uint8> (str_hash, str_equal);
         for (uint i = 0; i < this.books.length; i++) {
             try {
                 SList<E.Contact>? listed = null;
-                yield this.books[i].get_contacts ("(exists \"photo\")", null, out listed);
+                yield this.books[i].get_contacts ("(exists \"email\")", null, out listed);
                 foreach (var contact in listed) {
-                    var texture = contact != null ? photo_texture (contact) : null;
-                    if (texture == null)
-                        continue;
-                    string?[] emails = {
-                        contact.email_1,
-                        contact.email_2,
-                        contact.email_3,
-                        contact.email_4,
-                    };
-                    foreach (var raw in emails) {
-                        var email = Utils.sanitize_recipient_text (raw).down ();
-                        if (email.contains ("@") && !photos.contains (email))
-                            photos.set (email, texture);
-                    }
+                    if (contact != null)
+                        add_contact (contact, photos, keys, seen);
                 }
             } catch (Error e) {
-                debug ("Address book photos: %s", e.message);
+                debug ("Address book contacts: %s", e.message);
             }
-            Idle.add (load_photos.callback);
+            Idle.add (load_contacts.callback);
             yield;
         }
         this.photos = photos;
-        this.photos_loading = false;
-        photos_changed ();
+        this.contact_keys = keys;
+        this.contacts_loading = false;
+        contacts_changed ();
+    }
+
+    /* An address in two contacts keeps the first one, so contacts never
+     * chain into each other. */
+    private static void add_contact (
+        E.Contact contact,
+        HashTable<string, Gdk.Texture> photos,
+        HashTable<string, string> keys,
+        HashTable<string, uint8> seen
+    ) {
+        string?[] raw_emails = {
+            contact.email_1,
+            contact.email_2,
+            contact.email_3,
+            contact.email_4,
+        };
+        var emails = new GenericArray<string> ();
+        foreach (var raw in raw_emails) {
+            var email = Utils.sanitize_recipient_text (raw).down ();
+            if (email.contains ("@") && !seen.contains (email)) {
+                seen.set (email, 1);
+                emails.add (email);
+            }
+        }
+        if (emails.length == 0)
+            return;
+
+        var texture = photo_texture (contact);
+        for (uint i = 0; i < emails.length; i++) {
+            if (texture != null && !photos.contains (emails[i]))
+                photos.set (emails[i], texture);
+            if (emails.length > 1)
+                keys.set (emails[i], emails[0]);
+        }
     }
 
     private static Gdk.Texture? photo_texture (E.Contact contact) {

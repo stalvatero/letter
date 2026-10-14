@@ -21,7 +21,7 @@ void main () {
 
     var unknown = message ("Grace Hopper", null, "Me", null, false);
     assert_people (index.counterparts (unknown), { "name:grace hopper" }, "mail without an address still has a person");
-    assert (Mail.PeopleIndex.name_for (unknown, "name:grace hopper", false) == "Grace Hopper");
+    assert (index.name_for (unknown, "name:grace hopper", false) == "Grace Hopper");
 
     /* A name seen on several addresses is nobody's alone. */
     index.learn (message ("Mario Nardiello", "mario@example.org", "Me", "me@example.org", false));
@@ -30,6 +30,7 @@ void main () {
     assert_people (index.counterparts (old_mario), { "name:mario nardiello" }, "a shared name maps to no address");
 
     check_own_addresses ();
+    check_contacts ();
     check_names ();
     check_people_model ();
     check_unbound_row_is_freed ();
@@ -50,24 +51,47 @@ void check_own_addresses () {
     assert_people (index.counterparts (from_old), { "bob@example.org" }, "an address you sent from counts as yours");
 }
 
+/* One contact is one person, whichever of its addresses the mail used;
+ * the same name on another address is still someone else. */
+void check_contacts () {
+    var account = new Mail.Account () {
+        email = "me@example.org",
+    };
+    var index = new Mail.PeopleIndex (account, {}, new TwoAddressBook ());
+    var work = message ("Ada Lovelace", "ada@example.org", "Me", "me@example.org", false);
+    var home = message ("Ada L.", "ada@home.example", "Me", "me@example.org", false);
+    var namesake = message ("Ada Lovelace", "ada@other.example", "Me", "me@example.org", false);
+    var both = message ("Me", "me@example.org", "Ada", "ada@example.org,ada@home.example", true);
+    assert_people (index.counterparts (work), { "ada@example.org" }, "a contact's address is its person");
+    assert_people (index.counterparts (home), { "ada@example.org" }, "a contact's other address is the same person");
+    assert_people (index.counterparts (namesake), { "ada@other.example" }, "a name alone does not join a contact");
+    assert_people (index.counterparts (both), { "ada@example.org" }, "mail to two addresses of one contact counts once");
+    assert (index.name_for (home, "ada@example.org", false) == "Ada L.");
+
+    var from_old = message ("Me", "me@old.example", "Bob", "bob@example.org", false);
+    assert (index.is_outgoing (from_old));
+    assert_people (index.counterparts (from_old), { "bob@example.org" }, "your own contact's addresses are yours");
+}
+
 /* Names come only from mail tied to the address, and a shared address
  * whose mail carries several people's names shows the address. */
 void check_names () {
+    var index = new Mail.PeopleIndex (new Mail.Account () { email = "me@example.org" });
     var incoming = message ("Ada Lovelace", "ada@example.org", "Me", "me@example.org", false);
-    assert (Mail.PeopleIndex.name_for (incoming, "ada@example.org", false) == "Ada Lovelace");
-    assert (Mail.PeopleIndex.name_for (incoming, "team@example.org", false) == null);
+    assert (index.name_for (incoming, "ada@example.org", false) == "Ada Lovelace");
+    assert (index.name_for (incoming, "team@example.org", false) == null);
 
     /* You wrote to Mario with a group on Cc: the group is not Mario. */
     var with_cc = message ("Me", "me@example.org", "Mario Nardiello", "mario@example.org,team@example.org", true);
-    assert (Mail.PeopleIndex.name_for (with_cc, "team@example.org", true) == null);
-    assert (Mail.PeopleIndex.name_for (with_cc, "mario@example.org", true) == null);
+    assert (index.name_for (with_cc, "team@example.org", true) == null);
+    assert (index.name_for (with_cc, "mario@example.org", true) == null);
     var alone = message ("Me", "me@example.org", "Mario Nardiello", "mario@example.org", true);
-    assert (Mail.PeopleIndex.name_for (alone, "mario@example.org", true) == "Mario Nardiello");
+    assert (index.name_for (alone, "mario@example.org", true) == "Mario Nardiello");
 
     var relayed = message ("Mario Nardiello via Team", "team@example.org", "Me", "me@example.org", false);
-    assert (Mail.PeopleIndex.name_for (relayed, "team@example.org", false) == null);
+    assert (index.name_for (relayed, "team@example.org", false) == null);
     var surname_first = message ("Nardiello, Mario", "mario@example.org", "Me", "me@example.org", false);
-    assert (Mail.PeopleIndex.name_for (surname_first, "mario@example.org", false) == "Nardiello, Mario");
+    assert (index.name_for (surname_first, "mario@example.org", false) == "Nardiello, Mario");
 
     var mario = new Mail.Person ("mario@example.org", new Mail.Folder ());
     mario.begin_update ();
@@ -98,9 +122,33 @@ void assert_name (Mail.Person person, string expected, string what) {
         error ("%s: got \"%s\", expected \"%s\"", what, person.display_name, expected);
 }
 
-class NoPhotos : Object, Mail.PhotoSource {
+class NoPhotos : Object, Mail.ContactSource {
     public Gdk.Texture? photo_for (string email) {
         return null;
+    }
+
+    public string? contact_key_for (string email) {
+        return null;
+    }
+}
+
+/* An address book with Ada under two addresses, and you under an old one. */
+class TwoAddressBook : Object, Mail.ContactSource {
+    public Gdk.Texture? photo_for (string email) {
+        return null;
+    }
+
+    public string? contact_key_for (string email) {
+        switch (email) {
+            case "ada@example.org":
+            case "ada@home.example":
+                return "ada@example.org";
+            case "me@example.org":
+            case "me@old.example":
+                return "me@example.org";
+            default:
+                return null;
+        }
     }
 }
 
@@ -229,7 +277,7 @@ void check_unbound_row_is_freed () {
     row.bind (ada);
     ada.name = "Ada";
     folder.unread = 2;
-    photos.photos_changed ();
+    photos.contacts_changed ();
     row.unbind ();
     row = null;
     if (!watch.finalized)
