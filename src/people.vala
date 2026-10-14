@@ -355,9 +355,17 @@ public class Mail.PeopleIndex : Object {
      * with several, as on group and shared addresses. */
     private HashTable<string, string> address_by_name = new HashTable<string, string> (str_hash, str_equal);
 
-    public PeopleIndex (Account account) {
-        if (account.email != null && account.email.length > 0)
-            this.own.set (account.email.down (), 1);
+    /* Your own addresses are never people: the account's, its identity's
+     * aliases, and every address your sent mail went out from. */
+    public PeopleIndex (Account account, string[] aliases = {}) {
+        add_own (account.email);
+        foreach (var alias in aliases)
+            add_own (alias);
+    }
+
+    private void add_own (string? address) {
+        if (address != null && address.strip ().length > 0)
+            this.own.set (address.strip ().down (), 1);
     }
 
     public bool is_outgoing (Message message) {
@@ -371,6 +379,10 @@ public class Mail.PeopleIndex : Object {
     public void learn (Message message) {
         if (message.from_address == null || message.from_address.length == 0)
             return;
+        if (message.outgoing) {
+            add_own (message.from_address);
+            return;
+        }
         if (message.from == null || message.from.length == 0 || message.from.contains ("@"))
             return;
         var name = message.from.strip ().down ();
