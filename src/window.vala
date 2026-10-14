@@ -2813,7 +2813,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (message == null)
             return false;
 
-        var people = new PeopleIndex (account).counterparts (message);
+        var people = people_index (account).counterparts (message);
         var target = people.length > 0 ? person_folder (people[0]) : ensure_people_all_folder ();
         this.pending_select_uid = uid;
         this.open_message = message;
@@ -4679,7 +4679,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
         var messages = this.people_source;
 
-        var index = new PeopleIndex (account);
+        var index = people_index (account);
         var t1 = Utils.sync_tick ();
         if (changed)
             group_people_mail (index, messages);
@@ -4707,6 +4707,16 @@ public class Mail.Window : Adw.ApplicationWindow {
             Utils.sync_ms (t2)
         ));
         return changed;
+    }
+
+    private PeopleIndex people_index (Account account) {
+        var identity = this.mail_session != null ? this.mail_session.get_identity (account) : null;
+        if (identity == null)
+            return new PeopleIndex (account);
+        string[] own = { identity.address };
+        foreach (var alias in identity.aliases)
+            own += alias;
+        return new PeopleIndex (account, own);
     }
 
     private static string saved_people_path (Account account) {

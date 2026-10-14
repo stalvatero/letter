@@ -29,9 +29,25 @@ void main () {
     var old_mario = message ("Mario Nardiello", null, "Me", null, false);
     assert_people (index.counterparts (old_mario), { "name:mario nardiello" }, "a shared name maps to no address");
 
+    check_own_addresses ();
     check_names ();
     check_people_model ();
     check_unbound_row_is_freed ();
+}
+
+/* Your aliases and the addresses you sent from are you, not people. */
+void check_own_addresses () {
+    var account = new Mail.Account () {
+        email = "me@example.org",
+    };
+    var index = new Mail.PeopleIndex (account, { "alias@example.org" });
+    index.learn (message ("Me", "old@example.net", "Ada Lovelace", "ada@example.org", true));
+
+    var to_old = message ("Me", "alias@example.org", "Me", "old@example.net,ada@example.org", false);
+    assert (index.is_outgoing (to_old));
+    assert_people (index.counterparts (to_old), { "ada@example.org" }, "mail between your own addresses has no person of you");
+    var from_old = message ("Me", "old@example.net", "Bob", "bob@example.org", false);
+    assert_people (index.counterparts (from_old), { "bob@example.org" }, "an address you sent from counts as yours");
 }
 
 /* Names come only from mail tied to the address, and a shared address
