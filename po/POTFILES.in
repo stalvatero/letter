@@ -31,3 +31,4 @@ src/eml-viewer.vala
 src/dependency-page.vala
 src/contact-store.vala
 src/contact-picker.vala
+src/people.vala
