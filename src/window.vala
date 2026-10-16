@@ -154,6 +154,9 @@ public class Mail.Window : Adw.ApplicationWindow {
     private ThreadIndex? people_threads;
     private uint people_threads_stamp;
     private uint people_refresh_source;
+    /* The queued refresh waits for sync, and how long the last one took. */
+    private bool people_refresh_waits;
+    private int64 people_refresh_cost;
     /* Header caches edited in place, not replaced: lets a People rebuild
      * tell flag changes from mail that came or went without a pass over
      * every message. */
@@ -1739,6 +1742,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             )
         );
         this.camel_align_busy = false;
+        people_sync_settled ();
         this.camel_align_name = null;
         this.camel_align_full_name = null;
         this.camel_align_cancellable = null;
@@ -4125,6 +4129,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 this.folder_sync_active = false;
                 if (this.folder_sync_pending_name == folder.full_name && serial == this.folder_sync_serial)
                     this.folder_sync_pending_name = null;
+                people_sync_settled ();
             }
             if (!this.tearing_down && !this.send_in_progress)
                 flush_parked_mail_check ();
@@ -4407,6 +4412,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         } finally {
             this.startup_sync_active = false;
             this.mailbox_bootstrapping = false;
+            people_sync_settled ();
             pop_background_status ();
             if (!this.tearing_down && !this.send_in_progress
                 && (finished || this.mail_check_parked || this.mail_check_wanted))
@@ -4875,6 +4881,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             Source.remove (this.people_refresh_source);
             this.people_refresh_source = 0;
         }
+        this.people_refresh_waits = false;
         this.person_folders.remove_all ();
         this.people_mail.remove_all ();
         this.people_source = null;
@@ -4978,25 +4985,52 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.people_model.select (person);
     }
 
-    /* Header lists change in bursts during sync; rebuild once they settle. */
+    private bool people_sync_busy () {
+        return this.startup_sync_active || this.scheduled_sync_active
+            || this.folder_sync_active || this.camel_align_busy;
+    }
+
+    /* Header lists change in bursts during sync; rebuild once they settle.
+     * While a sync runs, a big first sync would otherwise rebuild every
+     * 300 ms on the main loop: wait longer, at least twenty times what the
+     * last refresh took, and catch up as soon as the sync is done. */
     private void queue_people_refresh () {
         if (!this.people_button.active || this.people_refresh_source != 0)
             return;
-        this.people_refresh_source = Timeout.add (300, () => {
+        uint delay = 300;
+        this.people_refresh_waits = people_sync_busy ();
+        if (this.people_refresh_waits)
+            delay = (uint) (this.people_refresh_cost / 1000 * 20).clamp (3000, 15000);
+        this.people_refresh_source = Timeout.add (delay, () => {
             this.people_refresh_source = 0;
-            var changed = rebuild_people_list ();
-            var folder = this.selected_folder;
-            if (folder == null || !folder.is_people_view || this.search_text.length > 0)
-                return Source.REMOVE;
-            /* Rows follow flag changes on their own; like a folder, the list
-             * is only replaced when mail came or went, or the unread filter
-             * has to drop what was just read. */
-            if (changed || this.unread_only)
-                show_people_messages (true);
-            else
-                update_folder_heading (folder, this.message_store.get_n_items ());
+            this.people_refresh_waits = false;
+            var t0 = Utils.sync_tick ();
+            refresh_people ();
+            this.people_refresh_cost = Utils.sync_tick () - t0;
             return Source.REMOVE;
         });
+    }
+
+    private void people_sync_settled () {
+        if (this.people_refresh_source == 0 || !this.people_refresh_waits || people_sync_busy ())
+            return;
+        Source.remove (this.people_refresh_source);
+        this.people_refresh_source = 0;
+        queue_people_refresh ();
+    }
+
+    private void refresh_people () {
+        var changed = rebuild_people_list ();
+        var folder = this.selected_folder;
+        if (folder == null || !folder.is_people_view || this.search_text.length > 0)
+            return;
+        /* Rows follow flag changes on their own; like a folder, the list
+         * is only replaced when mail came or went, or the unread filter
+         * has to drop what was just read. */
+        if (changed || this.unread_only)
+            show_people_messages (true);
+        else
+            update_folder_heading (folder, this.message_store.get_n_items ());
     }
 
     /* Where deleting or reporting spam moves mail from the People view. */
@@ -12432,6 +12466,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             Utils.sync_log ("scheduled sync finished");
         } finally {
             this.scheduled_sync_active = false;
+            people_sync_settled ();
             this.sync_log_name = "startup sync";
             pop_background_status ();
             if (!this.tearing_down && !this.send_in_progress)
