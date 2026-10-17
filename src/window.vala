@@ -5048,13 +5048,14 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
     }
 
-    private static string header_cache_escape (string? raw) {
+    internal static string header_cache_escape (string? raw) {
         if (raw == null || raw.length == 0)
             return "";
-        return raw.replace ("\\", "\\\\").replace ("\t", "\\t").replace ("\n", "\\n");
+        var text = Utils.replace_literal (raw, "\\", "\\\\");
+        return Utils.replace_literal (Utils.replace_literal (text, "\t", "\\t"), "\n", "\\n");
     }
 
-    private static string header_cache_unescape (string raw) {
+    internal static string header_cache_unescape (string raw) {
         var builder = new StringBuilder ();
         var escaped = false;
         unichar c;

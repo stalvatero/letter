@@ -1340,13 +1340,35 @@ namespace Mail.Utils {
         return display.contains (",") || display.contains (";");
     }
 
+    /* Vala’s string.replace() builds a GRegex on every call and aborts on
+     * RegexError for some real-world MIME cid/data-uri pairs. */
+    public static string replace_literal (string text, string old, string replacement) {
+        if (text.length == 0 || old.length == 0 || old == replacement)
+            return text;
+
+        int index = text.index_of (old);
+        if (index < 0)
+            return text;
+
+        var builder = new StringBuilder ();
+        int start = 0;
+        while (index >= 0) {
+            builder.append (text.substring (start, index - start));
+            builder.append (replacement);
+            start = index + old.length;
+            index = text.index_of (old, start);
+        }
+        builder.append (text.substring (start));
+        return builder.str;
+    }
+
     public static string sanitize_recipient_text (string? raw) {
         if (raw == null || raw.length == 0)
             return "";
 
-        var text = raw.replace ("\\\"", "\"").replace ("\\'", "'");
-        text = text.replace ("&quot;", "\"").replace ("&#39;", "'").replace ("&apos;", "'");
-        text = text.replace ("\u200b", "").replace ("\u00a0", " ");
+        var text = replace_literal (replace_literal (raw, "\\\"", "\""), "\\'", "'");
+        text = replace_literal (replace_literal (replace_literal (text, "&quot;", "\""), "&#39;", "'"), "&apos;", "'");
+        text = replace_literal (replace_literal (text, "\u200b", ""), "\u00a0", " ");
         text = text.strip ();
 
         while (text.length > 0) {

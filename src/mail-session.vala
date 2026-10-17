@@ -7552,8 +7552,8 @@ public class Mail.MessageContent : Object {
             var legacy = current.has_suffix ("/")
                 ? current.substring (0, current.length - 1)
                 : current;
-            result = replace_literal (result, current, data_uri);
-            result = replace_literal (result, legacy, data_uri);
+            result = Utils.replace_literal (result, current, data_uri);
+            result = Utils.replace_literal (result, legacy, data_uri);
         }
         return result;
     }
@@ -7997,37 +7997,15 @@ public class Mail.MessageContent : Object {
             done[best] = true;
             var uri = InlineImagePages.uri (token, best);
             var cid = images[best].cid;
-            result = replace_literal (result, "cid:" + cid, uri);
-            result = replace_literal (result, "CID:" + cid, uri);
+            result = Utils.replace_literal (result, "cid:" + cid, uri);
+            result = Utils.replace_literal (result, "CID:" + cid, uri);
             var unescaped = Uri.unescape_string (cid);
             if (unescaped != null && unescaped.length > 0 && unescaped != cid) {
-                result = replace_literal (result, "cid:" + unescaped, uri);
-                result = replace_literal (result, "CID:" + unescaped, uri);
+                result = Utils.replace_literal (result, "cid:" + unescaped, uri);
+                result = Utils.replace_literal (result, "CID:" + unescaped, uri);
             }
         }
         return result;
-    }
-
-    /* Vala’s string.replace() builds a GRegex and aborts on RegexError for some
-     * real-world MIME cid/data-uri pairs. Keep a plain literal substitute. */
-    private static string replace_literal (string text, string old, string replacement) {
-        if (text.length == 0 || old.length == 0 || old == replacement)
-            return text;
-
-        int index = text.index_of (old);
-        if (index < 0)
-            return text;
-
-        var builder = new StringBuilder ();
-        int start = 0;
-        while (index >= 0) {
-            builder.append (text.substring (start, index - start));
-            builder.append (replacement);
-            start = index + old.length;
-            index = text.index_of (old, start);
-        }
-        builder.append (text.substring (start));
-        return builder.str;
     }
 
     private static string decode_part_text (Camel.DataWrapper wrapper) {

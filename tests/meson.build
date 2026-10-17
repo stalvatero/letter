@@ -96,7 +96,7 @@ in_memory_settings_env = environment({
   'GSETTINGS_SCHEMA_DIR': meson.project_build_root() / 'data',
 })
 
-foreach name : ['content-policy', 'remote-content']
+foreach name : ['content-policy', 'remote-content', 'text-replace']
   test(
     name,
     executable(
