@@ -23,6 +23,7 @@ Feel free to try it out and enjoy the app's potential. All feedback is welcome.
 - Greek (translation by [Ioannis Argyropoulos](https://github.com/Argy22))
 - Italian
 - Japanese (translated by [Kansa_Fu](https://github.com/Kansa-fu))
+- Spanish (translation by [msc-ffs](https://github.com/msc-ffs))
 - More will come — translations via pull request are very welcome.
 
 
