@@ -229,6 +229,7 @@ public class Mail.OutboxStore : Object {
                 var ok = yield try_send_item (next);
                 this.active_id = null;
                 if (ok) {
+                    this.attention_shown.remove (next.id);
                     delete_outbox_item (next.id);
                     item_sent (next);
                     changed ();

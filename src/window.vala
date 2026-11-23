@@ -90,6 +90,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     private Gtk.SearchBar message_search_bar;
     [GtkChild]
     private unowned Gtk.MenuButton menu_button;
+    private Gtk.Widget? menu_update_badge;
+    private Gtk.Widget? updates_menu_dot;
     [GtkChild]
     private unowned Gtk.Paned message_split;
     [GtkChild]
@@ -242,6 +244,10 @@ public class Mail.Window : Adw.ApplicationWindow {
      * eviction so opening the destination before F5 still lists them. */
     private HashTable<string, GenericArray<Message>> optimistic_dest_headers;
     private PendingTransferUndo? pending_transfer_undo;
+    /* One toast for Queued → Sent (HIGH re-queues the previous toast; reuse). */
+    private Adw.Toast? send_lifecycle_toast;
+    /* Sticky “could not send” toasts — dismiss when the same item later sends. */
+    private HashTable<string, Adw.Toast> outbox_attention_toasts;
     private HashTable<string, uint8> collapsed_folders;
     private Gtk.SizeGroup account_header_sizes;
     private uint sync_status_token;
@@ -417,6 +423,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.folder_tree_cache = new HashTable<string, GenericArray<Folder>> (str_hash, str_equal);
         this.hidden_uids = new HashTable<string, uint8> (str_hash, str_equal);
         this.optimistic_dest_headers = new HashTable<string, GenericArray<Message>> (str_hash, str_equal);
+        this.outbox_attention_toasts = new HashTable<string, Adw.Toast> (str_hash, str_equal);
         this.collapsed_folders = new HashTable<string, uint8> (str_hash, str_equal);
         this.account_header_sizes = new Gtk.SizeGroup (Gtk.SizeGroupMode.VERTICAL);
         sync_toolbar_header_sizes ();
@@ -752,6 +759,35 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.toast_overlay.add_toast (new Adw.Toast (Markup.escape_text (message)) {
             timeout = 5,
         });
+    }
+
+    /* Queued / Sending / Sent share one toast. A second HIGH toast would push
+     * the first into Adw’s queue and it would reappear after timeout. */
+    public void show_send_toast (string message) {
+        var title = Markup.escape_text (message);
+        if (this.send_lifecycle_toast != null) {
+            this.send_lifecycle_toast.title = title;
+            this.send_lifecycle_toast.@ref ();
+            this.toast_overlay.add_toast (this.send_lifecycle_toast);
+            return;
+        }
+
+        var toast = new Adw.Toast (title) {
+            timeout = 5,
+            priority = Adw.ToastPriority.HIGH,
+        };
+        this.send_lifecycle_toast = toast;
+        toast.dismissed.connect (() => {
+            if (this.send_lifecycle_toast == toast)
+                this.send_lifecycle_toast = null;
+        });
+        this.toast_overlay.add_toast (toast);
+    }
+
+    private void dismiss_send_lifecycle_toast () {
+        var toast = this.send_lifecycle_toast;
+        this.send_lifecycle_toast = null;
+        toast?.dismiss ();
     }
 
     public MailSession? peek_session () {
@@ -1679,24 +1715,38 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void on_outbox_item_sent (PendingMail item) {
-        show_toast (_("Sent “%s”").printf (item.display_subject));
+        dismiss_outbox_attention_toast (item.id);
+        show_send_toast (_("Sent “%s”").printf (item.display_subject));
         sync_outbox_folder ();
     }
 
     private void on_outbox_needs_attention (PendingMail item, string message) {
+        dismiss_send_lifecycle_toast ();
+        dismiss_outbox_attention_toast (item.id);
         var toast = new Adw.Toast (
             Markup.escape_text (
                 _("Could not send “%s”: %s").printf (item.display_subject, message)
             )
         ) {
             timeout = 0,
+            priority = Adw.ToastPriority.HIGH,
             button_label = _("Outbox"),
         };
         toast.button_clicked.connect (() => {
             select_outbox_folder ();
         });
+        toast.dismissed.connect (() => {
+            if (this.outbox_attention_toasts.get (item.id) == toast)
+                this.outbox_attention_toasts.remove (item.id);
+        });
+        this.outbox_attention_toasts.set (item.id, toast);
         this.toast_overlay.add_toast (toast);
         sync_outbox_folder ();
+    }
+
+    private void dismiss_outbox_attention_toast (string id) {
+        Adw.Toast? toast = this.outbox_attention_toasts.take (id);
+        toast?.dismiss ();
     }
 
     private void open_pending_compose (PendingMail item, bool from_outbox) {
@@ -7702,9 +7752,87 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void bind_primary_menu () {
+        setup_menu_update_badge ();
         var popover = new Gtk.PopoverMenu.from_model (this.menu_button.menu_model);
         popover.add_child (new ThemeSelector (this.settings), "theme");
+        popover.add_child (build_updates_menu_row (), "updates");
         this.menu_button.popover = popover;
+
+        var app = get_application () as Application;
+        if (app != null)
+            app.notify["update-available"].connect (sync_update_badges);
+        sync_update_badges ();
+    }
+
+    private void setup_menu_update_badge () {
+        var icon = new Gtk.Image.from_icon_name ("open-menu-symbolic");
+        var badge = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) {
+            visible = false,
+            can_target = false,
+            halign = Gtk.Align.END,
+            valign = Gtk.Align.START,
+            width_request = 8,
+            height_request = 8,
+            margin_top = 2,
+            margin_end = 2,
+        };
+        badge.add_css_class ("update-badge-dot");
+        var overlay = new Gtk.Overlay () {
+            child = icon,
+        };
+        overlay.add_overlay (badge);
+        this.menu_button.set_child (overlay);
+        this.menu_update_badge = badge;
+    }
+
+    private Gtk.Widget build_updates_menu_row () {
+        var dot = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) {
+            visible = false,
+            can_target = false,
+            valign = Gtk.Align.CENTER,
+            width_request = 8,
+            height_request = 8,
+        };
+        dot.add_css_class ("update-badge-dot");
+        this.updates_menu_dot = dot;
+
+        var label = new Gtk.Label (_("Check for _Updates…")) {
+            xalign = 0,
+            hexpand = true,
+            use_underline = true,
+        };
+
+        var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 10) {
+            hexpand = true,
+            valign = Gtk.Align.CENTER,
+        };
+        row.append (dot);
+        row.append (label);
+
+        var button = new Gtk.Button () {
+            child = row,
+            has_frame = false,
+            hexpand = true,
+            action_name = "app.check-updates",
+        };
+        button.add_css_class ("flat");
+        button.add_css_class ("menu-updates-row");
+        button.clicked.connect (() => {
+            this.menu_button.popdown ();
+        });
+        return button;
+    }
+
+    private void sync_update_badges () {
+        var app = get_application () as Application;
+        var show = app != null && app.update_available;
+        if (this.menu_update_badge != null)
+            this.menu_update_badge.visible = show;
+        if (this.updates_menu_dot != null)
+            this.updates_menu_dot.visible = show;
+        this.menu_button.tooltip_text = show
+            ? _("Main Menu — update available")
+            : _("Main Menu");
     }
 
     private void on_fullscreen () {
@@ -8936,6 +9064,8 @@ public class Mail.Window : Adw.ApplicationWindow {
             items = undo_items,
         };
         this.pending_transfer_undo = pending;
+        /* Do not push Queued/Sent into Adw’s toast queue behind Undo. */
+        dismiss_send_lifecycle_toast ();
         var toast = new Adw.Toast (transfer_undo_title (destination, moved)) {
             button_label = _("Undo"),
             timeout = 3,
@@ -10726,7 +10856,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             var app = get_application () as Application;
             if (id != null)
                 app?.outbox?.request_send_now (id);
-            show_toast (_("Sending…"));
+            show_send_toast (_("Sending…"));
         });
         add_ctx_action (group, "move", !outbox, () => on_move ());
         add_ctx_action (group, "archive", !outgoing && !archived && !outbox, () => on_archive ());

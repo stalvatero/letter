@@ -30,6 +30,10 @@ refactors unless they affect behaviour.
   stay left-aligned; overflow pans with swipe/wheel and never shows a
   scrollbar (`GTK_POLICY_EXTERNAL`). From:/To: suggestions hide once the
   draft contains a space. Suggestion popover anchors under the whole field.
+- Once per session, Letter quietly checks for updates after startup settles.
+  If a newer release exists, a red dot appears on the main menu button and
+  beside **Check for Updates…**; opening that entry shows the release dialog
+  and clears the badges.
 
 ### Fixed
 
@@ -37,6 +41,10 @@ refactors unless they affect behaviour.
   scanning body-text indexes: the scan yields to the main loop, and the
   header `Adw.Spinner` stays visible until the search (headers + bodies)
   finishes.
+- Outbox send toasts (Queued → Sent) reuse one high-priority toast so
+  “Queued” does not reappear after “Sent”, and archive Undo dismisses the
+  send toast instead of parking it for minutes. A later successful send
+  dismisses a stale “could not send” toast.
 - Compose window no longer flashes a white editor while opening in dark mode
   (placeholder/stack stayed hard-coded light until WebKit finished loading).
 - Invalid UTF-8 in Camel / header-cache previews no longer grows ×6 on every
@@ -46,6 +54,8 @@ refactors unless they affect behaviour.
 - Compose paste inserts clipboard images again (screenshots, etc.). Ctrl+V /
   Paste read the image from GTK’s clipboard first; WebKit’s DOM paste alone
   often sees empty `clipboardData` on modern GNOME/Wayland (#47).
+- Compose Ctrl+V / Paste attaches files copied from the file manager instead of
+  inserting their path as plain text (e.g. `/home/…/Attachment.pdf`).
 - Attachment preview works when Sushi is the Flatpak NautilusPreviewer (e.g.
   Fedora atomic): Letter exports the file through the Documents portal before
   `ShowFile`, so the sandboxed previewer can read it (#45).

@@ -1076,3 +1076,22 @@ text.mail-search-input:focus-within {
 .search-suggest-row {
   padding: 6px 8px;
 }
+
+/* Quiet idle update check — red dot on the primary menu and Updates row. */
+.update-badge-dot {
+  background-color: var(--error-color);
+  border-radius: 999px;
+  min-width: 8px;
+  min-height: 8px;
+  padding: 0;
+}
+
+.menu-updates-row {
+  padding: 6px 12px;
+  border-radius: 6px;
+  min-height: 0;
+}
+
+.menu-updates-row:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}

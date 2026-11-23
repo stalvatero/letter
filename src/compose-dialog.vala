@@ -864,7 +864,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         persist_size ();
         close ();
         store.request_send_now ();
-        app?.show_mail_toast (_("Queued in Outbox"));
+        app?.show_send_toast (_("Queued in Outbox"));
     }
 
     private async void replace_editing_draft () {
@@ -2724,13 +2724,77 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         });
     }
 
-    /* Prefer Gdk.Clipboard over WebKit DOM paste for images. GNOME screenshot
-     * / Wayland often leave clipboardData.items empty in the WebView (#47). */
+    /* Prefer Gdk.Clipboard over WebKit DOM paste. Files become attachments
+     * (Nautilus Ctrl+C would otherwise paste a path). Images use GTK first —
+     * GNOME screenshot / Wayland often leave clipboardData empty (#47). */
     public async void paste_from_clipboard () {
         this.webview.grab_focus ();
+        if (yield try_attach_clipboard_files ())
+            return;
         if (yield try_insert_clipboard_image ())
             return;
         this.webview.execute_editing_command (WebKit.EDITING_COMMAND_PASTE);
+    }
+
+    private async bool try_attach_clipboard_files () {
+        var clipboard = this.webview.get_clipboard ();
+        var formats = clipboard.get_formats ();
+        if (formats == null)
+            return false;
+
+        GenericArray<File>? files = null;
+
+        if (formats.contain_gtype (typeof (Gdk.FileList))) {
+            try {
+                var value = yield clipboard.read_value_async (
+                    typeof (Gdk.FileList),
+                    Priority.DEFAULT,
+                    null
+                );
+                if (value != null)
+                    files = compose_usable_drop_files (value);
+            } catch (Error e) {
+                debug ("Clipboard has no FileList for paste: %s", e.message);
+            }
+        }
+
+        if ((files == null || files.length == 0) && formats.contain_gtype (typeof (File))) {
+            try {
+                var value = yield clipboard.read_value_async (
+                    typeof (File),
+                    Priority.DEFAULT,
+                    null
+                );
+                if (value != null)
+                    files = compose_usable_drop_files (value);
+            } catch (Error e) {
+                debug ("Clipboard has no File for paste: %s", e.message);
+            }
+        }
+
+        if ((files == null || files.length == 0) && formats.contain_mime_type ("text/uri-list")) {
+            try {
+                string mime_type;
+                var stream = yield clipboard.read_async (
+                    { "text/uri-list" },
+                    Priority.DEFAULT,
+                    null,
+                    out mime_type
+                );
+                if (stream != null) {
+                    var bytes = yield read_all_stream_bytes (stream);
+                    files = compose_usable_files_from_uri_list (bytes);
+                }
+            } catch (Error e) {
+                debug ("Clipboard has no uri-list for paste: %s", e.message);
+            }
+        }
+
+        if (files == null || files.length == 0)
+            return false;
+
+        files_dropped (files);
+        return true;
     }
 
     private async bool try_insert_clipboard_image () {
@@ -4683,6 +4747,29 @@ private GenericArray<File> compose_usable_drop_files (Value value) {
     for (uint i = 0; i < files.length; i++) {
         if (compose_is_usable_drop_file (files[i]))
             usable.add (files[i]);
+    }
+    return usable;
+}
+
+private GenericArray<File> compose_usable_files_from_uri_list (Bytes bytes) {
+    var usable = new GenericArray<File> ();
+    unowned uint8[] data = bytes.get_data ();
+    if (data.length == 0)
+        return usable;
+
+    var text = (string) data;
+    var lines = text.split ("\n");
+    for (uint i = 0; i < lines.length; i++) {
+        var uri = lines[i].strip ();
+        if (uri.length == 0 || uri.has_prefix ("#"))
+            continue;
+        try {
+            var file = File.new_for_uri (uri);
+            if (compose_is_usable_drop_file (file))
+                usable.add (file);
+        } catch (Error e) {
+            debug ("Clipboard uri-list entry skipped: %s", e.message);
+        }
     }
     return usable;
 }

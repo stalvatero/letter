@@ -13,6 +13,12 @@ public class Mail.Application : Adw.Application {
     private uint welcome_idle;
     private bool activate_pending;
     private bool checking_updates;
+    private bool idle_update_checked;
+    private uint idle_update_source;
+    private string? update_latest;
+    private string? update_url;
+    /* Quiet idle check found a newer release — windows show menu badges. */
+    public bool update_available { get; private set; }
 
     private const ActionEntry[] ACTION_ENTRIES = {
         { "quit", on_quit },
@@ -200,6 +206,7 @@ public class Mail.Application : Adw.Application {
             window.present ();
             dismiss_setup_window ();
             queue_welcome (window);
+            schedule_idle_update_check ();
             return;
         }
 
@@ -334,6 +341,16 @@ public class Mail.Application : Adw.Application {
         }
     }
 
+    public void show_send_toast (string message) {
+        foreach (var window in get_windows ()) {
+            var mail = window as Window;
+            if (mail == null)
+                continue;
+            mail.show_send_toast (message);
+            return;
+        }
+    }
+
     private void on_quit () {
         request_quit.begin ();
     }
@@ -438,33 +455,91 @@ public class Mail.Application : Adw.Application {
     private void on_check_updates () {
         if (this.checking_updates)
             return;
-        check_for_updates.begin ();
+        /* Badge already proved a newer release — open it without a re-fetch. */
+        if (this.update_available
+            && this.update_latest != null
+            && this.update_latest.length > 0
+            && this.update_url != null
+            && this.update_url.length > 0) {
+            var current = Utils.normalize_version (Config.VERSION);
+            present_update_available (
+                get_active_window (),
+                this.update_latest,
+                current,
+                this.update_url
+            );
+            clear_update_available ();
+            return;
+        }
+        check_for_updates.begin (false);
     }
 
-    private async void check_for_updates () {
+    /* Once per session, after the UI has settled — no toast on success/fail. */
+    private void schedule_idle_update_check () {
+        if (this.idle_update_checked || this.idle_update_source != 0)
+            return;
+        this.idle_update_source = Timeout.add_seconds (90, () => {
+            this.idle_update_source = 0;
+            idle_check_for_updates.begin ();
+            return Source.REMOVE;
+        });
+    }
+
+    private async void idle_check_for_updates () {
+        if (this.idle_update_checked)
+            return;
+        this.idle_update_checked = true;
+        if (this.checking_updates)
+            return;
+        yield check_for_updates (true);
+    }
+
+    private async void check_for_updates (bool quiet) {
         this.checking_updates = true;
         var action = lookup_action ("check-updates") as SimpleAction;
         action?.set_enabled (false);
 
         var parent = get_active_window ();
         var win = parent as Window;
-        win?.show_toast (_("Checking for updates…"));
+        if (!quiet)
+            win?.show_toast (_("Checking for updates…"));
 
         try {
             var release = yield Utils.fetch_latest_github_release ("stalvatero", "letter");
             var current = Utils.normalize_version (Config.VERSION);
             var latest = release.version;
-            if (Utils.compare_versions (latest, current) > 0)
-                present_update_available (parent, latest, current, release.html_url);
-            else
-                present_up_to_date (parent, current);
+            if (Utils.compare_versions (latest, current) > 0) {
+                this.update_latest = latest;
+                this.update_url = release.html_url;
+                this.update_available = true;
+                notify_property ("update-available");
+                if (!quiet) {
+                    present_update_available (parent, latest, current, release.html_url);
+                    clear_update_available ();
+                }
+            } else {
+                clear_update_available ();
+                if (!quiet)
+                    present_up_to_date (parent, current);
+            }
         } catch (Error e) {
             warning ("Update check failed: %s", e.message);
-            present_update_check_failed (parent);
+            if (!quiet)
+                present_update_check_failed (parent);
         } finally {
             this.checking_updates = false;
             action?.set_enabled (true);
         }
+    }
+
+    public void clear_update_available () {
+        if (!this.update_available
+            && (this.update_latest == null || this.update_latest.length == 0))
+            return;
+        this.update_available = false;
+        this.update_latest = null;
+        this.update_url = null;
+        notify_property ("update-available");
     }
 
     private void present_up_to_date (Gtk.Window? parent, string version) {
