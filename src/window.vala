@@ -90,8 +90,6 @@ public class Mail.Window : Adw.ApplicationWindow {
     private Gtk.SearchBar message_search_bar;
     [GtkChild]
     private unowned Gtk.MenuButton menu_button;
-    private Gtk.Widget? menu_update_badge;
-    private Gtk.Widget? updates_menu_dot;
     [GtkChild]
     private unowned Gtk.Paned message_split;
     [GtkChild]
@@ -7752,10 +7750,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void bind_primary_menu () {
-        setup_menu_update_badge ();
         var popover = new Gtk.PopoverMenu.from_model (this.menu_button.menu_model);
         popover.add_child (new ThemeSelector (this.settings), "theme");
-        popover.add_child (build_updates_menu_row (), "updates");
         this.menu_button.popover = popover;
 
         var app = get_application () as Application;
@@ -7764,75 +7760,47 @@ public class Mail.Window : Adw.ApplicationWindow {
         sync_update_badges ();
     }
 
-    private void setup_menu_update_badge () {
-        var icon = new Gtk.Image.from_icon_name ("open-menu-symbolic");
-        var badge = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) {
-            visible = false,
-            can_target = false,
-            halign = Gtk.Align.END,
-            valign = Gtk.Align.START,
-            width_request = 8,
-            height_request = 8,
-            margin_top = 2,
-            margin_end = 2,
-        };
-        badge.add_css_class ("update-badge-dot");
-        var overlay = new Gtk.Overlay () {
-            child = icon,
-        };
-        overlay.add_overlay (badge);
-        this.menu_button.set_child (overlay);
-        this.menu_update_badge = badge;
-    }
-
-    private Gtk.Widget build_updates_menu_row () {
-        var dot = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) {
-            visible = false,
-            can_target = false,
-            valign = Gtk.Align.CENTER,
-            width_request = 8,
-            height_request = 8,
-        };
-        dot.add_css_class ("update-badge-dot");
-        this.updates_menu_dot = dot;
-
-        var label = new Gtk.Label (_("Check for _Updates…")) {
-            xalign = 0,
-            hexpand = true,
-            use_underline = true,
-        };
-
-        var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 10) {
-            hexpand = true,
-            valign = Gtk.Align.CENTER,
-        };
-        row.append (dot);
-        row.append (label);
-
-        var button = new Gtk.Button () {
-            child = row,
-            has_frame = false,
-            hexpand = true,
-            action_name = "app.check-updates",
-        };
-        button.add_css_class ("flat");
-        button.add_css_class ("menu-updates-row");
-        button.clicked.connect (() => {
-            this.menu_button.popdown ();
-        });
-        return button;
-    }
-
+    /* Keep the native MenuButton / GMenu chrome; badge via CSS + label prefix. */
     private void sync_update_badges () {
         var app = get_application () as Application;
         var show = app != null && app.update_available;
-        if (this.menu_update_badge != null)
-            this.menu_update_badge.visible = show;
-        if (this.updates_menu_dot != null)
-            this.updates_menu_dot.visible = show;
+        if (show)
+            this.menu_button.add_css_class ("has-update-badge");
+        else
+            this.menu_button.remove_css_class ("has-update-badge");
         this.menu_button.tooltip_text = show
             ? _("Main Menu — update available")
             : _("Main Menu");
+        set_updates_menu_badged (show);
+    }
+
+    private void set_updates_menu_badged (bool badged) {
+        var root = this.menu_button.menu_model as Menu;
+        if (root == null)
+            return;
+
+        var plain = _("Check for _Updates…");
+        /* Red circle keeps native GMenu weight/alignment (no custom Button). */
+        var marked = "🔴 " + _("Check for _Updates…");
+        for (int s = 0; s < root.get_n_items (); s++) {
+            var section = root.get_item_link (s, Menu.LINK_SECTION) as Menu;
+            if (section == null)
+                continue;
+            for (int i = 0; i < section.get_n_items (); i++) {
+                var action = section.get_item_attribute_value (i, Menu.ATTRIBUTE_ACTION, VariantType.STRING);
+                if (action == null || action.get_string () != "app.check-updates")
+                    continue;
+                var label = section.get_item_attribute_value (i, Menu.ATTRIBUTE_LABEL, VariantType.STRING);
+                var current = label != null ? label.get_string () : "";
+                var want = badged ? marked : plain;
+                if (current == want)
+                    return;
+                var item = new MenuItem (want, "app.check-updates");
+                section.remove (i);
+                section.insert_item (i, item);
+                return;
+            }
+        }
     }
 
     private void on_fullscreen () {
