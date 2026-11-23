@@ -23,8 +23,20 @@ refactors unless they affect behaviour.
 
 - Spanish translation by [msc-ffs](https://github.com/msc-ffs).
 
+### Changed
+
+- Search: Space no longer creates chips. Enter runs the query with the live
+  draft (no “Contains” chip). Only From:/To: suggestions pin a chip. Chips
+  stay left-aligned; overflow pans with swipe/wheel and never shows a
+  scrollbar (`GTK_POLICY_EXTERNAL`). From:/To: suggestions hide once the
+  draft contains a space. Suggestion popover anchors under the whole field.
+
 ### Fixed
 
+- Search after Enter no longer freezes the message list for seconds while
+  scanning body-text indexes: the scan yields to the main loop, and the
+  header `Adw.Spinner` stays visible until the search (headers + bodies)
+  finishes.
 - Compose window no longer flashes a white editor while opening in dark mode
   (placeholder/stack stayed hard-coded light until WebKit finished loading).
 - Invalid UTF-8 in Camel / header-cache previews no longer grows ×6 on every

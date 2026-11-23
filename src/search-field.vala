@@ -198,6 +198,7 @@ public class Mail.SearchField : Gtk.Widget {
         };
         this.flow.add_css_class ("mail-search-flow");
 
+        /* EXTERNAL: swipe / wheel scroll, never show a scrollbar (Apple Mail–like). */
         this.flow_scrolled = new Gtk.ScrolledWindow () {
             hexpand = true,
             vexpand = false,
@@ -205,8 +206,7 @@ public class Mail.SearchField : Gtk.Widget {
             min_content_width = 0,
             min_content_height = 24,
             max_content_height = 24,
-            /* AUTOMATIC so many chips stay reachable; overlay keeps chrome thin. */
-            hscrollbar_policy = Gtk.PolicyType.AUTOMATIC,
+            hscrollbar_policy = Gtk.PolicyType.EXTERNAL,
             vscrollbar_policy = Gtk.PolicyType.NEVER,
             overlay_scrolling = true,
             propagate_natural_width = false,
@@ -215,16 +215,15 @@ public class Mail.SearchField : Gtk.Widget {
         };
         this.flow_scrolled.add_css_class ("mail-search-flow-scroll");
 
-        /* Do not hexpand inside the chip row — that steals width from chips
-         * and ellipsizes them instead of scrolling the row. */
+        /* Grow with typed text; overflow pans via EXTERNAL scroll, not a 6-char clip. */
         this.input = new Gtk.Text () {
             hexpand = false,
             hexpand_set = true,
             vexpand = false,
             valign = Gtk.Align.CENTER,
             width_chars = INPUT_WIDTH_CHARS,
-            max_width_chars = INPUT_WIDTH_CHARS,
-            propagate_text_width = false,
+            max_width_chars = 80,
+            propagate_text_width = true,
             placeholder_text = this.placeholder,
         };
         this.input.add_css_class ("mail-search-input");
@@ -235,8 +234,11 @@ public class Mail.SearchField : Gtk.Widget {
         input_keys.key_pressed.connect (on_input_key);
         this.input.add_controller (input_keys);
         this.input.notify["has-focus"].connect (() => {
-            if (this.input.has_focus)
+            if (this.input.has_focus) {
+                this.has_tooltip = false;
                 return;
+            }
+            this.has_tooltip = this.tooltip_text != null && this.tooltip_text.length > 0;
             Timeout.add (200, () => {
                 if (this.input.has_focus)
                     return Source.REMOVE;
@@ -322,13 +324,19 @@ public class Mail.SearchField : Gtk.Widget {
         submit_query ();
     }
 
-    /* Enter must always submit: with the suggest popover open the key controller
-     * used to apply a chip and swallow the event, so search never started. */
+    /* Enter runs search with the live draft. Only From:/To: suggestions become
+     * chips — free “contains” text stays editable (Apple Mail–like). */
     private void submit_query () {
-        if (suggest_is_open ())
-            apply_selected_suggest ();
-        else
-            commit_operators (true);
+        if (suggest_is_open ()) {
+            var row = this.suggest_list != null
+                ? this.suggest_list.get_selected_row () as SuggestItem
+                : null;
+            if (row != null && row.is_operator
+                && (row.kind == SearchFilterKind.FROM || row.kind == SearchFilterKind.TO)) {
+                apply_suggest (row);
+                return;
+            }
+        }
         hide_suggest ();
         if (!query ().is_empty)
             activated ();
@@ -339,13 +347,10 @@ public class Mail.SearchField : Gtk.Widget {
             return;
 
         clear_chip_selection ();
-
-        if (ends_with_space (this.input.text))
-            commit_operators (false);
-
         sync_chrome ();
         queue_suggest ();
         query_changed ();
+        scroll_input_into_view ();
     }
 
     private bool on_input_key (uint keyval, uint keycode, Gdk.ModifierType state) {
@@ -482,32 +487,6 @@ public class Mail.SearchField : Gtk.Widget {
         emit_chip_search ();
     }
 
-    private void commit_operators (bool force) {
-        if (!force && !ends_with_space (this.input.text))
-            return;
-
-        var parsed = SearchQuery.parse (this.input.text);
-        if (parsed.is_empty)
-            return;
-
-        for (uint i = 0; i < parsed.clauses.length; i++)
-            add_chip (parsed.clauses[i], false);
-
-        SearchFilterKind incomplete;
-        var leftover = SearchQuery.incomplete_prefix (this.input.text, out incomplete)
-            ? last_live_prefix (this.input.text)
-            : "";
-
-        hide_suggest ();
-        this.suppressing = true;
-        this.input.text = leftover;
-        this.suppressing = false;
-        sync_chrome ();
-        query_changed ();
-        /* Space → pill: run search immediately (Enter still works for bare text). */
-        emit_chip_search ();
-    }
-
     private void add_chip (SearchClause clause, bool notify) {
         if (clause.folded.length == 0)
             return;
@@ -521,17 +500,33 @@ public class Mail.SearchField : Gtk.Widget {
             valign = Gtk.Align.CENTER,
         };
         chip.holder.append (chip.widget);
-        Gtk.Widget? after = this.chips.length > 0 ? this.chips[this.chips.length - 1].holder : null;
-        this.flow.insert_child_after (chip.holder, after);
+        /* Insert before the trailing input so chips stay left-aligned. */
+        this.flow.insert_child_after (chip.holder, this.input.get_prev_sibling ());
         this.chips.add (chip);
         Idle.add (() => {
-            var adjustment = this.flow_scrolled.hadjustment;
-            adjustment.value = adjustment.upper - adjustment.page_size;
+            /* Keep the left edge of the chip row visible — do not jump past it. */
+            this.flow_scrolled.hadjustment.value = 0;
             return Source.REMOVE;
         });
         if (notify)
             query_changed ();
         sync_chrome ();
+    }
+
+    private void scroll_input_into_view () {
+        Idle.add (() => {
+            Graphene.Rect bounds;
+            if (!this.input.compute_bounds (this.flow, out bounds))
+                return Source.REMOVE;
+            var adj = this.flow_scrolled.hadjustment;
+            var start = bounds.origin.x;
+            var end = start + bounds.size.width;
+            if (end > adj.value + adj.page_size)
+                adj.value = end - adj.page_size;
+            else if (start < adj.value)
+                adj.value = start;
+            return Source.REMOVE;
+        });
     }
 
     private Gtk.Widget make_chip_widget (SearchClause clause) {
@@ -658,14 +653,24 @@ public class Mail.SearchField : Gtk.Widget {
             return;
         }
 
-        var parsed = SearchQuery.parse (this.input.text);
-        if (parsed.clauses.length == 0)
+        var stripped = this.input.text.strip ();
+        if (stripped.length == 0)
             return;
 
-        var clause = parsed.clauses[parsed.clauses.length - 1];
-        kind = clause.kind;
-        needle = clause.display;
-        prefixed = clause.kind != SearchFilterKind.TEXT;
+        if (SearchQuery.has_filter_operators (this.input.text)) {
+            var parsed = SearchQuery.parse (this.input.text);
+            if (parsed.clauses.length == 0)
+                return;
+            var clause = parsed.clauses[parsed.clauses.length - 1];
+            kind = clause.kind;
+            needle = clause.display;
+            prefixed = clause.kind != SearchFilterKind.TEXT;
+            return;
+        }
+
+        kind = SearchFilterKind.TEXT;
+        needle = stripped;
+        prefixed = false;
     }
 
     private void fill_suggest (SearchFilterKind kind, string needle, bool prefixed) {
@@ -678,7 +683,9 @@ public class Mail.SearchField : Gtk.Widget {
             contact_n = hits.length;
         }
 
-        var extra = prefixed ? 0 : 3;
+        /* From:/To: only for a single token — multi-word drafts are contains. */
+        var party_ok = !prefixed && !contains_space (needle);
+        var extra = prefixed ? 0 : (party_ok ? 3 : 1);
         if (extra == 0 && contact_n == 0) {
             hide_suggest ();
             return;
@@ -691,8 +698,10 @@ public class Mail.SearchField : Gtk.Widget {
         this.suggest_list.remove_all ();
         if (extra > 0) {
             this.suggest_list.append (new SuggestItem.operator (SearchFilterKind.TEXT, needle));
-            this.suggest_list.append (new SuggestItem.operator (SearchFilterKind.FROM, needle));
-            this.suggest_list.append (new SuggestItem.operator (SearchFilterKind.TO, needle));
+            if (party_ok) {
+                this.suggest_list.append (new SuggestItem.operator (SearchFilterKind.FROM, needle));
+                this.suggest_list.append (new SuggestItem.operator (SearchFilterKind.TO, needle));
+            }
         }
 
         if (hits != null) {
@@ -738,11 +747,13 @@ public class Mail.SearchField : Gtk.Widget {
             ? Gtk.PolicyType.AUTOMATIC
             : Gtk.PolicyType.NEVER;
         this.suggest_popover.width_request = width;
+        /* Anchor to the whole search field so the menu sits under the chrome,
+         * not mid-text / mid-chip. */
         this.suggest_popover.set_pointing_to ({
             0,
             0,
-            int.max (1, this.input.get_width ()),
-            int.max (1, this.input.get_height ()),
+            int.max (1, get_width ()),
+            int.max (1, get_height ()),
         });
     }
 
@@ -782,7 +793,8 @@ public class Mail.SearchField : Gtk.Widget {
             child = this.suggest_scrolled,
         };
         this.suggest_popover.add_css_class ("compose-suggest-popover");
-        this.suggest_popover.set_parent (this.input);
+        this.suggest_popover.set_offset (0, 2);
+        this.suggest_popover.set_parent (this);
     }
 
     private void on_suggest_activated (Gtk.ListBoxRow row) {
@@ -802,11 +814,27 @@ public class Mail.SearchField : Gtk.Widget {
 
     private void apply_suggest (SuggestItem item) {
         hide_suggest ();
-        drop_last_token ();
+        /* Contains: never chip — just search the draft text. */
+        if (item.is_operator && item.kind == SearchFilterKind.TEXT) {
+            if (!query ().is_empty)
+                activated ();
+            return;
+        }
+
+        if (item.is_operator) {
+            this.suppressing = true;
+            this.input.text = "";
+            this.suppressing = false;
+        } else {
+            drop_last_token ();
+        }
+
+        /* From:/To: (and contacts as From) become chips. */
+        var kind = item.is_operator
+            ? item.kind
+            : (item.kind != SearchFilterKind.TEXT ? item.kind : SearchFilterKind.FROM);
         add_chip (new SearchClause () {
-            kind = item.is_operator || item.kind != SearchFilterKind.TEXT
-                ? item.kind
-                : SearchFilterKind.TEXT,
+            kind = kind,
             display = item.display,
             folded = item.folded,
         }, true);
@@ -873,21 +901,15 @@ public class Mail.SearchField : Gtk.Widget {
         this.clear_button.visible = this.chips.length > 0 || this.input.text.length > 0;
     }
 
-    private static string last_live_prefix (string text) {
-        var token = text.strip ();
-        var space = token.last_index_of_char (' ');
-        if (space >= 0)
-            token = token.substring (space + 1).strip ();
-        return token;
-    }
-
-    private static bool ends_with_space (string text) {
-        if (text.length == 0)
-            return false;
+    private static bool contains_space (string text) {
         unichar c;
-        var i = text.length;
-        text.get_prev_char (ref i, out c);
-        return c.isspace ();
+        int i = 0;
+        while (i < text.length) {
+            text.get_next_char (ref i, out c);
+            if (c.isspace ())
+                return true;
+        }
+        return false;
     }
 
     private static SearchClause copy_clause (SearchClause clause) {

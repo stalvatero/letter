@@ -897,7 +897,7 @@ public class Mail.MailSession : Camel.Session {
 
         GenericArray<string> uids;
         if (include_body) {
-            uids = search_body_index (account, folder, query, limit);
+            uids = yield search_body_index (account, folder, query, limit);
         } else {
             yield enter_camel (false);
             try {
@@ -950,7 +950,7 @@ public class Mail.MailSession : Camel.Session {
             return uids;
 
         if (include_body)
-            return search_body_index (account, folder, query, 400);
+            return yield search_body_index (account, folder, query, 400);
 
         yield enter_camel (false);
         try {
@@ -1008,7 +1008,13 @@ public class Mail.MailSession : Camel.Session {
             case SearchFilterKind.TO:
                 return "(or (header-contains \"To\" %s) (header-contains \"Cc\" %s))".printf (value, value);
             default:
-                return search_token_clause (clause.folded, include_body);
+                var words = SearchQuery.folded_words (clause.folded);
+                if (words.length <= 1)
+                    return search_token_clause (clause.folded, include_body);
+                var parts = new string[words.length];
+                for (uint i = 0; i < words.length; i++)
+                    parts[i] = search_token_clause (words[i], include_body);
+                return "(and %s)".printf (string.joinv (" ", parts));
         }
     }
 
@@ -1090,8 +1096,9 @@ public class Mail.MailSession : Camel.Session {
     }
 
     /* Folded plain text already extracted during prefetch / open. No MIME
-     * parse and no Camel FolderSearch at query time. */
-    private GenericArray<string> search_body_index (
+     * parse and no Camel FolderSearch at query time. Yields so Enter search
+     * does not freeze the list while scanning large body indexes. */
+    private async GenericArray<string> search_body_index (
         Account account,
         Folder folder,
         SearchQuery query,
@@ -1104,27 +1111,31 @@ public class Mail.MailSession : Camel.Session {
 
         var t0 = Utils.sync_tick ();
         uint scanned = 0;
-        BodyTextIndex.scan (account.source_uid ?? account.uid, folder.full_name, (uid, text) => {
-            scanned++;
-            if (query.match_any) {
-                var any = false;
-                for (uint i = 0; i < tokens.length; i++) {
-                    if (text.contains (tokens[i])) {
-                        any = true;
-                        break;
+        yield BodyTextIndex.scan_async (
+            account.source_uid ?? account.uid,
+            folder.full_name,
+            (uid, text) => {
+                scanned++;
+                if (query.match_any) {
+                    var any = false;
+                    for (uint i = 0; i < tokens.length; i++) {
+                        if (text.contains (tokens[i])) {
+                            any = true;
+                            break;
+                        }
+                    }
+                    if (!any)
+                        return true;
+                } else {
+                    for (uint i = 0; i < tokens.length; i++) {
+                        if (!text.contains (tokens[i]))
+                            return true;
                     }
                 }
-                if (!any)
-                    return true;
-            } else {
-                for (uint i = 0; i < tokens.length; i++) {
-                    if (!text.contains (tokens[i]))
-                        return true;
-                }
+                uids.add (uid);
+                return uids.length < limit;
             }
-            uids.add (uid);
-            return uids.length < limit;
-        });
+        );
 
         if (scanned > 0) {
             Utils.sync_log (

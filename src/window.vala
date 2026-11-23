@@ -2087,7 +2087,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         var folders = folders_from_tree ();
         var seen = new HashTable<string, uint8> (str_hash, str_equal);
         var token = show_sync_status (_("Searching…"));
-        this.search_busy = true;
+        set_search_busy (true, _("Searching…"));
         Utils.sync_log ("search begin “%s”".printf (query_key));
 
         try {
@@ -2139,8 +2139,10 @@ public class Mail.Window : Adw.ApplicationWindow {
 
             hide_sync_status (token);
             token = show_sync_status (_("Searching message bodies…"));
+            set_search_busy (true, _("Searching message bodies…"));
 
-            /* Phase 2 — local body-text index (cached MIME only). */
+            /* Phase 2 — local body-text index (cached MIME only). Yields inside
+             * BodyTextIndex.scan_async so the list stays clickable. */
             for (uint i = 0; i < folders.length; i++) {
                 if (generation != this.search_generation || this.search_text != query_key)
                     return;
@@ -2199,9 +2201,18 @@ public class Mail.Window : Adw.ApplicationWindow {
 
             Utils.sync_log ("search done “%s” → %u hits".printf (query_key, results.length));
         } finally {
-            this.search_busy = false;
+            set_search_busy (false);
             hide_sync_status (token);
         }
+    }
+
+    private void set_search_busy (bool busy, string? tip = null) {
+        this.search_busy = busy;
+        this.conversation_sync_spinner.visible = busy;
+        if (busy && tip != null && tip.length > 0)
+            this.conversation_sync_spinner.tooltip_text = tip;
+        else if (!busy)
+            this.conversation_sync_spinner.tooltip_text = _("Updating…");
     }
 
     private static bool searchable_folder (Folder folder) {
@@ -2323,7 +2334,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             if (clause.kind != SearchFilterKind.TEXT)
                 continue;
             has_text = true;
-            var hit = folded.contains (clause.folded);
+            var hit = SearchQuery.folded_matches_haystack (folded, clause.folded, false);
             if (query.match_any) {
                 if (hit)
                     text_ok = true;
@@ -2467,8 +2478,8 @@ public class Mail.Window : Adw.ApplicationWindow {
         set_search_deeper_bar (false);
 
         var generation = this.search_generation;
-        this.search_busy = true;
         var token = show_sync_status (_("Indexing more local messages…"));
+        set_search_busy (true, _("Indexing more local messages…"));
         uint indexed = 0;
         try {
             var folders = folders_from_tree ();
@@ -2496,7 +2507,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             Utils.sync_log ("search deepen indexed +%u bodies".printf (indexed));
         } finally {
             hide_sync_status (token);
-            this.search_busy = false;
+            set_search_busy (false);
         }
 
         if (generation != this.search_generation || this.search_text != query_key)

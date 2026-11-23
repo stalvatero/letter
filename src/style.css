@@ -977,8 +977,11 @@ button.recipient-more label {
   box-shadow: none;
 }
 
-.mail-search-flow-scroll scrollbar.horizontal {
-  min-height: 4px;
+/* Scrollbar policy is EXTERNAL — never paint a bar (swipe/wheel still pan). */
+.mail-search-flow-scroll scrollbar {
+  opacity: 0;
+  min-width: 0;
+  min-height: 0;
 }
 
 text.mail-search-input {

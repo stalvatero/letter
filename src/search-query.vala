@@ -97,7 +97,7 @@ public class Mail.SearchQuery : Object {
     public GenericArray<string> highlight_tokens () {
         var tokens = new GenericArray<string> ();
         for (uint i = 0; i < this.clauses.length; i++)
-            tokens.add (this.clauses[i].folded);
+            append_folded_words (this.clauses[i].folded, tokens);
         return tokens;
     }
 
@@ -105,9 +105,65 @@ public class Mail.SearchQuery : Object {
         var tokens = new GenericArray<string> ();
         for (uint i = 0; i < this.clauses.length; i++) {
             if (this.clauses[i].kind == SearchFilterKind.TEXT)
-                tokens.add (this.clauses[i].folded);
+                append_folded_words (this.clauses[i].folded, tokens);
         }
         return tokens;
+    }
+
+    /* Multi-word TEXT chips keep one pill in the UI; matching ANDs each word. */
+    public static GenericArray<string> folded_words (string folded) {
+        var words = new GenericArray<string> ();
+        append_folded_words (folded, words);
+        return words;
+    }
+
+    private static void append_folded_words (string folded, GenericArray<string> words) {
+        if (folded.length == 0)
+            return;
+
+        int i = 0;
+        unichar c;
+        while (i < folded.length) {
+            while (i < folded.length) {
+                var next = i;
+                folded.get_next_char (ref next, out c);
+                if (!c.isspace ())
+                    break;
+                i = next;
+            }
+            if (i >= folded.length)
+                break;
+
+            var start = i;
+            while (i < folded.length) {
+                var next = i;
+                folded.get_next_char (ref next, out c);
+                if (c.isspace ())
+                    break;
+                i = next;
+            }
+            var word = folded.substring (start, i - start);
+            if (word.length > 0)
+                words.add (word);
+        }
+    }
+
+    public static bool folded_matches_haystack (string haystack, string folded, bool match_any) {
+        var words = folded_words (folded);
+        if (words.length == 0)
+            return false;
+        if (match_any) {
+            for (uint i = 0; i < words.length; i++) {
+                if (haystack.contains (words[i]))
+                    return true;
+            }
+            return false;
+        }
+        for (uint i = 0; i < words.length; i++) {
+            if (!haystack.contains (words[i]))
+                return false;
+        }
+        return true;
     }
 
     public static string chip_label (SearchClause clause) {
@@ -154,11 +210,42 @@ public class Mail.SearchQuery : Object {
 
     /* Localized operator tip for the search field (English operators always work too). */
     public static string filter_hint () {
-        return _("Search all folders. Filter with %s, %s and %s. Chips and Enter run search.").printf (
-            C_("Search filter", "contains:"),
+        return _("Search all folders. Enter searches. Pick %s or %s to pin a chip.").printf (
             C_("Search filter", "from:"),
             C_("Search filter", "to:")
         );
+    }
+
+    /* True when the draft uses from:/to:/contains: (localized forms included). */
+    public static bool has_filter_operators (string? raw) {
+        if (raw == null)
+            return false;
+
+        int i = 0;
+        unichar c;
+        while (i < raw.length) {
+            var next = i;
+            raw.get_next_char (ref next, out c);
+            if (c.isspace ()) {
+                i = next;
+                continue;
+            }
+
+            SearchFilterKind kind;
+            int after;
+            if (match_prefix (raw, i, out kind, out after))
+                return true;
+
+            i = next;
+            while (i < raw.length) {
+                next = i;
+                raw.get_next_char (ref next, out c);
+                if (c.isspace ())
+                    break;
+                i = next;
+            }
+        }
+        return false;
     }
 
     public static SearchQuery parse (string? raw) {
@@ -241,7 +328,7 @@ public class Mail.SearchQuery : Object {
                     break;
                 case SearchFilterKind.TEXT:
                     has_text = true;
-                    var hit = text_hay.contains (clause.folded);
+                    var hit = folded_matches_haystack (text_hay, clause.folded, false);
                     if (query.match_any) {
                         if (hit)
                             text_ok = true;

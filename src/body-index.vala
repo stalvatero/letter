@@ -172,6 +172,43 @@ public class Mail.BodyTextIndex : Object {
         }
     }
 
+    /* Same as scan, but yields to the main loop so search does not freeze UI. */
+    public static async void scan_async (
+        string account_uid,
+        string folder_full_name,
+        BodyTextVisitor visitor,
+        uint yield_every = 64
+    ) {
+        var path = index_file (account_uid, folder_full_name);
+        if (!FileUtils.test (path, FileTest.IS_REGULAR))
+            return;
+
+        try {
+            var input = new DataInputStream (File.new_for_path (path).read (null));
+            var first = input.read_line (null);
+            if (first != MAGIC)
+                return;
+            string? line;
+            uint n = 0;
+            while ((line = input.read_line (null)) != null) {
+                var tab = line.index_of_char ('\t');
+                if (tab <= 0)
+                    continue;
+                var uid = line.substring (0, tab);
+                var text = unescape (line.substring (tab + 1));
+                if (!visitor (uid, text))
+                    return;
+                n++;
+                if (yield_every > 0 && n % yield_every == 0) {
+                    Idle.add (scan_async.callback);
+                    yield;
+                }
+            }
+        } catch (Error e) {
+            debug ("Body text index scan %s: %s", path, e.message);
+        }
+    }
+
     private static string fold_text (string? raw) {
         if (raw == null || raw.length == 0)
             return "";
