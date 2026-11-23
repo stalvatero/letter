@@ -184,7 +184,9 @@ template $MailWindow: Adw.ApplicationWindow {
 
             [top]
             Adw.HeaderBar folder_header {
-              show-start-title-buttons: false;
+              /* Start controls live here (leftmost chrome). sync_window_controls
+               * moves them if the folder pane is hidden. */
+              show-start-title-buttons: true;
               show-end-title-buttons: false;
 
               styles [
@@ -259,6 +261,9 @@ template $MailWindow: Adw.ApplicationWindow {
 
             [top]
             Adw.HeaderBar conversation_header {
+              show-start-title-buttons: false;
+              show-end-title-buttons: true;
+
               styles [
                 "letter-toolbar",
               ]
@@ -444,6 +449,7 @@ template $MailWindow: Adw.ApplicationWindow {
               [top]
               Adw.HeaderBar reader_header {
                 show-start-title-buttons: false;
+                show-end-title-buttons: true;
 
                 styles [
                   "letter-toolbar",

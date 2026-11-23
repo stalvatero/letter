@@ -14,6 +14,10 @@ public class Mail.Window : Adw.ApplicationWindow {
      * At the 920sp collapse the split is ~870px wide (window − rail); with
      * 0.21 that lands near 180 — the usable minimum before hide. */
     private const int FOLDER_PANE_MIN = 180;
+    /* Room for close/minimize/maximize when Tweaks puts window controls on
+     * the start of the folder-pane HeaderBar (same idea as Files’ wider
+     * sidebar with left decorations). */
+    private const int FOLDER_PANE_MIN_WITH_CONTROLS = 220;
     private const int FOLDER_PANE_MAX = 260;
     private const double FOLDER_PANE_FRACTION = 0.21;
     /* Slightly above 900sp so header window controls are not clipped on
@@ -376,9 +380,17 @@ public class Mail.Window : Adw.ApplicationWindow {
         /* Same pattern as the account OverlaySplitView: breakpoint owns
          * collapsed (animated); we only mirror show-sidebar. */
         this.folder_pane_split.notify["collapsed"].connect (on_folder_pane_collapsed);
-        bind_folder_pane_narrow_breakpoint ();
+        var gtk_settings = Gtk.Settings.get_default ();
+        if (gtk_settings != null) {
+            gtk_settings.notify["gtk-decoration-layout"].connect (() => {
+                sync_folder_pane_for_start_controls ();
+                sync_window_controls ();
+                update_window_width_request ();
+            });
+        }
+        sync_folder_pane_for_start_controls ();
         apply_folder_pane_chrome ();
-        if (this.folder_pane_split.collapsed)
+        if (this.folder_pane_split.collapsed && !window_controls_on_start ())
             on_folder_pane_collapsed ();
         else
             apply_folder_pane (this.settings.get_boolean ("show-mail-folders-pane"));
@@ -408,6 +420,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.collapsed_folders = new HashTable<string, uint8> (str_hash, str_equal);
         this.account_header_sizes = new Gtk.SizeGroup (Gtk.SizeGroupMode.VERTICAL);
         sync_toolbar_header_sizes ();
+        sync_window_controls ();
         foreach (var key in this.settings.get_strv ("collapsed-folders")) {
             if (key.length > 0)
                 this.collapsed_folders.set (key, 1);
@@ -3028,12 +3041,109 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
     }
 
+    /* Multipane chrome: only the leftmost HeaderBar may show start window
+     * controls, and only the rightmost may show end controls. GTK then
+     * places close/minimize/maximize from gtk-decoration-layout (Tweaks).
+     * Without start on the folder pane, left-side decorations vanish. */
+    private void sync_window_controls () {
+        this.account_header.show_start_title_buttons = false;
+        this.account_header.show_end_title_buttons = false;
+        this.folder_header.show_start_title_buttons = false;
+        this.folder_header.show_end_title_buttons = false;
+        this.list_header.show_start_title_buttons = false;
+        this.list_header.show_end_title_buttons = false;
+        this.reader_header.show_start_title_buttons = false;
+        this.reader_header.show_end_title_buttons = false;
+        this.conversation_header.show_start_title_buttons = false;
+        this.conversation_header.show_end_title_buttons = false;
+
+        var left = leftmost_chrome_header ();
+        var right = rightmost_chrome_header ();
+        if (left != null)
+            left.show_start_title_buttons = true;
+        if (right != null)
+            right.show_end_title_buttons = true;
+
+        if (!this.folder_pane_split.collapsed) {
+            this.folder_pane_split.min_sidebar_width = left == this.folder_header
+                ? FOLDER_PANE_MIN_WITH_CONTROLS
+                : FOLDER_PANE_MIN;
+        }
+        sync_folder_pane_for_start_controls ();
+    }
+
+    private Adw.HeaderBar? leftmost_chrome_header () {
+        if (ACCOUNT_LIST_PANE_ENABLED
+            && this.account_pane.visible
+            && this.folder_split.show_sidebar)
+            return this.account_header;
+
+        /* Folder list is the natural left chrome (account list pane is off). */
+        if (this.folder_pane_split.show_sidebar)
+            return this.folder_header;
+
+        if (this.reading_pane_split)
+            return this.list_header;
+        return this.conversation_header;
+    }
+
+    private Adw.HeaderBar? rightmost_chrome_header () {
+        if (this.reading_pane_split && this.reader_mail.visible)
+            return this.reader_header;
+        return this.conversation_header;
+    }
+
+    /* gtk-decoration-layout start segment non-empty → Tweaks put controls left. */
+    private static bool window_controls_on_start () {
+        var settings = Gtk.Settings.get_default ();
+        if (settings == null)
+            return false;
+        var layout = settings.gtk_decoration_layout ?? "";
+        var colon = layout.index_of_char (':');
+        if (colon <= 0)
+            return false;
+        return layout.substring (0, colon).strip ().length > 0;
+    }
+
+    /* With left-side window controls the folder pane must stay docked: if it
+     * collapses, start buttons jump onto the message list and clip it.
+     * ApplicationWindow cannot remove breakpoints — idle the narrow one with
+     * max-width 0 instead. */
+    private void sync_folder_pane_for_start_controls () {
+        bind_folder_pane_narrow_breakpoint ();
+        if (this.folder_pane_narrow_break == null)
+            return;
+
+        if (window_controls_on_start ()) {
+            this.folder_pane_narrow_break.condition = new Adw.BreakpointCondition.length (
+                Adw.BreakpointConditionLengthType.MAX_WIDTH,
+                0,
+                Adw.LengthUnit.SP
+            );
+            cancel_folder_pane_hide ();
+            this.folder_pane_narrow = false;
+            this.folder_pane_overlay_wanted = false;
+            if (this.folder_pane_split.collapsed)
+                this.folder_pane_split.collapsed = false;
+            if (!this.folder_pane_split.show_sidebar)
+                set_folder_pane_sidebar (true);
+            return;
+        }
+
+        this.folder_pane_narrow_break.condition = new Adw.BreakpointCondition.length (
+            Adw.BreakpointConditionLengthType.MAX_WIDTH,
+            FOLDER_PANE_NARROW_SP,
+            Adw.LengthUnit.SP
+        );
+    }
+
     private void apply_account_sidebar (bool expanded) {
         if (!ACCOUNT_LIST_PANE_ENABLED) {
             this.account_pane.visible = false;
             this.folder_split.show_sidebar = false;
             this.sidebar_button.visible = false;
             apply_account_rail ();
+            sync_window_controls ();
             return;
         }
 
@@ -3047,6 +3157,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             ? _("Hide account list")
             : _("Show account list");
         apply_account_rail ();
+        sync_window_controls ();
     }
 
     private void apply_account_rail () {
@@ -7186,6 +7297,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.reader_mail.visible = true;
         }
 
+        sync_window_controls ();
         update_window_width_request ();
         ensure_split_reader_min ();
     }
@@ -7213,7 +7325,25 @@ public class Mail.Window : Adw.ApplicationWindow {
         return ACCOUNT_RAIL_WIDTH + MESSAGE_PANE_MIN + measure_reader_chrome_min ();
     }
 
+    private int split_shell_floor_with_folders () {
+        return ACCOUNT_RAIL_WIDTH
+            + FOLDER_PANE_MIN_WITH_CONTROLS
+            + MESSAGE_PANE_MIN
+            + measure_reader_chrome_min ();
+    }
+
     private void update_window_width_request () {
+        /* Left-side window controls: keep the folder pane (and its HeaderBar)
+         * so start buttons never land on the message list when the window
+         * shrinks. Floor stays above the former auto-collapse width. */
+        if (window_controls_on_start ()) {
+            width_request = int.max (
+                (int) FOLDER_PANE_NARROW_SP + 1,
+                split_shell_floor_with_folders ()
+            );
+            return;
+        }
+
         /* Hard floor after folders are gone — resize bumps into this instead
          * of clipping menu / minimize / maximize / close (native GTK feel). */
         if (this.reading_pane_split)
@@ -7373,9 +7503,13 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void bind_folder_pane_narrow_breakpoint () {
+        if (this.folder_pane_narrow_break != null)
+            return;
+
+        var width = window_controls_on_start () ? 0 : FOLDER_PANE_NARROW_SP;
         var bp = new Adw.Breakpoint (new Adw.BreakpointCondition.length (
             Adw.BreakpointConditionLengthType.MAX_WIDTH,
-            FOLDER_PANE_NARROW_SP,
+            width,
             Adw.LengthUnit.SP
         ));
         /* Only setter — Adw animates collapsed; do not also set it in Vala. */
@@ -7418,6 +7552,20 @@ public class Mail.Window : Adw.ApplicationWindow {
      * briefly so Adw can run dock→overlay, then close the overlay (slide-out).
      * On expand: restore preference — Adw runs overlay/dock slide-in. */
     private void on_folder_pane_collapsed () {
+        if (window_controls_on_start ()) {
+            /* Start controls need the folder HeaderBar — undo any collapse. */
+            cancel_folder_pane_hide ();
+            this.folder_pane_narrow = false;
+            this.folder_pane_overlay_wanted = false;
+            if (this.folder_pane_split.collapsed)
+                this.folder_pane_split.collapsed = false;
+            if (!this.folder_pane_split.show_sidebar)
+                set_folder_pane_sidebar (true);
+            sync_window_controls ();
+            update_window_width_request ();
+            return;
+        }
+
         if (this.folder_pane_split.collapsed) {
             this.folder_pane_narrow = true;
             this.folder_pane_overlay_wanted = false;
@@ -7427,7 +7575,8 @@ public class Mail.Window : Adw.ApplicationWindow {
                     this.folder_pane_hide_source = 0;
                     if (this.tearing_down
                         || !this.folder_pane_split.collapsed
-                        || this.folder_pane_overlay_wanted)
+                        || this.folder_pane_overlay_wanted
+                        || window_controls_on_start ())
                         return Source.REMOVE;
                     set_folder_pane_sidebar (false);
                     return Source.REMOVE;
@@ -7441,6 +7590,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.folder_pane_overlay_wanted = false;
             apply_folder_pane (this.settings.get_boolean ("show-mail-folders-pane"));
         }
+        sync_window_controls ();
         update_window_width_request ();
     }
 
@@ -7459,6 +7609,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.folder_pane_split.min_sidebar_width = FOLDER_PANE_MIN;
         this.folder_pane_split.max_sidebar_width = FOLDER_PANE_MAX;
         this.folder_pane_split.sidebar_width_fraction = FOLDER_PANE_FRACTION;
+        sync_window_controls ();
     }
 
     private void sync_folder_pane_button (bool show) {
@@ -7499,6 +7650,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             this.folder_pane_overlay_wanted = show;
         else
             this.settings.set_boolean ("show-mail-folders-pane", show);
+        sync_window_controls ();
     }
 
     private void on_folder_pane_toggled () {
@@ -7506,6 +7658,12 @@ public class Mail.Window : Adw.ApplicationWindow {
             return;
 
         var show = this.folder_pane_button.active;
+        /* Left-side window controls live on the folder HeaderBar — keep it. */
+        if (window_controls_on_start () && !show) {
+            sync_folder_pane_button (true);
+            return;
+        }
+
         this.folder_pane_button.tooltip_text = show
             ? _("Hide folders")
             : _("Show folders");
@@ -7519,6 +7677,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.folder_pane_overlay_wanted = false;
         this.folder_pane_split.show_sidebar = show;
         this.settings.set_boolean ("show-mail-folders-pane", show);
+        sync_window_controls ();
         update_window_width_request ();
         ensure_split_reader_min ();
     }

@@ -39,6 +39,12 @@ refactors unless they affect behaviour.
   `ShowFile`, so the sandboxed previewer can read it (#45).
 - Move to Folder: Enter / double-click on a folder closes the dialog after the
   move (it previously moved but left the modal open) (#43).
+- Window controls (close / minimize / maximize) stay visible when GNOME Tweaks
+  moves them to the left: they use the folder-pane HeaderBar on the start side
+  (and the reader / unified header on the end), like other multipane GNOME apps.
+  With left-side controls the folder pane no longer auto-collapses on a narrow
+  window (and cannot be hidden), so the message list is not clipped under the
+  buttons.
 
 ## [1.7.1](https://github.com/stalvatero/letter/compare/v1.7.0...v1.7.1) - 2026-10-23
 
