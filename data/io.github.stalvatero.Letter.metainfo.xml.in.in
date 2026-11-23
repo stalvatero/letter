@@ -56,6 +56,18 @@
     <category>Email</category>
   </categories>
   <releases>
+    <release version="1.8.0" type="stable" date="2026-11-23">
+      <description>
+        <p>
+          Spanish translation. Freer multi-word search without Space chips,
+          quieter body search, and an idle update check with a menu badge.
+          Fixes compose paste for images and files, attachment preview with
+          Sushi Flatpak, Move dialog Enter, left window controls, send-toast
+          queuing behind archive Undo, and UTF-8 preview OOM (#49, #47, #45,
+          #43).
+        </p>
+      </description>
+    </release>
     <release version="1.7.1" type="stable" date="2026-10-23">
       <description>
         <p>
