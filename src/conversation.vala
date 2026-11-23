@@ -626,6 +626,8 @@ public class Mail.Conversation : Object {
         for (int i = 0; i < text.length; ) {
             unichar c;
             text.get_next_char (ref i, out c);
+            if (c == (unichar) (-1) || c == (unichar) (-2) || !c.validate ())
+                continue;
             if (c.isspace ()) {
                 space = true;
                 continue;

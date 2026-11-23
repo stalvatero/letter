@@ -4796,29 +4796,27 @@ public class Mail.Window : Adw.ApplicationWindow {
 
     private static size_t estimate_message_bytes (Message message) {
         size_t n = 384;
-        if (message.uid != null)
-            n += message.uid.length;
-        if (message.subject != null)
-            n += message.subject.length;
-        if (message.from != null)
-            n += message.from.length;
-        if (message.to != null)
-            n += message.to.length;
-        if (message.cc != null)
-            n += message.cc.length;
-        if (message.preview != null)
-            n += message.preview.length;
-        if (message.search_blob != null)
-            n += message.search_blob.length;
-        if (message.from_blob != null)
-            n += message.from_blob.length;
-        if (message.to_blob != null)
-            n += message.to_blob.length;
-        if (message.conversation_key != null)
-            n += message.conversation_key.length;
-        if (message.msgid_refs != null)
-            n += message.msgid_refs.length * 8;
+        n += estimate_str_bytes (message.uid);
+        n += estimate_str_bytes (message.subject);
+        n += estimate_str_bytes (message.from);
+        n += estimate_str_bytes (message.to);
+        n += estimate_str_bytes (message.cc);
+        n += estimate_str_bytes (message.preview);
+        n += estimate_str_bytes (message.search_blob);
+        n += estimate_str_bytes (message.from_blob);
+        n += estimate_str_bytes (message.to_blob);
+        n += estimate_str_bytes (message.conversation_key);
+        if (message.msgid_refs != null && message.msgid_refs.length > 0)
+            n += (size_t) message.msgid_refs.length * 8;
         return n;
+    }
+
+    /* string.length is int; a multi‑GiB corrupt preview can wrap negative and
+     * sign-extend into size_t (~2^64), inverting the cache ceiling (#49). */
+    private static size_t estimate_str_bytes (string? value) {
+        if (value == null || value.length <= 0)
+            return 0;
+        return (size_t) value.length;
     }
 
     private size_t estimate_message_cache_bytes () {
@@ -5118,11 +5116,37 @@ public class Mail.Window : Adw.ApplicationWindow {
         };
     }
 
+    /* Corrupt previews (invalid UTF-8 ×6 amplification) made one Sent index
+     * 400+ MiB; loading it OOMs before any log line (#49). Healthy indexes
+     * for tens of thousands of headers stay well under this. */
+    private const int64 HEADER_LIST_CACHE_MAX_BYTES = 48 * 1024 * 1024;
+    private const int HEADER_LIST_LINE_MAX_BYTES = 8 * 1024;
+
     private static GenericArray<Message>? load_header_list_cache (Account account, Folder folder) {
         var account_uid = account.source_uid ?? account.uid;
         var path = MailSession.header_list_cache_file (account_uid, folder.full_name);
         if (!FileUtils.test (path, FileTest.IS_REGULAR))
             return null;
+
+        try {
+            var info = File.new_for_path (path).query_info (
+                FileAttribute.STANDARD_SIZE,
+                FileQueryInfoFlags.NONE
+            );
+            if (info.get_size () > HEADER_LIST_CACHE_MAX_BYTES) {
+                Utils.sync_log (
+                    "header list cache quarantine “%s” (%lld bytes > %lld); rebuild from Camel".printf (
+                        folder.full_name,
+                        info.get_size (),
+                        HEADER_LIST_CACHE_MAX_BYTES
+                    )
+                );
+                quarantine_header_list_cache (path);
+                return null;
+            }
+        } catch (Error e) {
+            debug ("Could not stat header list cache: %s", e.message);
+        }
 
         string contents;
         try {
@@ -5144,7 +5168,14 @@ public class Mail.Window : Adw.ApplicationWindow {
             var line = lines[i];
             if (line.length == 0)
                 continue;
+            if (line.length > HEADER_LIST_LINE_MAX_BYTES) {
+                line = trim_header_cache_line (line);
+                if (line.length == 0)
+                    continue;
+            }
             var parts = line.split ("\t", 11);
+            if (parts.length > 8 && parts[8].length > Utils.MESSAGE_PREVIEW_INPUT_MAX_BYTES)
+                parts[8] = parts[8].substring (0, Utils.MESSAGE_PREVIEW_INPUT_MAX_BYTES);
             var message = message_from_header_cache_parts (folder, parts, outgoing);
             if (message != null)
                 messages.add (message);
@@ -5153,6 +5184,46 @@ public class Mail.Window : Adw.ApplicationWindow {
         /* Valid file with no rows is a known empty folder. null means the
          * index is missing — the next open must not treat those the same. */
         return messages;
+    }
+
+    private static void quarantine_header_list_cache (string path) {
+        try {
+            move_aside_cache_file (path, path + ".corrupt");
+            var highwater = path + ".highwater";
+            if (FileUtils.test (highwater, FileTest.IS_REGULAR))
+                move_aside_cache_file (highwater, highwater + ".corrupt");
+        } catch (Error e) {
+            warning ("Could not quarantine header list cache %s: %s", path, e.message);
+            try {
+                File.new_for_path (path).delete ();
+            } catch (Error e2) {
+                warning ("Could not delete oversized header list cache %s: %s", path, e2.message);
+            }
+        }
+    }
+
+    private static void move_aside_cache_file (string path, string dest) throws Error {
+        var src = File.new_for_path (path);
+        var dst = File.new_for_path (dest);
+        if (dst.query_exists ())
+            dst.delete ();
+        src.move (dst, FileCopyFlags.OVERWRITE);
+    }
+
+    /* Keep uid/date/flags/… fields; drop an oversized preview so split stays cheap. */
+    private static string trim_header_cache_line (string line) {
+        var parts = line.split ("\t", 11);
+        if (parts.length < 9)
+            return line.substring (0, int.min (line.length, HEADER_LIST_LINE_MAX_BYTES));
+        if (parts[8].length > Utils.MESSAGE_PREVIEW_MAX_BYTES)
+            parts[8] = parts[8].substring (0, Utils.MESSAGE_PREVIEW_MAX_BYTES);
+        var builder = new StringBuilder ();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0)
+                builder.append_c ('\t');
+            builder.append (parts[i]);
+        }
+        return builder.str;
     }
 
     private static void save_header_list_cache (
@@ -9519,14 +9590,21 @@ public class Mail.Window : Adw.ApplicationWindow {
             picked = pick.mail_folder;
             dialog.set_response_enabled ("move", true);
         });
-        /* Enter / double-click on a writable folder confirms Move (Reddit QoL). */
+        /* Enter / double-click on a writable folder confirms Move (Reddit QoL).
+         * Emit the AlertDialog response outside the ListBox activate/key
+         * handler — calling response() synchronously left the dialog open
+         * after the move (#43). */
         list.row_activated.connect ((row) => {
             var pick = row as FolderPickRow;
             if (pick == null || !pick.mail_folder.can_accept_messages)
                 return;
             picked = pick.mail_folder;
             dialog.set_response_enabled ("move", true);
-            dialog.response ("move");
+            Idle.add (() => {
+                dialog.response ("move");
+                dialog.force_close ();
+                return Source.REMOVE;
+            });
         });
 
         search.changed.connect (() => {

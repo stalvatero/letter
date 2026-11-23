@@ -76,6 +76,30 @@ void test_sanitize_message_preview () {
     bad.append ("\nmondo");
     var cleaned = Mail.Utils.sanitize_message_preview (bad.str);
     assert (cleaned != null && cleaned.contains ("Ciao") && cleaned.contains ("mondo"));
+    /* Must not amplify (unichar)-1 into six FF BF bytes (#49). */
+    assert (!cleaned.contains ("\xff\xbf"));
+    assert (cleaned.length <= Mail.Utils.MESSAGE_PREVIEW_MAX_BYTES);
+}
+
+void test_sanitize_message_preview_no_utf8_amplification () {
+    var poisoned = new StringBuilder ("Bonjour");
+    /* One invalid byte → old collapse_spaces wrote 6; next pass ×6 again. */
+    poisoned.append_c ((char) 0xff);
+    var once = Mail.Utils.sanitize_message_preview (poisoned.str);
+    assert (once != null);
+    assert (once.length < 64);
+    assert (!once.contains ("\xff"));
+
+    /* Simulate a cache field already grown like 6^8 invalid bytes after prose. */
+    var huge = new StringBuilder ("Texte français.");
+    for (int i = 0; i < 4096; i++)
+        huge.append ("\xff\xbf\xbf\xbf\xbf\xbf");
+    assert (huge.str.length > 20000);
+    var capped = Mail.Utils.sanitize_message_preview (huge.str);
+    assert (capped != null);
+    assert (capped.has_prefix ("Texte"));
+    assert (capped.length <= Mail.Utils.MESSAGE_PREVIEW_MAX_BYTES);
+    assert (!capped.contains ("\xff"));
 }
 
 void test_compare_versions () {
@@ -111,6 +135,7 @@ void main (string[] args) {
     Test.add_func ("/replace-literal/matches-string-replace-on-empty-pattern", test_replace_literal_matches_string_replace_on_empty_pattern);
     Test.add_func ("/sanitize-recipient-text/cleans-names", test_sanitize_recipient_text);
     Test.add_func ("/sanitize-message-preview/strips-image-placeholders", test_sanitize_message_preview);
+    Test.add_func ("/sanitize-message-preview/no-utf8-amplification", test_sanitize_message_preview_no_utf8_amplification);
     Test.add_func ("/compare-versions/orders-semver", test_compare_versions);
     Test.add_func ("/header-cache/escape", test_header_cache_escape);
     Test.add_func ("/header-cache/escape-round-trip", test_header_cache_escape_round_trip);

@@ -19,6 +19,27 @@ refactors unless they affect behaviour.
 
 ## [Unreleased](https://github.com/stalvatero/letter/compare/v1.7.1...HEAD)
 
+### Translations
+
+- Spanish translation by [msc-ffs](https://github.com/msc-ffs).
+
+### Fixed
+
+- Compose window no longer flashes a white editor while opening in dark mode
+  (placeholder/stack stayed hard-coded light until WebKit finished loading).
+- Invalid UTF-8 in Camel / header-cache previews no longer grows ×6 on every
+  sanitize pass (`collapse_spaces` was re-encoding `(unichar)-1` as six bad
+  bytes). Previews are hard-capped; oversized header-list files are
+  quarantined so startup cannot OOM (#49).
+- Compose paste inserts clipboard images again (screenshots, etc.). Ctrl+V /
+  Paste read the image from GTK’s clipboard first; WebKit’s DOM paste alone
+  often sees empty `clipboardData` on modern GNOME/Wayland (#47).
+- Attachment preview works when Sushi is the Flatpak NautilusPreviewer (e.g.
+  Fedora atomic): Letter exports the file through the Documents portal before
+  `ShowFile`, so the sandboxed previewer can read it (#45).
+- Move to Folder: Enter / double-click on a folder closes the dialog after the
+  move (it previously moved but left the modal open) (#43).
+
 ## [1.7.1](https://github.com/stalvatero/letter/compare/v1.7.0...v1.7.1) - 2026-10-23
 
 ### Added

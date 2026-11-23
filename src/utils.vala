@@ -873,7 +873,23 @@ namespace Mail.Utils {
         return "image%s".printf (image_extension (mime));
     }
 
+    /* Flatpak Sushi (common on atomic distros) cannot see Letter’s /tmp.
+     * Export a transient Documents-portal path and grant read to the
+     * previewer, then ShowFile that URI. Host Sushi can read it too.
+     * If the portal fails, fall back to the original file URI (#45). */
+    private const string NAUTILUS_PREVIEWER_APP_ID = "org.gnome.NautilusPreviewer";
+    private const uint DOCUMENTS_ADD_REUSE_EXISTING = 1;
+
     private static async bool preview_with_sushi (File file) {
+        var uri = file.get_uri ();
+        try {
+            var exported = export_for_nautilus_previewer (file);
+            if (exported != null)
+                uri = exported.get_uri ();
+        } catch (Error e) {
+            debug ("Documents portal export for preview failed: %s", e.message);
+        }
+
         try {
             var conn = yield Bus.get (BusType.SESSION, null);
             yield conn.call (
@@ -881,7 +897,7 @@ namespace Mail.Utils {
                 "/org/gnome/NautilusPreviewer",
                 "org.gnome.NautilusPreviewer2",
                 "ShowFile",
-                new Variant ("(ssbs)", file.get_uri (), "", false, ""),
+                new Variant ("(ssbs)", uri, "", false, ""),
                 null,
                 DBusCallFlags.NONE,
                 8000,
@@ -891,6 +907,62 @@ namespace Mail.Utils {
         } catch (Error e) {
             debug ("Sushi preview is unavailable: %s", e.message);
             return false;
+        }
+    }
+
+    private static File? export_for_nautilus_previewer (File file) throws Error {
+        var path = file.get_path ();
+        if (path == null || path.length == 0)
+            return null;
+
+        var fd = Posix.open (path, Posix.O_RDONLY | Posix.O_CLOEXEC);
+        if (fd < 0)
+            throw new IOError.FAILED ("Could not open attachment for document portal");
+
+        try {
+            var fd_list = new UnixFDList ();
+            var handle = fd_list.append (fd);
+            var handles = new VariantBuilder (new VariantType ("ah"));
+            handles.add ("h", handle);
+            var parameters = new Variant.tuple ({
+                handles.end (),
+                new Variant.uint32 (DOCUMENTS_ADD_REUSE_EXISTING),
+                new Variant.string (NAUTILUS_PREVIEWER_APP_ID),
+                new Variant.strv ({ "read" }),
+            });
+
+            var conn = Bus.get_sync (BusType.SESSION, null);
+            UnixFDList? out_fds;
+            var reply = conn.call_with_unix_fd_list_sync (
+                "org.freedesktop.portal.Documents",
+                "/org/freedesktop/portal/documents",
+                "org.freedesktop.portal.Documents",
+                "AddFull",
+                parameters,
+                new VariantType ("(asa{sv})"),
+                DBusCallFlags.NONE,
+                10000,
+                fd_list,
+                out out_fds,
+                null
+            );
+
+            string[] doc_ids = reply.get_child_value (0).dup_strv ();
+            if (doc_ids.length == 0 || doc_ids[0] == null || doc_ids[0].length == 0)
+                return null;
+
+            var runtime = Environment.get_user_runtime_dir ();
+            if (runtime == null || runtime.length == 0)
+                runtime = "/run/user/%u".printf ((uint) Posix.getuid ());
+
+            var basename = file.get_basename ();
+            if (basename == null || basename.length == 0)
+                basename = "attachment";
+            return File.new_for_path (
+                Path.build_filename (runtime, "doc", doc_ids[0], basename)
+            );
+        } finally {
+            Posix.close (fd);
         }
     }
 
@@ -1508,6 +1580,12 @@ namespace Mail.Utils {
         return collapse_spaces (text);
     }
 
+    /* List/snippet length. Hard cap lives here so every caller (Camel summary,
+     * disk header cache, MIME body, outbox) stays bounded — see #49. */
+    public const int MESSAGE_PREVIEW_MAX_BYTES = 280;
+    /* Head kept before regex / collapse when the input is already absurd. */
+    public const int MESSAGE_PREVIEW_INPUT_MAX_BYTES = 2048;
+
     /* Camel (and HTML→text) often put image alt text or filenames in the
      * folder-summary preview: "[image: Google]", "[Firma.png]". Those clutter
      * the message list and are useless when the body is mostly pictures. */
@@ -1515,9 +1593,15 @@ namespace Mail.Utils {
         if (raw == null || raw.length == 0)
             return null;
 
+        /* Bound before any copy/regex: a corrupt on-disk preview can be
+         * hundreds of MiB (invalid UTF-8 amplified by collapse_spaces). */
+        string input = raw;
+        if (input.length > MESSAGE_PREVIEW_INPUT_MAX_BYTES)
+            input = input.substring (0, MESSAGE_PREVIEW_INPUT_MAX_BYTES);
+
         /* Never use string.replace() here: Camel previews can be invalid UTF-8
          * and Vala’s GRegex-backed replace aborts the process on RegexError. */
-        var text = replace_literal (replace_literal (replace_literal (raw, "\r\n", "\n"), "\r", "\n"), "\n", " ").strip ();
+        var text = replace_literal (replace_literal (replace_literal (input, "\r\n", "\n"), "\r", "\n"), "\n", " ").strip ();
         try {
             var image_re = new Regex ("\\[\\s*image\\s*:[^\\]]*\\]", RegexCompileFlags.CASELESS);
             text = image_re.replace (text, text.length, 0, "");
@@ -1538,6 +1622,10 @@ namespace Mail.Utils {
         }
 
         text = collapse_spaces (text).strip ();
+        if (text.length == 0)
+            return null;
+        if (text.length > MESSAGE_PREVIEW_MAX_BYTES)
+            text = text.substring (0, MESSAGE_PREVIEW_MAX_BYTES).strip ();
         if (text.length == 0)
             return null;
 
@@ -1590,6 +1678,12 @@ namespace Mail.Utils {
         int index = 0;
         unichar c;
         while (text.get_next_char (ref index, out c)) {
+            /* Invalid UTF-8 yields (unichar)-1 / -2. append_unichar (-1) writes
+             * six invalid bytes (FF BF ×5), which the next sanitize pass then
+             * expands ×6 again — that is how header-list previews grew to
+             * hundreds of MiB and OOM'd startup (#49). Drop them. */
+            if (c == (unichar) (-1) || c == (unichar) (-2) || !c.validate ())
+                continue;
             if (c.isspace ()) {
                 space = builder.len > 0;
                 continue;

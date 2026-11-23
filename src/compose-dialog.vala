@@ -1938,6 +1938,7 @@ public class Mail.ComposeHtmlView : Gtk.Box {
     private SimpleAction unlink_action;
     private SimpleAction link_action;
     private SimpleAction learn_spelling;
+    private SimpleAction paste_action;
     private SimpleAction paste_match_style;
     private string[] spell_langs = {};
     private HashTable<string, StoredInlineImage> inline_images = new HashTable<string, StoredInlineImage> (str_hash, str_equal);
@@ -2032,9 +2033,9 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         add_editing_shortcuts ();
         add_file_drop_target ();
         add_image_size_actions ();
-        update_webview_background ();
-        this.webview.realize.connect (update_webview_background);
-        Adw.StyleManager.get_default ().notify["dark"].connect (update_webview_background);
+        sync_compose_chrome ();
+        this.webview.realize.connect (sync_compose_chrome);
+        Adw.StyleManager.get_default ().notify["dark"].connect (sync_compose_chrome);
 
         var placeholder = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
             hexpand = true,
@@ -2110,6 +2111,8 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         this.link_action.activate.connect (() => ComposeExtras.prompt_edit_link.begin (this, this));
         this.learn_spelling = new SimpleAction ("compose-learn-spelling", null);
         this.learn_spelling.activate.connect (() => learn_selected_spelling.begin ());
+        this.paste_action = new SimpleAction ("compose-paste", null);
+        this.paste_action.activate.connect (() => paste_from_clipboard.begin ());
         this.paste_match_style = new SimpleAction ("compose-paste-match-style", null);
         this.paste_match_style.activate.connect (() => paste_and_match_style ());
     }
@@ -2539,6 +2542,16 @@ public class Mail.ComposeHtmlView : Gtk.Box {
                 continue;
             }
 
+            if (action == WebKit.ContextMenuAction.PASTE) {
+                menu.remove (item);
+                menu.insert (
+                    new WebKit.ContextMenuItem.from_gaction (
+                        this.paste_action, _("Paste"), null),
+                    i
+                );
+                continue;
+            }
+
             if (action == WebKit.ContextMenuAction.PASTE_AS_PLAIN_TEXT) {
                 menu.remove (item);
                 menu.insert (
@@ -2709,6 +2722,67 @@ public class Mail.ComposeHtmlView : Gtk.Box {
                 debug ("Could not paste and match style: %s", e.message);
             }
         });
+    }
+
+    /* Prefer Gdk.Clipboard over WebKit DOM paste for images. GNOME screenshot
+     * / Wayland often leave clipboardData.items empty in the WebView (#47). */
+    public async void paste_from_clipboard () {
+        this.webview.grab_focus ();
+        if (yield try_insert_clipboard_image ())
+            return;
+        this.webview.execute_editing_command (WebKit.EDITING_COMMAND_PASTE);
+    }
+
+    private async bool try_insert_clipboard_image () {
+        var clipboard = this.webview.get_clipboard ();
+
+        try {
+            var texture = yield clipboard.read_texture_async (null);
+            if (texture != null) {
+                var png = texture.save_to_png_bytes ();
+                if (png != null && png.get_size () > 0) {
+                    insert_image (png, "image/png", _("Pasted image"));
+                    return true;
+                }
+            }
+        } catch (Error e) {
+            debug ("Clipboard has no texture for paste: %s", e.message);
+        }
+
+        try {
+            string mime_type;
+            var stream = yield clipboard.read_async (
+                { "image/png", "image/jpeg", "image/jpg", "image/gif", "image/bmp", "image/webp" },
+                Priority.DEFAULT,
+                null,
+                out mime_type
+            );
+            if (stream != null) {
+                var bytes = yield read_all_stream_bytes (stream);
+                if (bytes.get_size () > 0) {
+                    var mime = (mime_type != null && mime_type.has_prefix ("image/"))
+                        ? mime_type
+                        : "image/png";
+                    insert_image (bytes, mime, _("Pasted image"));
+                    return true;
+                }
+            }
+        } catch (Error e) {
+            debug ("Clipboard has no image bytes for paste: %s", e.message);
+        }
+
+        return false;
+    }
+
+    private static async Bytes read_all_stream_bytes (InputStream stream) throws Error {
+        var output = new MemoryOutputStream.resizable ();
+        yield output.splice_async (
+            stream,
+            OutputStreamSpliceFlags.CLOSE_SOURCE | OutputStreamSpliceFlags.CLOSE_TARGET,
+            Priority.DEFAULT,
+            null
+        );
+        return output.steal_as_bytes ();
     }
 
     public void apply_command (string command) {
@@ -2938,6 +3012,10 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         }
         if (key == Gdk.Key.v && shift) {
             paste_and_match_style ();
+            return true;
+        }
+        if (key == Gdk.Key.v && !shift) {
+            paste_from_clipboard.begin ();
             return true;
         }
         if (key == Gdk.Key.k && !shift) {
@@ -3229,6 +3307,16 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         }
     }
 
+    /* Match message-reader: GTK placeholder/stack stay white unless we flip a
+     * class before the first map. WebKit alone still paints late. */
+    private void sync_compose_chrome () {
+        if (Adw.StyleManager.get_default ().dark)
+            add_css_class ("compose-follow-dark");
+        else
+            remove_css_class ("compose-follow-dark");
+        update_webview_background ();
+    }
+
     private void update_webview_background () {
         var rgba = Gdk.RGBA ();
         rgba.parse (Adw.StyleManager.get_default ().dark ? "#1e1e1e" : "#ffffff");
@@ -3360,10 +3448,11 @@ public class Mail.ComposeHtmlView : Gtk.Box {
         var dark = Adw.StyleManager.get_default ().dark;
         var bg = dark ? "#1e1e1e" : "#ffffff";
         var fg = dark ? "#eeeeee" : "#1a1a1a";
+        var scheme = dark ? "dark" : "only light";
         var css = new StringBuilder ("<style>");
         if (!outgoing) {
             css.append_printf ("""
-html { color-scheme: light dark; background: %s; }
+html { color-scheme: %s; background: %s; }
 body {
   margin: 0;
   padding: 12px 16px 16px 20px;
@@ -3371,7 +3460,7 @@ body {
   color: %s;
   font: 15px/1.4 system-ui, sans-serif;
 }
-""", bg, bg, fg);
+""", scheme, bg, bg, fg);
             css.append ("""
 #editor { outline: none; min-height: 12em; }
 #editor > p { margin: 0; }
@@ -4345,9 +4434,9 @@ blockquote:not(.mail-quote) {
                     }
                 });
 
-                /* Clipboard screenshots (GNOME Ctrl+V) arrive as image/* items or
-                 * as blob:/data: <img> nodes. Route them through Vala insert_image
-                 * so send can turn them into CID MIME parts. */
+                /* Secondary path: Vala Ctrl+V / Paste reads Gdk.Clipboard first
+                 * (#47). Keep harvesting DOM paste leftovers (image/* items or
+                 * blob:/data: <img>) so send still gets CID MIME parts. */
                 function pasteDataUrl(dataUrl, fallbackMime) {
                     var comma = dataUrl.indexOf(',');
                     if (comma < 0)

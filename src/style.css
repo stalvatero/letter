@@ -588,6 +588,14 @@ headerbar button.search-toggle:checked {
   background: #ffffff;
 }
 
+.compose-follow-dark.compose-body,
+.compose-follow-dark .compose-body-stack,
+.compose-follow-dark .compose-body-placeholder,
+.compose-follow-dark webview.compose-body {
+  background: #1e1e1e;
+  background-color: #1e1e1e;
+}
+
 webview.message-body {
   background: #ffffff;
   background-color: #ffffff;
