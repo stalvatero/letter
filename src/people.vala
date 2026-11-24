@@ -461,6 +461,35 @@ public class Mail.PeopleIndex : Object {
         return stamp;
     }
 
+    /* Unread incoming mail that was not in the list before, in a folder that
+     * tells about new mail. A folder's first list is not news, and older
+     * mail fetched during a first sync is mostly read already. */
+    public static bool brings_new_mail (
+        Folder folder,
+        GenericArray<Message> messages,
+        HashTable<string, uint8> known
+    ) {
+        if (known.size () == 0 || (!folder.watch_new_mail && folder.kind != FolderKind.INBOX))
+            return false;
+        for (uint i = 0; i < messages.length; i++) {
+            var message = messages[i];
+            if (!message.seen && !message.outgoing && !message.is_placeholder
+                && !known.contains (message.uid))
+                return true;
+        }
+        return false;
+    }
+
+    /* How long new mail waits before People shows it: a moment, but never
+     * sooner after the last refresh than five times what that one took, so
+     * a sync that keeps bringing mail cannot keep the main loop busy. */
+    public static uint arrival_delay_ms (int64 since_last_us, int64 last_cost_us) {
+        var gap = (last_cost_us * 5).clamp (2000000, 10000000);
+        if (since_last_us >= gap)
+            return 300;
+        return (uint) int64.max (300, (gap - since_last_us) / 1000);
+    }
+
     public static string? name_from_key (string address) {
         return address.has_prefix (NAME_PREFIX) ? address.substring (NAME_PREFIX.length) : null;
     }

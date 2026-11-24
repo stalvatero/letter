@@ -157,6 +157,7 @@ public class Mail.Window : Adw.ApplicationWindow {
     /* The queued refresh waits for sync, and how long the last one took. */
     private bool people_refresh_waits;
     private int64 people_refresh_cost;
+    private int64 people_refresh_ended;
     /* Header caches edited in place, not replaced: lets a People rebuild
      * tell flag changes from mail that came or went without a pass over
      * every message. */
@@ -1234,6 +1235,8 @@ public class Mail.Window : Adw.ApplicationWindow {
             queue_conversation_refresh ();
         maybe_harvest_sent_recipients (account, folder, visible);
         sync_bookmarks_folder ();
+        if (PeopleIndex.brings_new_mail (folder, visible, known))
+            people_mail_arrived ();
         sync_important_markers ();
         if (known.length > 0)
             notify_new_arrivals (account, folder, visible, known);
@@ -5001,12 +5004,35 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.people_refresh_waits = people_sync_busy ();
         if (this.people_refresh_waits)
             delay = (uint) (this.people_refresh_cost / 1000 * 20).clamp (3000, 15000);
+        start_people_refresh (delay);
+    }
+
+    /* New mail shows in People about as soon as in its folder, even while
+     * the sync that brought it goes on; the wait above is for header walks. */
+    private void people_mail_arrived () {
+        if (!this.people_button.active)
+            return;
+        if (this.people_refresh_source != 0 && !this.people_refresh_waits)
+            return;
+        var delay = PeopleIndex.arrival_delay_ms (
+            Utils.sync_tick () - this.people_refresh_ended,
+            this.people_refresh_cost
+        );
+        if (this.people_refresh_source != 0)
+            Source.remove (this.people_refresh_source);
+        this.people_refresh_source = 0;
+        this.people_refresh_waits = false;
+        start_people_refresh (delay);
+    }
+
+    private void start_people_refresh (uint delay) {
         this.people_refresh_source = Timeout.add (delay, () => {
             this.people_refresh_source = 0;
             this.people_refresh_waits = false;
             var t0 = Utils.sync_tick ();
             refresh_people ();
-            this.people_refresh_cost = Utils.sync_tick () - t0;
+            this.people_refresh_ended = Utils.sync_tick ();
+            this.people_refresh_cost = this.people_refresh_ended - t0;
             return Source.REMOVE;
         });
     }
@@ -7052,6 +7078,8 @@ public class Mail.Window : Adw.ApplicationWindow {
         folder.total = total;
         refresh_folder_badge (folder);
         sync_bookmarks_folder ();
+        if (added > 0 && !created && PeopleIndex.brings_new_mail (folder, cache, known))
+            people_mail_arrived ();
         sync_important_markers ();
         if (is_current_folder (folder) && this.search_text.length == 0) {
             if (added > 0 || removed.length > 0)

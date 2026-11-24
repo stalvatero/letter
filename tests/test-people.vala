@@ -34,6 +34,7 @@ void main () {
     check_names ();
     check_people_model ();
     check_mail_stamp ();
+    check_new_mail ();
     check_unbound_row_is_freed ();
 }
 
@@ -308,6 +309,44 @@ void check_mail_stamp () {
     var without = Mail.PeopleIndex.mail_stamp (mail);
     old_row.from_address = "person0@example.org";
     assert (Mail.PeopleIndex.mail_stamp (mail) != without);
+}
+
+void check_new_mail () {
+    var inbox = new Mail.Folder () { name = "INBOX", full_name = "INBOX" };
+    assert (inbox.kind == Mail.FolderKind.INBOX);
+    var archive = new Mail.Folder () { name = "Archive", full_name = "Archive" };
+    var known = new HashTable<string, uint8> (str_hash, str_equal);
+    known.set ("1", 1);
+
+    var list = new GenericArray<Mail.Message> ();
+    var old = message ("Ada", "ada@example.org", "Me", "me@example.org", false);
+    old.seen = true;
+    list.add (old);
+    assert (!Mail.PeopleIndex.brings_new_mail (inbox, list, known));
+
+    var fresh = message ("Bob", "bob@example.org", "Me", "me@example.org", false);
+    fresh.uid = "2";
+    list.add (fresh);
+    assert (Mail.PeopleIndex.brings_new_mail (inbox, list, known));
+    assert (!Mail.PeopleIndex.brings_new_mail (archive, list, known));
+    archive.watch_new_mail = true;
+    assert (Mail.PeopleIndex.brings_new_mail (archive, list, known));
+
+    /* A folder's first list, read mail and your own sends are not news. */
+    assert (!Mail.PeopleIndex.brings_new_mail (inbox, list, new HashTable<string, uint8> (str_hash, str_equal)));
+    fresh.seen = true;
+    assert (!Mail.PeopleIndex.brings_new_mail (inbox, list, known));
+    fresh.seen = false;
+    fresh.outgoing = true;
+    assert (!Mail.PeopleIndex.brings_new_mail (inbox, list, known));
+
+    /* Soon after a quiet spell; otherwise not before five times the last
+     * refresh's cost (2-10 s) has passed since it ended. */
+    assert (Mail.PeopleIndex.arrival_delay_ms (60000000, 300000) == 300);
+    assert (Mail.PeopleIndex.arrival_delay_ms (500000, 100000) == 1500);
+    assert (Mail.PeopleIndex.arrival_delay_ms (2200000, 815000) == 1875);
+    assert (Mail.PeopleIndex.arrival_delay_ms (0, 5000000) == 10000);
+    assert (Mail.PeopleIndex.arrival_delay_ms (1999000, 0) == 300);
 }
 
 Mail.Message message (string from, string? from_address, string to, string? recipients, bool outgoing) {
