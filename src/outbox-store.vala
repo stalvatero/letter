@@ -41,13 +41,13 @@ public class Mail.OutboxStore : Object {
     public signal void item_sent (PendingMail item);
     public signal void item_needs_attention (PendingMail item, string message);
 
-    private MailSession session;
+    private MailBackend session;
     private bool pump_running;
     private uint pump_source;
     private string? active_id;
     private HashTable<string, uint8> attention_shown;
 
-    public OutboxStore (MailSession session) {
+    public OutboxStore (MailBackend session) {
         this.session = session;
         this.attention_shown = new HashTable<string, uint8> (str_hash, str_equal);
     }

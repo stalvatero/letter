@@ -12,11 +12,10 @@
 *.ui~
 meson-logs/
 .cache/
-.cursor/
-
 # Local debug artefacts
 *.core
 *.log
-
 # Local working notes (not part of the repo)
 /docs/
+.cursor
+.cursor/

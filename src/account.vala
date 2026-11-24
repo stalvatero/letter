@@ -33,8 +33,12 @@ public enum Mail.AccountKind {
                 return "goa-account-exchange";
             case LOCAL:
                 return "drive-harddisk-symbolic";
+            case IMAP:
+                /* Prefer a theme icon that exists without GOA installed (KDE /
+                 * LETTER_SKIP_GOA). goa-account is often missing there. */
+                return "mail-unread-symbolic";
             default:
-                return "goa-account";
+                return "mail-unread-symbolic";
         }
     }
 
@@ -145,6 +149,62 @@ public class Mail.Account : Object {
             return this.kind.label ();
         }
     }
+
+    /** Letter Identity catalog (`backend_name == letter-imap`). */
+    public bool is_letter_identity {
+        get {
+            return this.backend_name == "letter-imap";
+        }
+    }
+
+    /** Linked to a GNOME Online Accounts object (possibly merged onto Identity). */
+    public bool has_goa {
+        get {
+            return this.goa_id != null && this.goa_id.length > 0;
+        }
+    }
+
+    /**
+     * Short label for UI badges: Letter / GNOME / Letter + GNOME.
+     * Engine follows Identity when both are present (RoutingMailBackend).
+     */
+    public string provenance_label {
+        owned get {
+            if (this.is_letter_identity && this.has_goa)
+                return _("Letter + GNOME");
+            if (this.is_letter_identity)
+                return _("Letter");
+            if (this.has_goa)
+                return _("GNOME");
+            return this.kind.label ();
+        }
+    }
+
+    public string provenance_tooltip {
+        owned get {
+            if (this.is_letter_identity && this.has_goa)
+                return _("Letter Identity (same address also in GNOME Online Accounts). Mail uses Letter’s own sync engine.");
+            if (this.is_letter_identity)
+                return _("Letter Identity — mail uses Letter’s own sync engine (flexible sync, faster local search).");
+            if (this.has_goa)
+                return _("GNOME Online Accounts — mail, calendars, and contacts use the GNOME/Evolution stack.");
+            return this.kind.label ();
+        }
+    }
+
+    /**
+     * GOA → GNOME foot (`start-here-symbolic`); Letter Identity → full-colour
+     * app icon (the -symbolic asset renders as an empty stub in the list).
+     */
+    public string provenance_icon_name {
+        owned get {
+            if (this.is_letter_identity)
+                return Config.APP_ID;
+            if (this.has_goa)
+                return "start-here-symbolic";
+            return Config.APP_ID;
+        }
+    }
 }
 
 public class Mail.Folder : Object {
@@ -160,6 +220,10 @@ public class Mail.Folder : Object {
     public string full_name { get; set; }
     public int unread { get; set; }
     public int total { get; set; }
+    /* IMAP STATUS / EXISTS floor — survives partial header tips and restarts
+     * (persisted in the folder-tree cache). -1 = unknown. */
+    public int server_total { get; set; default = -1; }
+    public int server_unread { get; set; default = -1; }
     public uint indent { get; set; }
     public uint flags { get; set; }
     public bool watch_new_mail { get; set; }

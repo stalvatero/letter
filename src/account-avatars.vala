@@ -1,4 +1,5 @@
-/* Profile pictures for the accounts rail (Google + Microsoft 365). */
+/* Profile pictures for the accounts rail (Google + Microsoft 365).
+ * GOA accounts use the Online Accounts token; Letter Identity uses libsecret. */
 public class Mail.AccountAvatars : Object {
     private const string GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
     private const string MICROSOFT_PHOTO_URL = "https://graph.microsoft.com/v1.0/me/photos/48x48/$value";
@@ -7,8 +8,17 @@ public class Mail.AccountAvatars : Object {
     private Soup.Session session = new Soup.Session ();
     private HashTable<string, Gdk.Texture> pictures = new HashTable<string, Gdk.Texture> (str_hash, str_equal);
 
+    /** Prefer Letter Identity OAuth, else GOA when present. */
+    public async Gdk.Texture? load_for_account (Account account, Goa.Client? goa) {
+        if (account.is_letter_identity)
+            return yield load_identity (account);
+        if (goa != null && account.has_goa)
+            return yield load_goa (goa, account);
+        return null;
+    }
+
     /* The account's picture, or null when it has none or it cannot be fetched. */
-    public async Gdk.Texture? load (Goa.Client goa, Account account) {
+    public async Gdk.Texture? load_goa (Goa.Client goa, Account account) {
         var id = account.goa_id;
         if (id == null)
             return null;
@@ -23,23 +33,83 @@ public class Mail.AccountAvatars : Object {
             string token;
             int expires_in;
             yield oauth.call_get_access_token (null, out token, out expires_in);
-            Gdk.Texture? picture = null;
-            switch (account.kind) {
-                case AccountKind.GOOGLE:
-                    picture = yield load_google (token);
-                    break;
-                case AccountKind.MICROSOFT:
-                    picture = yield load_microsoft (token);
-                    break;
-                default:
-                    break;
-            }
+            var picture = yield fetch_picture (account.kind, token);
             if (picture != null)
                 this.pictures.set (id, picture);
             return picture;
         } catch (Error e) {
             debug ("No account picture for %s: %s", id, e.message);
             return null;
+        }
+    }
+
+    private async Gdk.Texture? load_identity (Account account) {
+        var id = account.source_uid ?? account.uid;
+        if (id == null || id.length == 0)
+            return null;
+        var cache_key = "identity:" + id;
+        var cached = this.pictures.get (cache_key);
+        if (cached != null)
+            return cached;
+
+        IdentityAccount? row = null;
+        try {
+            var catalog = IdentityCatalog.load ();
+            for (uint i = 0; i < catalog.accounts.length; i++) {
+                if (catalog.accounts[i].id == id) {
+                    row = catalog.accounts[i];
+                    break;
+                }
+            }
+        } catch (Error e) {
+            debug ("Identity catalog for avatar: %s", e.message);
+            return null;
+        }
+        if (row == null || !row.uses_oauth2 ())
+            return null;
+
+        string? token = null;
+        Error? token_error = null;
+        var acc = row;
+        SourceFunc resume = load_identity.callback;
+        new Thread<void*> ("letter-avatar-token", () => {
+            try {
+                token = IdentityOAuth.ensure_access_token_sync (acc);
+            } catch (Error e) {
+                token_error = e;
+            }
+            Idle.add (() => {
+                resume ();
+                return Source.REMOVE;
+            });
+            return null;
+        });
+        yield;
+        if (token_error != null || token == null || token.length == 0) {
+            debug ("No Identity token for avatar %s: %s",
+                id, token_error != null ? token_error.message : "empty");
+            return null;
+        }
+
+        try {
+            var picture = yield fetch_picture (account.kind, token);
+            if (picture != null)
+                this.pictures.set (cache_key, picture);
+            return picture;
+        } catch (Error e) {
+            debug ("No Identity picture for %s: %s", id, e.message);
+            return null;
+        }
+    }
+
+    private async Gdk.Texture? fetch_picture (AccountKind kind, string token) throws Error {
+        switch (kind) {
+            case AccountKind.GOOGLE:
+                return yield load_google (token);
+            case AccountKind.MICROSOFT:
+                return yield load_microsoft (token);
+            default:
+                return null;
         }
     }
 

@@ -2,7 +2,7 @@ public class Mail.MessageWindow : Adw.ApplicationWindow {
     public signal void folder_changed ();
     public signal void flags_changed ();
 
-    private MailSession session;
+    private MailBackend session;
     private AccountStore store;
     private Account account;
     private Folder folder;
@@ -33,7 +33,7 @@ public class Mail.MessageWindow : Adw.ApplicationWindow {
 
     public MessageWindow (
         Gtk.Application app,
-        MailSession session,
+        MailBackend session,
         AccountStore store,
         Account account,
         Folder folder,

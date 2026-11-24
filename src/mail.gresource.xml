@@ -3,5 +3,7 @@
   <gresource prefix="/io/github/stalvatero/Letter">
     <file preprocess="xml-stripblanks">window.ui</file>
     <file>style.css</file>
+    <!-- Bundled so provenance badges work when the hicolor theme is not installed. -->
+    <file alias="icons/app.svg">io.github.stalvatero.Letter.svg</file>
   </gresource>
 </gresources>

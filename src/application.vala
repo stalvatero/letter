@@ -30,6 +30,7 @@ public class Mail.Application : Adw.Application {
         { "refresh", on_refresh },
         { "new-message", on_new_message },
         { "online-accounts", on_online_accounts },
+        { "add-mail-account", on_add_mail_account },
         { "open-calendar", on_open_calendar },
         { "open-contacts", on_open_contacts },
         { "notification-open", on_notification_open, "s" },
@@ -46,7 +47,8 @@ public class Mail.Application : Adw.Application {
     }
 
     construct {
-        this.accounts = new AccountStore ();
+        this.settings = new Settings (Config.APP_ID);
+        this.accounts = new AccountStore (this.settings);
         this.contacts = new ContactStore ();
         this.calendars = new CalendarStore ();
         this.notifier = new Notifier ();
@@ -54,7 +56,6 @@ public class Mail.Application : Adw.Application {
             handle_notification (kind, new Variant.string (token));
         });
         this.notifier.fallback.connect (on_notification_fallback);
-        this.settings = new Settings (Config.APP_ID);
 
         OptionEntry[] options = {
             { "new-message", '\0', OptionFlags.NONE, OptionArg.NONE, null, _("Compose a new message"), null },
@@ -73,7 +74,10 @@ public class Mail.Application : Adw.Application {
         Utils.migrate_legacy_app_dirs ();
         migrate_settings_from_mail ();
         normalize_body_cache_days ();
-        this.accounts.load.begin ();
+        this.accounts.load.begin ((obj, res) => {
+            this.accounts.load.end (res);
+            queue_goa_accounts_prompt ();
+        });
         this.accounts.changed.connect (on_accounts_changed);
         this.accounts.changed.connect (on_accounts_changed_ui);
         Environment.set_application_name (Utils.app_display_name ());
@@ -193,6 +197,84 @@ public class Mail.Application : Adw.Application {
             this.activate_pending = false;
             release ();
         }
+    }
+
+    /** After Preferences removes an Identity account (may open SetupWindow). */
+    public void on_identity_account_removed () {
+        show_window_for_accounts ();
+    }
+
+    /** Preferences toggled use-goa-accounts — rebind each window’s mail engine. */
+    public void on_goa_preference_changed () {
+        foreach (var window in get_windows ()) {
+            var mail = window as Window;
+            if (mail == null)
+                continue;
+            mail.release_mail_backend ();
+            mail.on_accounts_changed_public ();
+        }
+        on_accounts_changed ();
+        show_mail_toast (
+            this.accounts.using_goa
+                ? _("GNOME Online Accounts enabled")
+                : _("Using Letter Identity accounts only")
+        );
+    }
+
+    private void queue_goa_accounts_prompt () {
+        if (this.settings.get_boolean ("goa-accounts-prompted"))
+            return;
+        if (Environment.get_variable ("LETTER_SKIP_GOA") == "1") {
+            this.settings.set_boolean ("goa-accounts-prompted", true);
+            return;
+        }
+        if (!Utils.has_gnome_online_accounts ()) {
+            this.settings.set_boolean ("goa-accounts-prompted", true);
+            return;
+        }
+        Idle.add (() => {
+            present_goa_accounts_prompt ();
+            return Source.REMOVE;
+        });
+    }
+
+    private void present_goa_accounts_prompt () {
+        if (this.settings.get_boolean ("goa-accounts-prompted"))
+            return;
+        var parent = get_active_window ();
+        if (parent == null)
+            parent = main_window ();
+        if (parent == null)
+            return;
+
+        var dialog = new Adw.AlertDialog (
+            _("Use GNOME Online Accounts?"),
+            _("This system has GNOME Online Accounts.\n\n• GNOME accounts — one sign-in shared with Calendar and Contacts; mail uses the Evolution stack that GNOME already provides.\n\n• Letter Identity — accounts added in Letter use Letter’s own engine: more flexible sync, smoother local search, and cache-first behaviour tailored to this app.\n\nYou can use either or both. The same address is shown once. Change this anytime in Preferences → Accounts.")
+        );
+        dialog.add_response ("identity", _("Letter only"));
+        dialog.add_response ("goa", _("Include GNOME accounts"));
+        dialog.set_response_appearance ("goa", Adw.ResponseAppearance.SUGGESTED);
+        dialog.default_response = "goa";
+        dialog.close_response = "goa";
+        dialog.response.connect ((response) => {
+            var enable = response != "identity";
+            apply_goa_prompt_choice.begin (enable);
+        });
+        dialog.present (parent);
+    }
+
+    private async void apply_goa_prompt_choice (bool enable) {
+        this.settings.set_boolean ("goa-accounts-prompted", true);
+        if (enable == this.accounts.goa_preference_enabled ()) {
+            this.settings.set_boolean ("use-goa-accounts", enable);
+            return;
+        }
+        foreach (var window in get_windows ()) {
+            var mail = window as Window;
+            mail?.release_mail_backend ();
+        }
+        yield this.accounts.set_use_goa_accounts (enable);
+        on_goa_preference_changed ();
     }
 
     private void show_window_for_accounts () {
@@ -632,6 +714,19 @@ public class Mail.Application : Adw.Application {
 
     private void on_online_accounts () {
         Utils.open_online_accounts ();
+    }
+
+    private void on_add_mail_account () {
+        var parent = get_active_window ();
+        var dialog = new IdentityImapDialog ();
+        dialog.account_added.connect ((id) => {
+            this.accounts.reload_identity ();
+            /* SetupWindow is open when Identity was empty — flip to main shell. */
+            show_window_for_accounts ();
+            show_mail_toast (_("Account added"));
+            debug ("Identity account added: %s", id);
+        });
+        dialog.present (parent);
     }
 
     private void on_open_calendar () {

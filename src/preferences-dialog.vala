@@ -358,21 +358,66 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
 
         var accounts = new Adw.PreferencesGroup () {
             title = _("Accounts"),
-            description = _("Add or remove providers in GNOME Settings. Drag accounts to set the order in the rail and Local library."),
+            description = _("Add Letter Identity accounts here. On GNOME you can also opt in to Online Accounts — each row is marked Letter or GNOME. Drag accounts to set the order in the rail and Local library."),
         };
         this.accounts_group = accounts;
 
-        var settings_row = new Adw.ActionRow () {
-            title = _("Add Account"),
-            subtitle = _("Google, Microsoft 365, Exchange, IMAP"),
+        var letter_row = new Adw.ActionRow () {
+            title = _("Add account"),
+            subtitle = _("Google, Microsoft, or IMAP — passwords and tokens stay in the system keyring"),
             activatable = true,
         };
-        settings_row.add_prefix (new Gtk.Image.from_icon_name ("list-add-symbolic"));
-        settings_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic") {
+        letter_row.add_prefix (new Gtk.Image.from_icon_name ("list-add-symbolic"));
+        letter_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic") {
             valign = Gtk.Align.CENTER,
         });
-        settings_row.activated.connect (() => Utils.open_online_accounts ());
-        add_prefs_row (accounts, settings_row);
+        letter_row.activated.connect (() => {
+            var app = this.host?.get_application () as Application;
+            if (app != null)
+                app.activate_action ("add-mail-account", null);
+            else {
+                var dialog = new IdentityImapDialog ();
+                dialog.account_added.connect (() => this.store.reload_identity ());
+                dialog.present (this.host);
+            }
+        });
+        add_prefs_row (accounts, letter_row);
+
+        /* GOA UI only when the host actually has GNOME Online Accounts
+         * (not KDE / Cinnamon / Cosmic without GOA). */
+        var goa_available = Utils.has_gnome_online_accounts ()
+            && Environment.get_variable ("LETTER_SKIP_GOA") != "1";
+        if (goa_available) {
+            var goa_on = this.settings.get_boolean ("use-goa-accounts");
+            var goa_switch = new Adw.SwitchRow () {
+                title = _("Use GNOME Online Accounts"),
+                subtitle = _("GNOME accounts share sign-in with Calendar and Contacts and use the Evolution mail stack. Letter Identity uses Letter’s own engine — more flexible sync and faster local search. Same address in both is shown once and uses Letter."),
+                active = goa_on,
+            };
+            var settings_row = new Adw.ActionRow () {
+                title = _("Open GNOME Online Accounts"),
+                subtitle = _("Manage system accounts in Settings"),
+                activatable = goa_on,
+                sensitive = goa_on,
+            };
+            settings_row.add_prefix (new Gtk.Image.from_icon_name ("network-workgroup-symbolic"));
+            settings_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic") {
+                valign = Gtk.Align.CENTER,
+            });
+            settings_row.activated.connect (() => {
+                if (settings_row.sensitive)
+                    Utils.open_online_accounts ();
+            });
+            goa_switch.notify["active"].connect (() => {
+                settings_row.sensitive = goa_switch.active;
+                settings_row.activatable = goa_switch.active;
+                if (goa_switch.active == this.store.goa_preference_enabled ())
+                    return;
+                apply_goa_preference.begin (goa_switch.active);
+            });
+            add_prefs_row (accounts, goa_switch);
+            add_prefs_row (accounts, settings_row);
+        }
         fill_mail_accounts ();
         this.store.changed.connect (() => {
             fill_mail_accounts ();
@@ -942,6 +987,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
                 subtitle = account.email != null && account.email.length > 0
                     ? account.email
                     : account.kind.label (),
+                tooltip_text = account.provenance_tooltip,
             };
             row.set_data ("order-key", account.order_key);
 
@@ -949,6 +995,9 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
             icon.valign = Gtk.Align.CENTER;
             /* Prefixes pack right-to-left: add brand first, handle last → handle leftmost. */
             row.add_prefix (icon);
+
+            if (account.is_letter_identity || account.has_goa)
+                row.add_suffix (Utils.account_provenance_image (account, 16));
 
             var handle = new Gtk.Image.from_icon_name ("list-drag-handle-symbolic") {
                 valign = Gtk.Align.CENTER,
@@ -958,18 +1007,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
             handle.add_css_class ("account-drag-handle");
             row.add_prefix (handle);
 
-            var edit = new Gtk.Button.with_label (_("Edit")) {
-                valign = Gtk.Align.CENTER,
-                tooltip_text = _("Open this account in GNOME Settings"),
-            };
-            edit.add_css_class ("flat");
             var captured = account;
-            edit.clicked.connect (() => {
-                if (captured.goa_id != null && captured.goa_id.length > 0)
-                    Utils.open_online_account (captured.goa_id);
-                else
-                    Utils.open_online_accounts ();
-            });
 
             var firms = new Gtk.Button.with_label (_("Signatures")) {
                 valign = Gtk.Align.CENTER,
@@ -979,11 +1017,116 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
                 push_subpage (new SignatureListPage (captured, this.signatures));
             });
 
-            row.add_suffix (edit);
+            if (account.is_letter_identity) {
+                var edit = new Gtk.Button.with_label (_("Edit")) {
+                    valign = Gtk.Align.CENTER,
+                    tooltip_text = _("Change account label, sender name, or connection"),
+                };
+                edit.add_css_class ("flat");
+                edit.clicked.connect (() => open_identity_edit (captured));
+                row.add_suffix (edit);
+
+                var remove = new Gtk.Button.with_label (_("Remove")) {
+                    valign = Gtk.Align.CENTER,
+                    tooltip_text = _("Remove this Letter Identity account"),
+                };
+                remove.add_css_class ("flat");
+                remove.clicked.connect (() => confirm_remove_identity.begin (captured));
+                row.add_suffix (remove);
+            } else {
+                var edit = new Gtk.Button.with_label (_("Edit")) {
+                    valign = Gtk.Align.CENTER,
+                    tooltip_text = _("Open this account in GNOME Settings"),
+                };
+                edit.add_css_class ("flat");
+                edit.clicked.connect (() => {
+                    if (captured.goa_id != null && captured.goa_id.length > 0)
+                        Utils.open_online_account (captured.goa_id);
+                    else
+                        Utils.open_online_accounts ();
+                });
+                row.add_suffix (edit);
+            }
             row.add_suffix (firms);
             setup_account_row_dnd (row, handle, account);
             add_prefs_row (this.accounts_group, row);
             this.account_rows.add (row);
+        }
+    }
+
+    private async void apply_goa_preference (bool enabled) {
+        yield this.store.set_use_goa_accounts (enabled);
+        var app = this.host?.get_application () as Application;
+        if (app != null)
+            app.on_goa_preference_changed ();
+    }
+
+    private void open_identity_edit (Account account) {
+        var id = account.source_uid ?? account.uid;
+        if (id == null || id.length == 0)
+            return;
+        try {
+            var dialog = new IdentityEditDialog (id);
+            dialog.account_updated.connect (() => {
+                this.store.reload_identity ();
+                var app = this.host?.get_application () as Application;
+                if (app != null) {
+                    /* Account list + rail pick up the new display name. */
+                    foreach (var window in app.get_windows ()) {
+                        var mail = window as Window;
+                        mail?.on_accounts_changed_public ();
+                    }
+                }
+            });
+            dialog.present (this);
+        } catch (Error e) {
+            var err = new Adw.AlertDialog (_("Could not open account"), e.message);
+            err.add_response ("ok", _("OK"));
+            err.present (this);
+        }
+    }
+
+    private async void confirm_remove_identity (Account account) {
+        var id = account.source_uid ?? account.uid;
+        if (id == null || id.length == 0)
+            return;
+
+        var size = format_size (IdentityCatalog.local_library_bytes (id));
+        var dialog = new Adw.AlertDialog (
+            _("Remove “%s”?").printf (account.display_name),
+            _("This cannot be undone. Letter deletes the account and its sign-in secrets (password or OAuth tokens). Mail on the server is not deleted.\n\nLocal library on disk: %s.").printf (size)
+        );
+        dialog.add_response ("cancel", _("Cancel"));
+        dialog.add_response ("keep", _("Remove, keep cache"));
+        dialog.add_response ("wipe", _("Remove and delete cache"));
+        dialog.set_response_appearance ("wipe", Adw.ResponseAppearance.DESTRUCTIVE);
+        dialog.default_response = "cancel";
+        dialog.close_response = "cancel";
+
+        var response = yield dialog.choose (this, null);
+        if (response != "keep" && response != "wipe")
+            return;
+
+        var wipe = response == "wipe";
+        try {
+            IdentityCatalog.remove_account (id, wipe);
+            this.store.reload_identity ();
+
+            var app = this.host?.get_application () as Application;
+            if (app != null)
+                app.on_identity_account_removed ();
+
+            add_toast (new Adw.Toast (
+                wipe
+                    ? _("Account removed and local cache deleted")
+                    : _("Account removed (local cache kept)")
+            ) {
+                timeout = 4,
+            });
+        } catch (Error e) {
+            add_toast (new Adw.Toast (e.message) {
+                timeout = 6,
+            });
         }
     }
 

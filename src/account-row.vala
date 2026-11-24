@@ -19,6 +19,8 @@ public class Mail.AccountRow : Adw.ActionRow {
             add_suffix (service_icon ("x-office-calendar-symbolic", _("Calendar enabled")));
         if (this.account.has_contacts)
             add_suffix (service_icon ("avatar-default-symbolic", _("Address book enabled")));
+        if (this.account.is_letter_identity || this.account.has_goa)
+            add_suffix (Utils.account_provenance_image (this.account, 16));
         if (!this.account.has_mail)
             add_css_class ("account-offline");
     }
@@ -157,6 +159,7 @@ public class Mail.MessageRow : Gtk.Box {
     private ulong unread_id;
     private ulong flagged_id;
     private ulong important_id;
+    private ulong attachment_id;
 
     private GenericArray<string>? highlight_tokens;
 
@@ -284,6 +287,7 @@ public class Mail.MessageRow : Gtk.Box {
         this.unread_id = conversation.notify["unread"].connect (() => apply_conversation ());
         this.flagged_id = conversation.notify["flagged"].connect (() => apply_conversation ());
         this.important_id = conversation.notify["important"].connect (() => apply_conversation ());
+        this.attachment_id = conversation.notify["has-attachment"].connect (() => apply_conversation ());
     }
 
     public override void dispose () {
@@ -295,10 +299,12 @@ public class Mail.MessageRow : Gtk.Box {
         var unread = this.unread_id;
         var flagged = this.flagged_id;
         var important = this.important_id;
+        var attachment = this.attachment_id;
         var conversation = this.conversation;
         this.unread_id = 0;
         this.flagged_id = 0;
         this.important_id = 0;
+        this.attachment_id = 0;
         this.conversation = null;
         if (unread != 0 && conversation != null && SignalHandler.is_connected (conversation, unread))
             conversation.disconnect (unread);
@@ -306,6 +312,8 @@ public class Mail.MessageRow : Gtk.Box {
             conversation.disconnect (flagged);
         if (important != 0 && conversation != null && SignalHandler.is_connected (conversation, important))
             conversation.disconnect (important);
+        if (attachment != 0 && conversation != null && SignalHandler.is_connected (conversation, attachment))
+            conversation.disconnect (attachment);
     }
 
     public void apply_seen (bool seen) {

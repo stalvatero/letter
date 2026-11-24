@@ -77,6 +77,7 @@ test('rows', test_rows)
 test_important_cache = executable(
   'test-important-cache',
   [
+    meson.project_source_root() / 'src' / 'config.vapi',
     meson.project_source_root() / 'src' / 'account.vala',
     meson.project_source_root() / 'src' / 'header-list-policy.vala',
     'test-important-cache.vala',

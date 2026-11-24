@@ -1,17 +1,127 @@
+/**
+ * Aggregates AccountSource adapters into the UI ListStore.
+ * Phase 1: Letter Identity first, then optional GoaEds.
+ */
 public class Mail.AccountStore : Object {
     public ListStore items { get; default = new ListStore (typeof (Account)); }
     public uint calendar_count { get; private set; }
     public uint contact_count { get; private set; }
     public bool loaded { get; private set; }
     public string? error_message { get; private set; }
+    public bool using_goa { get; private set; }
 
-    public E.SourceRegistry? registry { get; private set; }
-    public Goa.Client? goa { get; private set; }
+    public E.SourceRegistry? registry {
+        get {
+            for (uint i = 0; i < this.sources.length; i++) {
+                if (this.sources[i].registry != null)
+                    return this.sources[i].registry;
+            }
+            return null;
+        }
+    }
+
+    /** GOA client when the optional GOA/EDS source is active (rail avatars). */
+    public Goa.Client? goa {
+        get {
+            for (uint i = 0; i < this.sources.length; i++) {
+                var src = this.sources[i] as GoaEdsAccountSource;
+                if (src != null)
+                    return src.goa;
+            }
+            return null;
+        }
+    }
 
     public signal void changed ();
 
-    private bool watching = false;
+    private GenericArray<AccountSource> sources;
+    private Settings? settings;
     private bool loading = false;
+
+    public AccountStore (Settings? settings = null) {
+        this.settings = settings;
+        this.sources = new GenericArray<AccountSource> ();
+        /* Letter Identity first so in-app accounts appear without GOA;
+         * GOA/EDS remains optional sibling and can enrich matching rows. */
+        add_source (new LetterIdentityAccountSource ());
+        sync_goa_source ();
+    }
+
+    /** Env LETTER_SKIP_GOA=1 always wins; else GSettings use-goa-accounts. */
+    public bool goa_preference_enabled () {
+        var skip = Environment.get_variable ("LETTER_SKIP_GOA");
+        if (skip != null && skip == "1")
+            return false;
+        if (this.settings != null)
+            return this.settings.get_boolean ("use-goa-accounts");
+        return true;
+    }
+
+    /**
+     * Toggle GOA/EDS as an account source. Persists to GSettings when set.
+     * Caller should rebind the mail backend after accounts reload.
+     */
+    public async void set_use_goa_accounts (bool enabled) {
+        if (this.settings != null) {
+            this.settings.set_boolean ("use-goa-accounts", enabled);
+            this.settings.set_boolean ("goa-accounts-prompted", true);
+        }
+        var had = this.using_goa;
+        sync_goa_source ();
+        if (this.using_goa && !had) {
+            for (uint i = 0; i < this.sources.length; i++) {
+                if (this.sources[i] is GoaEdsAccountSource)
+                    yield this.sources[i].load ();
+            }
+        }
+        this.loaded = true;
+        rebuild_and_notify ();
+    }
+
+    private void sync_goa_source () {
+        var want = goa_preference_enabled ();
+        GoaEdsAccountSource? goa = null;
+        for (uint i = 0; i < this.sources.length; i++) {
+            goa = this.sources[i] as GoaEdsAccountSource;
+            if (goa != null)
+                break;
+        }
+        if (want && goa == null) {
+            add_source (new GoaEdsAccountSource ());
+            this.using_goa = true;
+            message ("AccountStore: GOA/EDS source enabled");
+        } else if (!want && goa != null) {
+            for (uint i = 0; i < this.sources.length; i++) {
+                if (this.sources[i] == goa) {
+                    this.sources.remove_index (i);
+                    break;
+                }
+            }
+            this.using_goa = false;
+            message ("AccountStore: GOA/EDS source disabled");
+        } else {
+            this.using_goa = want && goa != null;
+            if (!want) {
+                var skip = Environment.get_variable ("LETTER_SKIP_GOA");
+                if (skip != null && skip == "1")
+                    message ("AccountStore: LETTER_SKIP_GOA=1 — GOA/EDS source disabled");
+            }
+        }
+    }
+
+    public void add_source (AccountSource source) {
+        this.sources.add (source);
+        source.changed.connect (rebuild_and_notify);
+    }
+
+    /** After the Identity wizard (or CLI) writes accounts.json + libsecret. */
+    public void reload_identity () {
+        for (uint i = 0; i < this.sources.length; i++) {
+            var src = this.sources[i] as LetterIdentityAccountSource;
+            if (src != null)
+                src.reload_from_disk ();
+        }
+    }
 
     public bool has_mail_accounts () {
         for (uint i = 0; i < this.items.get_n_items (); i++) {
@@ -37,48 +147,31 @@ public class Mail.AccountStore : Object {
         this.error_message = null;
 
         try {
-            try {
-                this.registry = yield new E.SourceRegistry (null);
-            } catch (Error e) {
-                warning ("Could not connect to Evolution Data Server: %s", e.message);
-                this.error_message = e.message;
-            }
+            for (uint i = 0; i < this.sources.length; i++)
+                yield this.sources[i].load ();
 
-            try {
-                this.goa = yield new Goa.Client (null);
-            } catch (Error e) {
-                warning ("Could not connect to GNOME Online Accounts: %s", e.message);
-                if (this.error_message == null)
-                    this.error_message = e.message;
-            }
-
+            collect_errors ();
             rebuild ();
             this.loaded = true;
             changed ();
-
-            if (!this.watching) {
-                this.watching = true;
-
-                if (this.registry != null) {
-                    this.registry.source_added.connect (() => rebuild_and_notify ());
-                    this.registry.source_removed.connect (() => rebuild_and_notify ());
-                    this.registry.source_changed.connect (() => rebuild_and_notify ());
-                    this.registry.source_enabled.connect (() => rebuild_and_notify ());
-                    this.registry.source_disabled.connect (() => rebuild_and_notify ());
-                }
-
-                if (this.goa != null) {
-                    this.goa.account_added.connect (() => rebuild_and_notify ());
-                    this.goa.account_removed.connect (() => rebuild_and_notify ());
-                    this.goa.account_changed.connect (() => rebuild_and_notify ());
-                }
-            }
         } finally {
             this.loading = false;
         }
     }
 
+    private void collect_errors () {
+        this.error_message = null;
+        for (uint i = 0; i < this.sources.length; i++) {
+            var err = this.sources[i].error_message;
+            if (err != null && err.length > 0) {
+                this.error_message = err;
+                break;
+            }
+        }
+    }
+
     private void rebuild_and_notify () {
+        collect_errors ();
         rebuild ();
         changed ();
     }
@@ -88,29 +181,18 @@ public class Mail.AccountStore : Object {
         this.calendar_count = 0;
         this.contact_count = 0;
 
-        if (this.registry != null) {
-            foreach (var source in this.registry.list_enabled (E.SOURCE_EXTENSION_CALENDAR)) {
-                if (!is_builtin (source))
-                    this.calendar_count++;
-            }
+        for (uint i = 0; i < this.sources.length; i++) {
+            var source = this.sources[i];
+            this.calendar_count += source.calendar_count;
+            this.contact_count += source.contact_count;
 
-            foreach (var source in this.registry.list_enabled (E.SOURCE_EXTENSION_ADDRESS_BOOK)) {
-                if (!is_builtin (source))
-                    this.contact_count++;
-            }
-        }
+            var primary = source.primary_accounts ();
+            for (uint j = 0; j < primary.length; j++)
+                add_or_merge (primary[j]);
 
-        if (this.goa != null) {
-            foreach (var object in this.goa.get_accounts ())
-                add_or_merge (account_from_goa (object));
-        }
-
-        if (this.registry != null) {
-            foreach (var source in this.registry.list_sources (E.SOURCE_EXTENSION_MAIL_ACCOUNT)) {
-                if (source.get_uid () == "vfolder")
-                    continue;
-                merge_into_existing (account_from_source (source));
-            }
+            var enrichment = source.enrichment_accounts ();
+            for (uint j = 0; j < enrichment.length; j++)
+                merge_into_existing (enrichment[j]);
         }
     }
 
@@ -165,12 +247,20 @@ public class Mail.AccountStore : Object {
         if (into.email == null)
             into.email = from.email;
 
+        /* Keep Letter Identity as the mail engine when the same address
+         * exists in GOA — RoutingMailBackend keys off letter-imap. */
+        var identity = into.is_letter_identity || from.is_letter_identity;
+
         if (from.provider_icon != null) {
-            into.has_mail = from.has_mail;
-            into.has_calendar = from.has_calendar;
-            into.has_contacts = from.has_contacts;
-            into.goa_id = from.goa_id;
-            into.kind = from.kind;
+            into.has_mail = from.has_mail || into.has_mail;
+            into.has_calendar = from.has_calendar || into.has_calendar;
+            into.has_contacts = from.has_contacts || into.has_contacts;
+            if (from.goa_id != null)
+                into.goa_id = from.goa_id;
+            if (!identity)
+                into.kind = from.kind;
+            else if (into.kind == AccountKind.OTHER || into.kind == AccountKind.IMAP)
+                into.kind = from.kind;
             into.provider_icon = from.provider_icon;
         } else if (into.provider_icon == null) {
             if (from.has_mail)
@@ -183,135 +273,23 @@ public class Mail.AccountStore : Object {
 
         if (into.source_uid == null)
             into.source_uid = from.source_uid;
+        else if (from.is_letter_identity && from.source_uid != null)
+            into.source_uid = from.source_uid;
 
         if (into.goa_id == null)
             into.goa_id = from.goa_id;
 
-        if (into.backend_name == null)
+        if (identity)
+            into.backend_name = "letter-imap";
+        else if (into.backend_name == null)
             into.backend_name = from.backend_name;
 
-        if (into.kind == AccountKind.OTHER || into.kind == AccountKind.IMAP)
+        if (!identity && (into.kind == AccountKind.OTHER || into.kind == AccountKind.IMAP))
             into.kind = from.kind;
 
         if (into.display_name == null || into.display_name == into.email) {
             if (from.display_name != null && from.display_name != from.email)
                 into.display_name = from.display_name;
         }
-    }
-
-    private Account? account_from_source (E.Source source) {
-        var mail_account = (E.SourceMailAccount) source.get_extension (E.SOURCE_EXTENSION_MAIL_ACCOUNT);
-        var backend_name = mail_account.dup_backend_name ();
-        if (mail_account.get_builtin () || backend_name == "maildir"
-            || backend_name == "mbox" || backend_name == "local")
-            return null;
-
-        var account = new Account () {
-            uid = source.get_uid (),
-            source_uid = source.get_uid (),
-            display_name = source.dup_display_name (),
-            enabled = source.get_enabled (),
-            has_mail = source.get_enabled (),
-            backend_name = backend_name,
-        };
-
-        var identity_uid = mail_account.dup_identity_uid ();
-        if (identity_uid != null && this.registry != null) {
-            var identity_source = this.registry.ref_source (identity_uid);
-            if (identity_source != null && identity_source.has_extension (E.SOURCE_EXTENSION_MAIL_IDENTITY)) {
-                var identity = (E.SourceMailIdentity) identity_source.get_extension (E.SOURCE_EXTENSION_MAIL_IDENTITY);
-                account.email = identity.dup_address ();
-                var name = identity.dup_name ();
-                if (name != null && name.length > 0)
-                    account.display_name = name;
-            }
-        }
-
-        string? goa_type = null;
-        apply_goa_extension (source, account);
-        var parent_uid = source.get_parent ();
-        if (parent_uid != null && this.registry != null) {
-            var parent = this.registry.ref_source (parent_uid);
-            if (parent != null) {
-                apply_goa_extension (parent, account);
-                if (parent.has_extension (E.SOURCE_EXTENSION_COLLECTION)) {
-                    var collection = (E.SourceCollection) parent.get_extension (E.SOURCE_EXTENSION_COLLECTION);
-                    account.has_calendar = collection.get_calendar_enabled ();
-                    account.has_contacts = collection.get_contacts_enabled ();
-                    goa_type = parent.dup_display_name ();
-                    var identity = collection.dup_identity ();
-                    if (identity != null && account.goa_id == null)
-                        account.goa_id = identity;
-                }
-            }
-        }
-
-        account.kind = AccountKind.from_provider (goa_type, account.backend_name);
-        return account;
-    }
-
-    private Account? account_from_goa (Goa.Object object) {
-        var goa_account = object.get_account ();
-        if (goa_account == null)
-            return null;
-
-        var mail = object.get_mail ();
-        if (mail == null && !goa_is_mail_provider (goa_account.provider_type))
-            return null;
-
-        var email = (mail != null ? mail.email_address : null) ?? goa_account.identity;
-        var presentation = goa_account.presentation_identity;
-        var display = presentation;
-        if (display == null || display.length == 0 || (email != null && display == email))
-            display = email ?? AccountKind.from_provider (goa_account.provider_type, null).label ();
-        var account = new Account () {
-            uid = goa_account.id,
-            goa_id = goa_account.id,
-            display_name = display,
-            email = email,
-            kind = AccountKind.from_provider (goa_account.provider_type, null),
-            provider_icon = goa_account.provider_icon,
-            has_mail = mail != null && !goa_account.mail_disabled,
-            has_calendar = object.get_calendar () != null && !goa_account.calendar_disabled,
-            has_contacts = object.get_contacts () != null && !goa_account.contacts_disabled,
-            enabled = !goa_account.attention_needed,
-        };
-
-        return account;
-    }
-
-    private void apply_goa_extension (E.Source source, Account account) {
-        if (!source.has_extension (E.SOURCE_EXTENSION_GOA))
-            return;
-
-        var ext = (E.SourceGoa) source.get_extension (E.SOURCE_EXTENSION_GOA);
-        var id = ext.dup_account_id ();
-        if (id != null && id.length > 0)
-            account.goa_id = id;
-        var address = ext.dup_address ();
-        if (account.email == null && address != null && address.length > 0)
-            account.email = address;
-        var name = ext.dup_name ();
-        if (name != null && name.length > 0 && (account.display_name == null || account.display_name == account.email))
-            account.display_name = name;
-    }
-
-    private static bool goa_is_mail_provider (string? provider_type) {
-        var type = (provider_type ?? "").down ();
-        return type == "google"
-            || type == "ms_graph"
-            || type == "exchange"
-            || type == "imap_smtp"
-            || type == "windows_live"
-            || type.contains ("microsoft");
-    }
-
-    private static bool is_builtin (E.Source source) {
-        if (source.has_extension (E.SOURCE_EXTENSION_MAIL_ACCOUNT)) {
-            var mail = (E.SourceMailAccount) source.get_extension (E.SOURCE_EXTENSION_MAIL_ACCOUNT);
-            return mail.get_builtin ();
-        }
-
-        return false;
     }
 }

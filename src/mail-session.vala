@@ -6,7 +6,11 @@ private class Mail.FolderWatch : Object {
     public uint idle;
 }
 
-public class Mail.MailSession : Camel.Session {
+/**
+ * Camel MailBackend adapter. Prefer MailBackend.open() at call sites.
+ * Static disk helpers/constants stay here until extracted from Camel.
+ */
+public class Mail.MailSession : Camel.Session, MailBackend {
     public E.SourceRegistry registry { get; construct; }
 
     private E.CredentialsPrompter prompter;
@@ -75,13 +79,7 @@ public class Mail.MailSession : Camel.Session {
         }
     }
 
-    public signal void folder_changed (string account_key, string folder_name);
-    public signal void send_starting ();
-    public signal void send_finished ();
-    public signal void message_sent (Account account, Message? sent);
-    public signal void draft_saved (Account account, Message? draft, string? replaced_uid);
-    public signal void draft_removed (Account account, Folder folder, string uid);
-    public signal void transfer_failed (Account account, Folder from, GenericArray<string> uids, string error);
+    /* Signals come from MailBackend. */
 
     public MailSession (E.SourceRegistry registry) {
         var data = Path.build_filename (Environment.get_user_data_dir (), "letter", "mail");
@@ -468,6 +466,74 @@ public class Mail.MailSession : Camel.Session {
         return nodes;
     }
 
+    /**
+     * Build the same sidebar tree Camel list_folders produces: nest by `/`,
+     * lift Gmail specials to the root, sort by FolderKind.sort_rank, flatten.
+     * Used by ImapMailBackend (no Camel FolderInfo).
+     */
+    public static GenericArray<Folder> folders_from_imap_paths (GenericArray<string> paths) {
+        var roots = folder_nodes_from_paths (paths);
+        reshape_gmail_tree (roots);
+        sort_folder_nodes (roots);
+        var folders = new GenericArray<Folder> ();
+        flatten_folder_nodes (roots, 0, folders, false, false);
+        return folders;
+    }
+
+    private static GenericArray<FolderNode> folder_nodes_from_paths (GenericArray<string> paths) {
+        var roots = new GenericArray<FolderNode> ();
+        var by_full = new HashTable<string, FolderNode> (str_hash, str_equal);
+
+        for (uint i = 0; i < paths.length; i++) {
+            var full = paths[i];
+            if (full == null || full.length == 0)
+                continue;
+            ensure_folder_node_path (full, roots, by_full);
+        }
+        return roots;
+    }
+
+    private static FolderNode ensure_folder_node_path (
+        string full,
+        GenericArray<FolderNode> roots,
+        HashTable<string, FolderNode> by_full
+    ) {
+        var existing = by_full.get (full);
+        if (existing != null)
+            return existing;
+
+        var slash = full.last_index_of_char ('/');
+        FolderNode? parent = null;
+        string leaf;
+        if (slash < 0) {
+            leaf = full;
+        } else {
+            var parent_path = full.substring (0, slash);
+            parent = ensure_folder_node_path (parent_path, roots, by_full);
+            leaf = full.substring (slash + 1);
+        }
+
+        var node = new FolderNode ();
+        node.folder = new Folder () {
+            name = leaf,
+            full_name = full,
+            unread = 0,
+            total = 0,
+            flags = 0,
+            has_children = false,
+        };
+        apply_folder_display_name (node.folder);
+        by_full.set (full, node);
+
+        if (parent != null) {
+            parent.folder.has_children = true;
+            parent.children.add (node);
+        } else {
+            roots.add (node);
+        }
+        return node;
+    }
+
     /* Map well-known folders to the UI locale. Gmail/EDS often ship display
      * names in the account language; cached trees may also freeze an older
      * locale — call this whenever a Folder is shown, not only on Camel list. */
@@ -635,17 +701,30 @@ public class Mail.MailSession : Camel.Session {
         }
     }
 
-    /* Set by list_messages when refresh_info hit its time budget mid-way. */
-    public bool last_list_refresh_incomplete { get; private set; }
-    /* Graph refresh_info threw a non-cancel error (socket timeout, etc.). */
-    public bool last_list_refresh_failed { get; private set; }
-    /* Camel UID summary shrank past INCOMPLETE_REFRESH_SHRINK_MAX this refresh. */
-    public bool last_list_refresh_rewound { get; private set; }
-    /* refresh_info ran and returned. Skipped, timed out, and failed walks stay false. */
-    public bool last_list_refresh_completed { get; private set; }
+    /* Get-only for MailBackend; assignments use the private fields. */
+    public bool last_list_refresh_incomplete {
+        get { return this._last_list_refresh_incomplete; }
+    }
+    public bool last_list_refresh_failed {
+        get { return this._last_list_refresh_failed; }
+    }
+    public bool last_list_refresh_rewound {
+        get { return this._last_list_refresh_rewound; }
+    }
+    public bool last_list_refresh_completed {
+        get { return this._last_list_refresh_completed; }
+    }
     /* Finished walk and Camel’s UID summary was already near Letter’s list —
      * safe to accept a catastrophic shrink in the window cache. */
-    public bool last_list_refresh_authoritative { get; private set; }
+    public bool last_list_refresh_authoritative {
+        get { return this._last_list_refresh_authoritative; }
+    }
+
+    private bool _last_list_refresh_incomplete;
+    private bool _last_list_refresh_failed;
+    private bool _last_list_refresh_rewound;
+    private bool _last_list_refresh_completed;
+    private bool _last_list_refresh_authoritative;
 
     public async GenericArray<Message> list_messages (
         Account account,
@@ -666,10 +745,10 @@ public class Mail.MailSession : Camel.Session {
         if (watch)
             watch_camel_folder (account, folder, camel_folder);
 
-        this.last_list_refresh_failed = false;
-        this.last_list_refresh_rewound = false;
-        this.last_list_refresh_completed = false;
-        this.last_list_refresh_authoritative = false;
+        this._last_list_refresh_failed = false;
+        this._last_list_refresh_rewound = false;
+        this._last_list_refresh_completed = false;
+        this._last_list_refresh_authoritative = false;
         var refresh_completed = true;
         var refresh_performed = false;
         /* Camel UID count before Graph/IMAP refresh_info — used so a “finished”
@@ -687,15 +766,15 @@ public class Mail.MailSession : Camel.Session {
                 refresh_timeout_seconds
             );
         }
-        this.last_list_refresh_incomplete = refresh && !refresh_completed;
+        this._last_list_refresh_incomplete = refresh && !refresh_completed;
         /* Pending flags and REFRESH_INFO_SKIP leave refresh_completed true
          * without talking to the server. That must not count as finished. */
         var server_refresh_finished = refresh_performed
             && refresh_completed
             && !this.last_list_refresh_failed;
-        this.last_list_refresh_completed = server_refresh_finished;
+        this._last_list_refresh_completed = server_refresh_finished;
         var letter_n = previous != null ? previous.length : 0;
-        this.last_list_refresh_authoritative = server_refresh_finished
+        this._last_list_refresh_authoritative = server_refresh_finished
             && HeaderListPolicy.camel_summary_caught_up (letter_n, camel_uids_before);
 
         if (cancellable != null && cancellable.is_cancelled ())
@@ -775,7 +854,7 @@ public class Mail.MailSession : Camel.Session {
                  * list must not pin the startup cursor on this folder, or
                  * Inbox is skipped on every later launch. */
                 if (!refresh_completed)
-                    this.last_list_refresh_incomplete = true;
+                    this._last_list_refresh_incomplete = true;
             } else if (reason == "complete empty"
                 || reason == "small-folder trust shrink"
                 || reason == "complete Important"
@@ -1212,6 +1291,32 @@ public class Mail.MailSession : Camel.Session {
             if (decoded != null && decoded.length > 0)
                 text = decoded;
         }
+        return hash_message_id_raw (text);
+    }
+
+    public static uint64[] msgid_refs_from_raw_headers (string? in_reply_to, string? references) {
+        return hashes_from_id_headers (in_reply_to, references);
+    }
+
+    public static string? conversation_key_from_raw_headers (
+        string? conversation_id,
+        string? gm_thrid,
+        string? thread_index
+    ) {
+        return conversation_key_from_headers (conversation_id, gm_thrid, thread_index);
+    }
+
+    /** Camel-free Message-ID hash for ImapMailBackend (same MD5 truncation). */
+    public static uint64 hash_message_id_raw (string? message_id) {
+        if (message_id == null)
+            return 0;
+        var text = message_id.strip ();
+        if (text.length == 0)
+            return 0;
+        var lt = text.index_of_char ('<');
+        var gt = text.index_of_char ('>');
+        if (lt >= 0 && gt > lt)
+            text = text.substring (lt, gt - lt + 1);
         if (text.length == 0)
             return 0;
 
@@ -1249,6 +1354,17 @@ public class Mail.MailSession : Camel.Session {
         } finally {
             leave_camel (false);
         }
+    }
+
+    public bool peek_folder_remote_counts (
+        Account account,
+        Folder folder,
+        out int total,
+        out int unread
+    ) {
+        total = -1;
+        unread = -1;
+        return false;
     }
 
     public async bool remote_counts_differ (
@@ -1559,7 +1675,7 @@ public class Mail.MailSession : Camel.Session {
             completed = !timed_out;
             var uids_after = folder_list_uids (camel_folder).length;
             if (uids_after + INCOMPLETE_REFRESH_SHRINK_MAX < uids_before)
-                this.last_list_refresh_rewound = true;
+                this._last_list_refresh_rewound = true;
             Utils.sync_log ("Camel refresh_info “%s” %s %s (uids %u→%u%s)".printf (
                 name,
                 high ? "HIGH" : "LOW",
@@ -1589,7 +1705,7 @@ public class Mail.MailSession : Camel.Session {
         } catch (Error e) {
             var uids_after = folder_list_uids (camel_folder).length;
             if (uids_after + INCOMPLETE_REFRESH_SHRINK_MAX < uids_before)
-                this.last_list_refresh_rewound = true;
+                this._last_list_refresh_rewound = true;
             if (e is IOError.CANCELLED) {
                 Utils.sync_log ("Camel refresh_info CANCELLED%s (uids %u→%u)".printf (
                     timed_out
@@ -1610,7 +1726,7 @@ public class Mail.MailSession : Camel.Session {
                     );
                 }
             } else {
-                this.last_list_refresh_failed = true;
+                this._last_list_refresh_failed = true;
                 Utils.sync_log ("Camel refresh_info FAILED: %s".printf (e.message));
                 warning ("Could not refresh folder: %s", e.message);
             }
@@ -6133,6 +6249,9 @@ public class Mail.MailSession : Camel.Session {
         var uid = account.source_uid;
         if (uid == null || uid.length == 0)
             return 0;
+
+        if (account.backend_name == "letter-imap")
+            return IdentityCatalog.local_library_bytes (uid);
 
         return directory_size (Path.build_filename (mail_cache_root (), uid))
             + directory_size (Path.build_filename (mail_data_root (), uid));

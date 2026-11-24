@@ -2,7 +2,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
     private const int64 MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
     private Settings settings;
-    private MailSession session;
+    private MailBackend session;
     private SignatureStore signature_store;
     private GenericArray<Account> accounts = new GenericArray<Account> ();
     private Gtk.DropDown? from_drop;
@@ -64,7 +64,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
 
     public ComposeWindow (
         Gtk.Application app,
-        MailSession session,
+        MailBackend session,
         AccountStore store,
         Account? selected,
         string? to = null,
@@ -94,6 +94,8 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         this.editing_draft = editing_draft;
         this.editing_draft_folder = editing_draft_folder;
         this.editing_draft_account = selected;
+        /* Promote local-draft-* → server UID must update replace_uid for the next save. */
+        this.session.draft_saved.connect (on_session_draft_saved);
         var edit_body = resend || editing;
         this.reply_of = (!forward_quote && !edit_body) ? quoted : null;
         this.thread_of = thread_parent_for_compose (quoted, forward_quote, edit_body, editing);
@@ -311,6 +313,26 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         if (!this.send_button.sensitive || this.sending)
             return;
         send.begin ();
+    }
+
+    private void disconnect_draft_signals () {
+        this.session.draft_saved.disconnect (on_session_draft_saved);
+    }
+
+    private void on_session_draft_saved (Account account, Message? draft, string? replaced_uid) {
+        if (draft == null || this.editing_draft == null || replaced_uid == null)
+            return;
+        if (this.editing_draft.uid != replaced_uid)
+            return;
+        if (this.editing_draft_account != null
+            && account.uid != this.editing_draft_account.uid
+            && (account.source_uid ?? "") != (this.editing_draft_account.source_uid ?? ""))
+            return;
+        this.editing_draft = draft;
+        if (this.editing_draft_folder != null) {
+            draft.folder_full_name = this.editing_draft_folder.full_name;
+            draft.folder_name = this.editing_draft_folder.name;
+        }
     }
 
     public void adopt_compose_id (string id) {
@@ -628,8 +650,10 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
 
     private bool on_close_request () {
         persist_size ();
-        if (this.force_close)
+        if (this.force_close) {
+            disconnect_draft_signals ();
             return false;
+        }
 
         if (this.prompting) {
             present_for_attention ();
@@ -662,7 +686,13 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
 
         if (response == "save") {
             try {
-                yield save_draft ();
+                var saved = yield save_draft ();
+                if (!saved) {
+                    this.toast_overlay.add_toast (new Adw.Toast (_("Nothing to save yet.")) {
+                        timeout = 3,
+                    });
+                    return;
+                }
                 this.force_close = true;
                 close ();
             } catch (Error e) {
@@ -677,11 +707,11 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         }
     }
 
-    private async void save_draft () throws Error {
-        yield save_draft_to_folder ();
+    private async bool save_draft () throws Error {
+        return yield save_draft_to_folder ();
     }
 
-    private async void save_draft_to_folder () throws Error {
+    private async bool save_draft_to_folder () throws Error {
         while (this.draft_save_in_progress) {
             this.draft_save_queued = true;
             Timeout.add (50, save_draft_to_folder.callback);
@@ -689,17 +719,20 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         }
 
         this.draft_save_in_progress = true;
+        var any = false;
         try {
             do {
                 this.draft_save_queued = false;
-                yield save_draft_to_folder_once ();
+                if (yield save_draft_to_folder_once ())
+                    any = true;
             } while (this.draft_save_queued);
         } finally {
             this.draft_save_in_progress = false;
         }
+        return any;
     }
 
-    private async void save_draft_to_folder_once () throws Error {
+    private async bool save_draft_to_folder_once () throws Error {
         var account = selected_account ();
         if (account == null) {
             throw new IOError.FAILED (_("This account has no sending identity."));
@@ -712,7 +745,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         string html;
         yield this.body_view.get_bodies (out plain, out html);
         if (!has_draft_worthy_content (plain))
-            return;
+            return false;
 
         Folder? drafts_folder;
         var replace_uid = this.editing_draft?.uid;
@@ -735,10 +768,11 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
             out drafts_folder
         );
         if (saved == null)
-            return;
+            return false;
         yield finish_editing_draft (account, saved, drafts_folder);
         this.body_mutated = false;
         yield remember_clean_state ();
+        return true;
     }
 
     private async void remember_clean_state () {
@@ -756,8 +790,10 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
 
     private async void save_draft_now () {
         try {
-            yield save_draft ();
-            this.toast_overlay.add_toast (new Adw.Toast (_("Saved to Drafts")) {
+            var saved = yield save_draft ();
+            this.toast_overlay.add_toast (new Adw.Toast (
+                saved ? _("Saved to Drafts") : _("Nothing to save yet.")
+            ) {
                 timeout = 3,
             });
         } catch (Error e) {

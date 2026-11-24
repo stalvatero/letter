@@ -8,8 +8,11 @@ public class Mail.WelcomeTour : Object {
     private Gtk.Button next_button;
     private Gtk.Button accounts_button;
     private uint page_index;
+    private bool skip_goa;
 
     public WelcomeTour () {
+        this.skip_goa = Environment.get_variable ("LETTER_SKIP_GOA") == "1";
+
         this.carousel = new Adw.Carousel () {
             hexpand = true,
             vexpand = true,
@@ -19,25 +22,35 @@ public class Mail.WelcomeTour : Object {
         this.carousel.append (status_page (
             "mail-unread-symbolic",
             _("Welcome to Letter"),
-            _("Letter is the email application designed for the GNOME desktop and integrates with Calendar and Contacts. It uses the same accounts you already have: Google, Microsoft 365, Exchange, IMAP.")
+            _("Letter is the email application designed for the GNOME desktop and integrates with Calendar and Contacts. Add Google, Microsoft 365, or IMAP from inside Letter.")
         ));
         this.carousel.append (status_page (
             "computer-symbolic",
             _("One experience, one interface"),
-            _("Sign-in stays in Online Accounts in GNOME Settings. Evolution Data Server handles the mail flow. Letter uses the GTK 4 and libadwaita libraries, so GNOME 50 or later is required for it to work correctly.")
+            _("Letter uses GTK 4 and libadwaita. GNOME 50 or later is recommended. Mail accounts can live in Letter Identity or, on GNOME, beside Online Accounts.")
         ));
+
+        string needs_body;
+        string button_label;
+        if (this.skip_goa) {
+            needs_body = _("No mail accounts yet. Add an IMAP mailbox in Letter (Fastmail, mailbox.org, ISP, …). Gmail and Outlook use Sign in with Google / Microsoft — coming next.");
+            button_label = _("Add Account");
+        } else {
+            needs_body = _("Add at least one mail account. Prefer Add Account in Letter; on GNOME you can also use Settings → Online Accounts. Microsoft 365 may need the evolution-ews package.");
+            button_label = _("Add Account");
+        }
         var needs = status_page (
             "preferences-system-symbolic",
             _("What Letter needs"),
-            _("Add at least one mail account in Settings → Online Accounts. IMAP is added there too. Microsoft 365 also needs the evolution-ews package. Without Online Accounts, Letter has nothing to show — by design.")
+            needs_body
         );
-        this.accounts_button = new Gtk.Button.with_label (_("Online Accounts")) {
+        this.accounts_button = new Gtk.Button.with_label (button_label) {
             halign = Gtk.Align.CENTER,
             focusable = false,
         };
         this.accounts_button.add_css_class ("pill");
         this.accounts_button.add_css_class ("suggested-action");
-        this.accounts_button.clicked.connect (() => Utils.open_online_accounts ());
+        this.accounts_button.clicked.connect (open_add_account);
         needs.child = this.accounts_button;
         this.carousel.append (needs);
         this.carousel.page_changed.connect ((index) => {
@@ -101,6 +114,14 @@ public class Mail.WelcomeTour : Object {
         this.accounts_button.focusable = last;
     }
 
+    private void open_add_account () {
+        var app = GLib.Application.get_default ();
+        if (app != null)
+            app.activate_action ("add-mail-account", null);
+        else
+            Utils.open_online_accounts ();
+    }
+
     private void go_back () {
         if (this.page_index == 0)
             return;
@@ -109,7 +130,7 @@ public class Mail.WelcomeTour : Object {
 
     private void go_next () {
         if (this.page_index + 1 >= this.carousel.n_pages) {
-            Utils.open_online_accounts ();
+            open_add_account ();
             finished ();
             return;
         }

@@ -155,6 +155,15 @@
   border-radius: 10px;
 }
 
+.account-provenance-goa {
+  margin-left: 2px;
+  color: var(--accent-color);
+}
+
+.account-provenance-letter {
+  margin-left: 2px;
+}
+
 .account-goa-hint {
   padding: 12px 14px;
   border-radius: 14px;

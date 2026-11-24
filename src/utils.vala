@@ -2858,17 +2858,75 @@ namespace Mail.Utils {
             try {
                 image = new Gtk.Image.from_gicon (Icon.new_for_string (account.provider_icon));
             } catch (Error e) {
-                image = new Gtk.Image.from_icon_name (account.kind.icon_name ());
+                image = new Gtk.Image.from_icon_name (resolve_account_icon_name (account));
             }
         } else {
-            image = new Gtk.Image.from_icon_name (account.kind.icon_name ());
+            image = new Gtk.Image.from_icon_name (resolve_account_icon_name (account));
         }
         image.pixel_size = pixel_size;
         return image;
     }
 
+    private const string LETTER_APP_ICON_RESOURCE = "/io/github/stalvatero/Letter/icons/app.svg";
+
+    /** Small Letter app icon (from GResource) or GNOME foot (sidebar + Preferences). */
+    public static Gtk.Image account_provenance_image (Account account, int pixel_size = 16) {
+        Gtk.Image image;
+        if (account.is_letter_identity) {
+            /* Always the real app artwork — do not fall back to theme names
+             * (missing hicolor → second envelope / network glyph). */
+            try {
+                var file = File.new_for_uri ("resource://" + LETTER_APP_ICON_RESOURCE);
+                var paintable = new Gtk.IconPaintable.for_file (file, pixel_size, 1);
+                image = new Gtk.Image.from_paintable (paintable);
+            } catch (Error e) {
+                warning ("Letter app icon resource: %s", e.message);
+                image = new Gtk.Image.from_icon_name (Config.APP_ID);
+            }
+            image.add_css_class ("account-provenance-letter");
+        } else {
+            var name = "start-here-symbolic";
+            var display = Gdk.Display.get_default ();
+            if (display != null) {
+                var theme = Gtk.IconTheme.get_for_display (display);
+                if (!theme.has_icon (name))
+                    name = "network-workgroup-symbolic";
+            }
+            image = new Gtk.Image.from_icon_name (name);
+            image.add_css_class ("account-provenance-goa");
+        }
+        image.pixel_size = pixel_size;
+        image.tooltip_text = account.provenance_tooltip;
+        image.valign = Gtk.Align.CENTER;
+        return image;
+    }
+
+    /** Prefer provider brand icons when the theme has them; else a mail glyph. */
+    public static string resolve_account_icon_name (Account account) {
+        var name = account.kind.icon_name ();
+        var display = Gdk.Display.get_default ();
+        if (display != null) {
+            var theme = Gtk.IconTheme.get_for_display (display);
+            if (theme.has_icon (name))
+                return name;
+            if (account.kind == AccountKind.GOOGLE && theme.has_icon ("goa-account-google"))
+                return "goa-account-google";
+            if ((account.kind == AccountKind.MICROSOFT || account.kind == AccountKind.EXCHANGE)
+                && theme.has_icon ("goa-account-ms365"))
+                return "goa-account-ms365";
+        }
+        return "mail-unread-symbolic";
+    }
+
     public static bool is_sendable (Account account) {
-        return account.kind != AccountKind.LOCAL && account.source_uid != null && account.has_mail;
+        if (account.kind == AccountKind.LOCAL || !account.has_mail)
+            return false;
+        /* GOA/EDS rows use source_uid; Letter Identity may only have uid. */
+        if (account.source_uid != null && account.source_uid.length > 0)
+            return true;
+        return account.backend_name == "letter-imap"
+            && account.uid != null
+            && account.uid.length > 0;
     }
 
     public static bool is_cancelled_error (Error error) {

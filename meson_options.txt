@@ -5,3 +5,24 @@ option(
   value: 'development',
   description: 'Build with a development application ID and styling',
 )
+
+option(
+  'imap_spike',
+  type: 'boolean',
+  value: true,
+  description: 'Build standalone IMAP spike (no Camel; Platform exploration)',
+)
+
+option(
+  'graph_spike',
+  type: 'boolean',
+  value: true,
+  description: 'Build standalone Graph+PKCE spike (no Camel/evolution-ews)',
+)
+
+option(
+  'identity_spike',
+  type: 'boolean',
+  value: true,
+  description: 'Build Identity catalog CLI spike (disk + libsecret)',
+)

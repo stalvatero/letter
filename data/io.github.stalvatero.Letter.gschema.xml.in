@@ -207,6 +207,17 @@
       <description>Whether the first-run welcome has been dismissed.</description>
     </key>
 
+    <key name="use-goa-accounts" type="b">
+      <default>true</default>
+      <summary>Use GNOME Online Accounts</summary>
+      <description>When enabled, Letter lists GNOME Online Accounts alongside Letter Identity. Disable to use only in-app Identity accounts. LETTER_SKIP_GOA=1 always disables GOA.</description>
+    </key>
+    <key name="goa-accounts-prompted" type="b">
+      <default>false</default>
+      <summary>GOA accounts prompt shown</summary>
+      <description>Whether the user has answered the first-run question about using GNOME Online Accounts.</description>
+    </key>
+
     <key name="settings-migrated" type="b">
       <default>false</default>
       <summary>Settings migrated</summary>

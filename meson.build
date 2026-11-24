@@ -46,6 +46,7 @@ webkit_dep = dependency('webkitgtk-6.0', version: '>= 2.44')
 gsound_dep = dependency('gsound', version: '>= 1.0')
 soup_dep = dependency('libsoup-3.0', version: '>= 3.0')
 json_glib_dep = dependency('json-glib-1.0', version: '>= 1.6')
+libsecret_dep = dependency('libsecret-1', version: '>= 0.20')
 gnutls_dep = dependency('gnutls', version: '>= 3.6')
 tls_issuer_dep = declare_dependency(
   sources: files('src/tls-issuer.c'),
@@ -95,6 +96,7 @@ mail_deps = [
   gsound_dep,
   soup_dep,
   json_glib_dep,
+  libsecret_dep,
   tls_issuer_dep,
 ]
 
@@ -138,6 +140,18 @@ subdir('data')
 subdir('src')
 subdir('po')
 subdir('tests')
+
+if get_option('imap_spike')
+  subdir('spikes/imap')
+endif
+
+if get_option('graph_spike')
+  subdir('spikes/graph')
+endif
+
+if get_option('identity_spike')
+  subdir('spikes/identity')
+endif
 
 meson.add_devenv({
   'GSETTINGS_SCHEMA_DIR': meson.project_build_root() / 'data',
