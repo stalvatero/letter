@@ -142,6 +142,9 @@ public class Mail.FolderRow : Gtk.ListBoxRow {
 public class Mail.MessageRow : Gtk.Box {
     public Conversation? conversation { get; private set; }
     public uint list_position { get; set; default = Gtk.INVALID_LIST_POSITION; }
+    /* In a person's view the sender is known: the subject takes the top line
+     * and the preview gets two. */
+    public bool hide_sender { get; set; }
     public signal void mark_read_clicked ();
 
     private Gtk.Box unread_indicator;
@@ -260,6 +263,7 @@ public class Mail.MessageRow : Gtk.Box {
             hexpand = true,
             xalign = 0,
             ellipsize = Pango.EllipsizeMode.END,
+            wrap_mode = Pango.WrapMode.WORD_CHAR,
             use_markup = false,
         };
         this.preview_label.add_css_class ("message-preview");
@@ -328,9 +332,12 @@ public class Mail.MessageRow : Gtk.Box {
             return;
 
         var latest = conversation.latest;
-        set_highlighted (this.from_label, conversation.participants);
+        set_highlighted (this.from_label, this.hide_sender ? conversation.subject : conversation.participants);
         this.date_label.label = Utils.format_message_date (conversation.date);
         set_highlighted (this.subject_label, conversation.subject);
+        this.subject_label.visible = !this.hide_sender;
+        this.preview_label.wrap = this.hide_sender;
+        this.preview_label.lines = this.hide_sender ? 2 : -1;
         this.attachment_icon.visible = conversation.has_attachment;
         this.bookmark_icon.visible = conversation.flagged;
         this.important_icon.visible = conversation.important;
