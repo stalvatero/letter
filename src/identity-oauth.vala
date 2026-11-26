@@ -1038,6 +1038,7 @@ public class Mail.IdentityOAuth : Object {
 
     /** Browser page after OAuth redirect — gettext so it follows the UI locale. */
     private static string oauth_success_html () {
+        var lang = oauth_html_lang ();
         var title = Markup.escape_text (_("Signed in"));
         var heading = Markup.escape_text (_("Letter"));
         var message = Markup.escape_text (
@@ -1046,7 +1047,7 @@ public class Mail.IdentityOAuth : Object {
         /* Inline app icon (same mark as data/icons/…/Letter.svg). */
         const string ICON = """<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 128 128" aria-hidden="true"><rect x="8" y="8" width="112" height="112" rx="24" fill="#1a5fb4"/><g transform="translate(8 8) scale(0.875)"><rect x="22" y="30" width="84" height="68" rx="8" fill="#f6f5f4"/><path d="M22 38.5 L64 68 L106 38.5" fill="none" stroke="#1a5fb4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="32" y="78" width="6" height="10" rx="1.5" fill="#9a9996"/><rect x="42" y="78" width="28" height="4" rx="2" fill="#9a9996"/><rect x="32" y="88" width="52" height="4" rx="2" fill="#c0bfbc"/></g></svg>""";
         return """<!DOCTYPE html>
-<html lang="">
+<html lang="%s">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -1118,6 +1119,17 @@ public class Mail.IdentityOAuth : Object {
     <p>%s</p>
   </main>
 </body>
-</html>""".printf (heading, title, ICON, heading, message);
+</html>""".printf (lang, heading, title, ICON, heading, message);
+    }
+
+    private static string oauth_html_lang () {
+        var loc = Intl.setlocale (LocaleCategory.MESSAGES, null);
+        if (loc == null || loc.length == 0 || loc == "C" || loc.has_prefix ("C."))
+            return "en";
+        var base = loc.split (".")[0];
+        var parts = base.split ("_");
+        if (parts.length == 0 || parts[0].length == 0)
+            return "en";
+        return parts[0].down ();
     }
 }

@@ -84,6 +84,9 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
         list.append (microsoft);
         list.append (imap);
 
+        var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
+        box.append (list);
+
         var hint = new Gtk.Label (
             _("Google and Microsoft open your browser to sign in. IMAP is for hosts with a normal password (or app password).")
         ) {
@@ -91,14 +94,36 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
             justify = Gtk.Justification.CENTER,
             margin_start = 24,
             margin_end = 24,
-            margin_bottom = 18,
+            margin_top = 12,
+            margin_bottom = 12,
         };
         hint.add_css_class ("dim-label");
         hint.add_css_class ("caption");
-
-        var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
-        box.append (list);
         box.append (hint);
+
+        if (Environment.get_variable ("LETTER_SKIP_GOA") != "1"
+            && Utils.has_gnome_online_accounts ()) {
+            var goa_list = new Gtk.ListBox () {
+                selection_mode = Gtk.SelectionMode.NONE,
+                margin_top = 0,
+                margin_bottom = 18,
+                margin_start = 12,
+                margin_end = 12,
+            };
+            goa_list.add_css_class ("boxed-list");
+            var goa = new Adw.ActionRow () {
+                title = _("Or open GNOME Online Accounts"),
+                subtitle = _("Add mail in Settings — Calendar and Contacts stay shared on GNOME"),
+                activatable = true,
+            };
+            goa.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            goa.activated.connect (() => {
+                Utils.open_online_accounts ();
+                close ();
+            });
+            goa_list.append (goa);
+            box.append (goa_list);
+        }
 
         var toolbar = new Adw.ToolbarView () {
             content = box,

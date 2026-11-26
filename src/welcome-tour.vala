@@ -22,29 +22,26 @@ public class Mail.WelcomeTour : Object {
         this.carousel.append (status_page (
             "mail-unread-symbolic",
             _("Welcome to Letter"),
-            _("Letter is the email application designed for the GNOME desktop and integrates with Calendar and Contacts. Add Google, Microsoft 365, or IMAP from inside Letter.")
+            _("Letter is designed for a modern email experience and it can be used on any desktop environment.\n\nOn GNOME, you can use Online Accounts so mail stays alongside Calendar and Contacts. Letter Identity is Letter’s own engine: solid and stable sync, smoother local search, and Google, Microsoft 365, or IMAP signed in from Letter.")
         ));
         this.carousel.append (status_page (
             "computer-symbolic",
             _("One experience, one interface"),
-            _("Letter uses GTK 4 and libadwaita. GNOME 50 or later is recommended. Mail accounts can live in Letter Identity or, on GNOME, beside Online Accounts.")
+            _("Letter uses GTK 4 and libadwaita for a clean, elegant interface with a modern and balanced look on all desktops and coherent for GNOME users.")
         ));
 
         string needs_body;
-        string button_label;
         if (this.skip_goa) {
-            needs_body = _("No mail accounts yet. Add an IMAP mailbox in Letter (Fastmail, mailbox.org, ISP, …). Gmail and Outlook use Sign in with Google / Microsoft — coming next.");
-            button_label = _("Add Account");
+            needs_body = _("Add a mail account in Letter: Google, Microsoft 365, or IMAP. Letter Identity includes what you need to sign in.");
         } else {
-            needs_body = _("Add at least one mail account. Prefer Add Account in Letter; on GNOME you can also use Settings → Online Accounts. Microsoft 365 may need the evolution-ews package.");
-            button_label = _("Add Account");
+            needs_body = _("Add a mail account in Letter: Google, Microsoft 365, or IMAP. Letter Identity includes what you need to sign in.\n\nOn GNOME you can instead use Settings → Online Accounts.");
         }
         var needs = status_page (
             "preferences-system-symbolic",
-            _("What Letter needs"),
+            _("Add your mail"),
             needs_body
         );
-        this.accounts_button = new Gtk.Button.with_label (button_label) {
+        this.accounts_button = new Gtk.Button.with_label (_("Add Account")) {
             halign = Gtk.Align.CENTER,
             focusable = false,
         };
@@ -130,7 +127,8 @@ public class Mail.WelcomeTour : Object {
 
     private void go_next () {
         if (this.page_index + 1 >= this.carousel.n_pages) {
-            open_add_account ();
+            /* Get Started — do not reopen Add Account; let the app show mail
+             * (or a clear “no accounts” message). */
             finished ();
             return;
         }

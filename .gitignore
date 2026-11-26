@@ -15,7 +15,6 @@ meson-logs/
 # Local debug artefacts
 *.core
 *.log
-# Local working notes (not part of the repo)
-/docs/
+# Cursor IDE (local)
 .cursor
 .cursor/

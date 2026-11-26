@@ -605,9 +605,13 @@ msgid "OK"
 msgstr "OK"
 
 #: src/application.vala:427
-msgid "A GNOME mail client that shares accounts with Calendar and Contacts."
+msgid ""
+"A modern email client for your desktop. Letter Identity signs you in from "
+"Letter; on GNOME you can also share accounts with Calendar and Contacts."
 msgstr ""
-"Un client di posta GNOME che condivide gli account con Calendario e Contatti."
+"Un client di posta moderno per il tuo desktop. Letter Identity gestisce "
+"l’accesso da Lettera; su GNOME puoi anche condividere gli account con "
+"Calendario e Contatti."
 
 #: src/application.vala:433
 msgid "translator-credits"
@@ -2406,11 +2410,13 @@ msgstr "Integrazione GNOME"
 
 #: src/preferences-dialog.vala:49
 msgid ""
-"Letter reads the same Evolution Data Server used by Calendar and Contacts, "
-"and the same GNOME Online Accounts for Google, Microsoft 365, and IMAP."
+"These counts are for GNOME Online Accounts with Evolution Data Server "
+"(Calendar and Contacts). If you only use Letter Identity, you can ignore "
+"this section."
 msgstr ""
-"Lettera usa lo stesso Evolution Data Server di Calendario e Contatti, e gli "
-"stessi account online GNOME per Google, Microsoft 365 e IMAP."
+"Questi conteggi riguardano GNOME Online Accounts con Evolution Data Server "
+"(Calendario e Contatti). Se usi solo Letter Identity, puoi ignorare questa "
+"sezione."
 
 #: src/preferences-dialog.vala:52
 msgid "Mail accounts"
@@ -2589,11 +2595,13 @@ msgstr "Sincronizzazione"
 msgid ""
 "Headers stay local for every folder. Bodies and attachments are kept only "
 "for the period you choose. The first sync can take a while; after that, "
-"folders stay up to date."
+"folders stay up to date. Letter Microsoft accounts use on-demand attachments "
+"for smarter disk use."
 msgstr ""
 "Le intestazioni restano in locale per ogni cartella. Corpi e allegati solo "
 "per il periodo scelto. La prima sincronizzazione può richiedere tempo; poi "
-"le cartelle restano aggiornate."
+"le cartelle restano aggiornate. Gli account Microsoft di Letter utilizzano "
+"allegati on-demand per una gestione intelligente dello spazio su disco."
 
 #: src/preferences-dialog.vala:306
 msgid "Check for new mail"
@@ -2645,44 +2653,73 @@ msgstr "Libreria locale"
 
 #: src/preferences-dialog.vala:350
 msgid ""
-"Letter caches headers and full messages (bodies and attachments) for every "
-"folder in the window below. First fill can take hours; Inbox checks and "
-"sending stay responsive. Progress resumes after restart."
+"Letter caches headers and message bodies for every folder below. Attachments "
+"download when you open a message and then stay on disk until you Reset. "
+"First fill can take hours; Inbox checks and sending stay responsive."
 msgstr ""
-"Letter memorizza intestazioni e messaggi completi (corpi e allegati) per "
-"ogni cartella nella finestra sotto. Il primo riempimento può richiedere ore; "
-"i controlli della Posta in arrivo e l’invio restano reattivi. L’avanzamento "
-"riprende dopo un riavvio."
+"Lettera memorizza intestazioni e corpi dei messaggi per ogni cartella sotto. "
+"Gli allegati si scaricano quando apri un messaggio e restano su disco fino a "
+"Ripristina. Il primo riempimento può richiedere ore; i controlli della Posta "
+"in arrivo e l’invio restano reattivi."
 
 #: src/preferences-dialog.vala:353
 msgid "Disk used"
 msgstr "Spazio su disco"
 
-#: src/preferences-dialog.vala:360 src/preferences-dialog.vala:406
+#: src/preferences-dialog.vala:360 src/preferences-dialog.vala:451
 msgid "Accounts"
 msgstr "Account"
 
 #: src/preferences-dialog.vala:361
 msgid ""
-"Add or remove providers in GNOME Settings. Drag accounts to set the order in "
-"the rail and Local library."
+"Add Letter Identity accounts here. On GNOME you can also opt in to Online "
+"Accounts — each row is marked Letter or GNOME. Drag accounts to set the "
+"order in the rail and Local library."
 msgstr ""
-"Aggiungi o rimuovi i provider in Impostazioni. Trascina gli account per "
-"impostare l’ordine nella barra e in Libreria locale."
+"Aggiungi qui gli account Letter Identity. Su GNOME puoi anche abilitare "
+"Account online: ogni riga è contrassegnata Letter o GNOME. Trascina gli "
+"account per impostare l’ordine nella barra e in Libreria locale."
 
 #: src/preferences-dialog.vala:366
-msgid "Add Account"
+msgid "Add account"
 msgstr "Aggiungi account"
 
 #: src/preferences-dialog.vala:367
-msgid "Google, Microsoft 365, Exchange, IMAP"
-msgstr "Google, Microsoft 365, Exchange, IMAP"
+msgid ""
+"Google, Microsoft, or IMAP — passwords and tokens stay in the system keyring"
+msgstr ""
+"Google, Microsoft o IMAP — password e token restano nel portachiavi di "
+"sistema"
 
-#: src/preferences-dialog.vala:390
+#: src/preferences-dialog.vala:393
+msgid "Use GNOME Online Accounts"
+msgstr "Usa GNOME Online Accounts"
+
+#: src/preferences-dialog.vala:394
+msgid ""
+"GNOME accounts share sign-in with Calendar and Contacts and use the "
+"Evolution mail stack. Letter Identity uses Letter’s own engine — more "
+"flexible sync and faster local search. Same address in both is shown once "
+"and uses Letter."
+msgstr ""
+"Gli account GNOME condividono l’accesso con Calendario e Contatti e usano "
+"lo stack di posta Evolution. Letter Identity usa il motore di Lettera: "
+"sincronizzazione più flessibile e ricerca locale più rapida. Lo stesso "
+"indirizzo in entrambi viene mostrato una sola volta e usa Letter."
+
+#: src/preferences-dialog.vala:398
+msgid "Open GNOME Online Accounts"
+msgstr "Apri GNOME Online Accounts"
+
+#: src/preferences-dialog.vala:399
+msgid "Manage system accounts in Settings"
+msgstr "Gestisci gli account di sistema nelle Impostazioni"
+
+#: src/preferences-dialog.vala:435
 msgid "Dependencies and recommended packages"
 msgstr "Dipendenze e pacchetti consigliati"
 
-#: src/preferences-dialog.vala:391
+#: src/preferences-dialog.vala:436
 msgid "Check the software requirements for Letter to work correctly."
 msgstr "Verifica i requisiti software per il corretto funzionamento di Lettera"
 
@@ -2719,9 +2756,8 @@ msgid "Slate"
 msgstr "Ardesia"
 
 #: src/preferences-dialog.vala:875
-#, fuzzy
 msgid "Accent"
-msgstr "Accetta"
+msgstr "In evidenza"
 
 #: src/preferences-dialog.vala:902
 msgid "How often to refresh mail while Letter is open."
@@ -2946,60 +2982,124 @@ msgstr "Il messaggio non può essere inviato."
 msgid "Welcome"
 msgstr "Benvenuto"
 
-#: src/welcome-tour.vala:21
+#: src/welcome-tour.vala:25
 msgid "Welcome to Letter"
 msgstr "Benvenuto in Lettera"
 
-#: src/welcome-tour.vala:22
-msgid ""
-"Letter is the email application designed for the GNOME desktop and "
-"integrates with Calendar and Contacts. It uses the same accounts you already "
-"have: Google, Microsoft 365, Exchange, IMAP."
-msgstr ""
-"Lettera è l’applicazione di posta elettronica studiata appositamente per "
-"l’ambiente desktop GNOME e si integra con Calendario e Contatti. Usa gli "
-"stessi account che hai già: Google, Microsoft 365, Exchange, IMAP."
-
 #: src/welcome-tour.vala:26
+msgid ""
+"Letter is designed for a modern email experience and it can be used on any desktop environment.\n"
+"\n"
+"On GNOME, you can use Online Accounts so mail stays alongside Calendar and "
+"Contacts. Letter Identity is Letter’s own engine: solid and stable sync, smoother "
+"local search, and Google, Microsoft 365, or IMAP signed in from Letter."
+msgstr ""
+"Lettera è pensata per offrire un’esperienza moderna nella gestione della "
+"posta elettronica e può essere utilizzata in qualsiasi ambiente desktop.\n"
+"\n"
+"Su GNOME puoi usare Account online così la posta resta insieme a Calendario "
+"e Contatti. Letter Identity è il motore di account di Lettera: "
+"sincronizzazione stabile e affidabile, ricerca locale più fluida e accesso a Google, "
+"Microsoft 365 o IMAP direttamente da Lettera."
+
+#: src/welcome-tour.vala:30
 msgid "One experience, one interface"
 msgstr "Esperienza e interfaccia unica"
 
-#: src/welcome-tour.vala:27
-msgid ""
-"Sign-in stays in Online Accounts in GNOME Settings. Evolution Data Server "
-"handles the mail flow. Letter uses the GTK 4 and libadwaita libraries, so "
-"GNOME 50 or later is required for it to work correctly."
-msgstr ""
-"Gli accessi restano in Account online delle Impostazioni di Sistema GNOME. "
-"Evolution Data Server gestisce il flusso di posta elettronica. Lettera "
-"sfrutta le librerie GTK 4 e libadwaita, motivo per cui per un corretto "
-"funzionamento è richiesto GNOME a partire dalla versione 50 e successive."
-
 #: src/welcome-tour.vala:31
-msgid "What Letter needs"
-msgstr "Cosa serve a Lettera"
-
-#: src/welcome-tour.vala:32
 msgid ""
-"Add at least one mail account in Settings → Online Accounts. IMAP is added "
-"there too. Microsoft 365 also needs the evolution-ews package. Without "
-"Online Accounts, Letter has nothing to show — by design."
+"Letter uses GTK 4 and libadwaita for a clean, elegant interface with a modern "
+"and balanced look on all desktops and coherent for GNOME users."
 msgstr ""
-"Aggiungi almeno un account di posta in Impostazioni → Account online. Anche "
-"IMAP si aggiunge lì. Microsoft 365 richiede anche il pacchetto evolution-"
-"ews. Senza Account online, Lettera non ha nulla da mostrare: è voluto."
+"Lettera usa GTK 4 e libadwaita per un’interfaccia pulita ed elegante per un aspetto "
+"moderno ed equilibrato su tutti i desktop, e coerente per gli utenti GNOME."
 
-#: src/welcome-tour.vala:48
+#: src/welcome-tour.vala:36
+msgid ""
+"Add a mail account in Letter: Google, Microsoft 365, or IMAP. Letter "
+"Identity includes what you need to sign in."
+msgstr ""
+"Aggiungi un account di posta in Lettera: Google, Microsoft 365 o IMAP. "
+"Letter Identity include ciò che serve per accedere."
+
+#: src/welcome-tour.vala:38
+msgid ""
+"Add a mail account in Letter: Google, Microsoft 365, or IMAP. Letter "
+"Identity includes what you need to sign in.\n"
+"\n"
+"On GNOME you can instead use Settings → Online Accounts."
+msgstr ""
+"Aggiungi un account di posta in Lettera: Google, Microsoft 365 o IMAP. "
+"Letter Identity include ciò che serve per accedere.\n"
+"\n"
+"Su GNOME puoi invece usare Impostazioni → Account online."
+
+#: src/welcome-tour.vala:42
+msgid "Add your mail"
+msgstr "Aggiungi la tua posta"
+
+#: src/welcome-tour.vala:69
 msgid "Back"
 msgstr "Indietro"
 
-#: src/welcome-tour.vala:54 src/welcome-tour.vala:100
+#: src/welcome-tour.vala:75 src/welcome-tour.vala:115
 msgid "Next"
 msgstr "Avanti"
 
-#: src/welcome-tour.vala:100
+#: src/welcome-tour.vala:115
 msgid "Get Started"
 msgstr "Inizia"
+
+#: src/application.vala:403
+msgid "No mail accounts found"
+msgstr "Nessun account di posta trovato"
+
+#: src/application.vala:404
+msgid ""
+"Letter did not detect any mail accounts. Add Google, Microsoft 365, or IMAP "
+"in Letter, or on GNOME use Settings → Online Accounts."
+msgstr ""
+"Lettera non ha rilevato alcun account di posta. Aggiungi Google, Microsoft "
+"365 o IMAP in Lettera, oppure su GNOME usa Impostazioni → Account online."
+
+#: src/identity-imap-dialog.vala:28 src/identity-imap-dialog.vala:133
+msgid "Add Mail Account"
+msgstr "Aggiungi account di posta"
+
+#: src/identity-imap-dialog.vala:61
+msgid "Gmail — Sign in with Google"
+msgstr "Gmail — Accedi con Google"
+
+#: src/identity-imap-dialog.vala:68
+msgid "Microsoft"
+msgstr "Microsoft"
+
+#: src/identity-imap-dialog.vala:69
+msgid "Outlook / Microsoft 365 — Sign in with Microsoft"
+msgstr "Outlook / Microsoft 365 — Accedi con Microsoft"
+
+#: src/identity-imap-dialog.vala:77
+msgid "Fastmail, mailbox.org, ISP, or other IMAP host"
+msgstr "Fastmail, mailbox.org, ISP o altro host IMAP"
+
+#: src/identity-imap-dialog.vala:91
+msgid ""
+"Google and Microsoft open your browser to sign in. IMAP is for hosts with a "
+"normal password (or app password)."
+msgstr ""
+"Google e Microsoft aprono il browser per accedere. IMAP è per host con "
+"password normale (o password per le app)."
+
+#: src/identity-imap-dialog.vala:115
+msgid "Or open GNOME Online Accounts"
+msgstr "Oppure apri GNOME Online Accounts"
+
+#: src/identity-imap-dialog.vala:116
+msgid ""
+"Add mail in Settings — Calendar and Contacts stay shared on GNOME"
+msgstr ""
+"Aggiungi la posta dalle Impostazioni — su GNOME Calendario e Contatti "
+"restano condivisi"
 
 #: src/outbox-store.vala:246
 msgid "Sending failed"
@@ -3128,24 +3228,15 @@ msgstr "Dipendenze"
 
 #: src/dependency-page.vala:29
 msgid ""
-"Letter is made for the GNOME desktop from version 50 onward and makes full "
-"use of the GTK 4 and libadwaita libraries. A normal GNOME installation "
-"already includes everything needed to make it work. Check the essential "
-"packages below, and the optional ones only if you need them."
+"Letter uses GTK 4 and libadwaita on GNOME. The essential packages below "
+"matter when you use GNOME Online Accounts. Letter Identity does not need "
+"them for Google, Microsoft 365, or IMAP signed in from Letter. Check the "
+"optional packages only if you need them."
 msgstr ""
-"Lettera è pensata per l’ambiente GNOME dalla versione 50 in poi e sfrutta in "
-"modo completo le librerie GTK 4 e Libadwaita. Una normale installazione di "
-"GNOME include già tutto il necessario per farla funzionare. Controlla di "
-"seguito i pacchetti indispensabili e quelli facoltativi da installare solo "
-"se ti servono."
-
-#: src/dependency-page.vala:32
-msgid ""
-"You are running the Flatpak build. Recommended packages are installed on the "
-"host system (outside the sandbox); Letter checks the host for them."
-msgstr ""
-"Stai usando la build Flatpak. I pacchetti consigliati vanno installati sul "
-"sistema host (fuori dalla sandbox); Lettera li verifica lì."
+"Lettera usa GTK 4 e libadwaita su GNOME. I pacchetti indispensabili sotto "
+"contano se usi GNOME Online Accounts. Letter Identity non li richiede per "
+"Google, Microsoft 365 o IMAP aggiunti da Lettera. Controlla i pacchetti "
+"facoltativi solo se ti servono."
 
 #: src/dependency-page.vala:42
 msgid "Essential"
@@ -3160,16 +3251,24 @@ msgid "GNOME Online Accounts"
 msgstr "Account online GNOME"
 
 #: src/dependency-page.vala:95
-msgid "Account sign-in for Google, Microsoft 365, Exchange, and IMAP"
-msgstr "Accesso account per Google, Microsoft 365, Exchange e IMAP"
+msgid ""
+"Sign-in via GNOME Online Accounts for Google, Microsoft 365, Exchange, and "
+"IMAP. Not required if you only use Letter Identity."
+msgstr ""
+"Accesso tramite GNOME Online Accounts per Google, Microsoft 365, Exchange e "
+"IMAP. Non richiesto se usi solo Letter Identity."
 
 #: src/dependency-page.vala:102
 msgid "Evolution Data Server"
 msgstr "Evolution Data Server"
 
 #: src/dependency-page.vala:103
-msgid "Mail, calendar, and contacts backend used by Letter"
-msgstr "Backend di posta, calendario e contatti usato da Lettera"
+msgid ""
+"Mail, calendar, and contacts backend for GNOME Online Accounts. Not required "
+"for Letter Identity alone."
+msgstr ""
+"Backend di posta, calendario e contatti per GNOME Online Accounts. Non "
+"richiesto per Letter Identity da solo."
 
 #: src/dependency-page.vala:116
 msgid "Microsoft Graph backends"
@@ -3182,6 +3281,10 @@ msgid ""
 "Letter’s own copy then downloads the mail. The same host package serves "
 "desktop Calendar and Contacts."
 msgstr ""
+"Account online può effettuare l’accesso senza questo pacchetto, ma il data "
+"server di sistema pubblica una casella Microsoft 365 solo se è installato "
+"evolution-ews. La copia di Lettera scarica poi la posta. Lo stesso pacchetto "
+"host serve Calendario e Contatti del desktop."
 
 #: src/dependency-page.vala:119
 msgid "evolution-ews for Microsoft 365 mail, calendar, and contacts"
@@ -3397,6 +3500,509 @@ msgstr ""
 "«Concedi consenso amministratore per …», poi usa di nuovo Accedi in Letter "
 "come «%s»."
 
+#: src/identity-oauth.vala
+msgid "Signed in"
+msgstr "Accesso effettuato"
+
+#: src/identity-oauth.vala
+msgid "You can close this tab and return to Letter."
+msgstr "Puoi chiudere questa scheda e tornare a Lettera."
+
+#: src/identity-oauth.vala
+#, c-format
+msgid ""
+"Microsoft Graph needs updated permissions for “%s”. Letter will ask you to "
+"sign in again — your local mail stays on this device."
+msgstr ""
+"Microsoft Graph richiede autorizzazioni aggiornate per «%s». Lettera ti "
+"chiederà di accedere di nuovo — la posta locale resta su questo dispositivo."
+
+#: src/identity-oauth.vala
+#, c-format
+msgid "Sign-in cancelled or denied (%s)."
+msgstr "Accesso annullato o negato (%s)."
+
+#: src/identity-oauth.vala
+msgid "Could not bind localhost OAuth redirect."
+msgstr "Impossibile associare il redirect OAuth su localhost."
+
+#: src/identity-oauth.vala
+#, c-format
+msgid "Could not bind OAuth redirect on port %u (is another Letter sign-in open?): %s"
+msgstr ""
+"Impossibile associare il redirect OAuth sulla porta %u (c’è un altro accesso "
+"Letter aperto?): %s"
+
+#: src/identity-oauth.vala
+msgid "No authorization code received."
+msgstr "Nessun codice di autorizzazione ricevuto."
+
+#: src/identity-oauth.vala
+msgid "OAuth state mismatch."
+msgstr "Stato OAuth non corrispondente."
+
+#: src/identity-oauth.vala
+#, c-format
+msgid "Token request failed: %s"
+msgstr "Richiesta token non riuscita: %s"
+
+#: src/identity-oauth.vala
+#, c-format
+msgid "Token endpoint HTTP %u: %s"
+msgstr "Endpoint token HTTP %u: %s"
+
+#: src/identity-oauth.vala
+msgid "Invalid token JSON."
+msgstr "JSON del token non valido."
+
+#: src/identity-oauth.vala
+#, c-format
+msgid "Token error: %s"
+msgstr "Errore token: %s"
+
+#: src/identity-oauth.vala
+msgid "Token JSON missing access_token."
+msgstr "Nel JSON del token manca access_token."
+
+#: src/identity-oauth.vala
+#, c-format
+msgid "No OAuth tokens for “%s”."
+msgstr "Nessun token OAuth per «%s»."
+
+#: src/identity-oauth.vala
+#, c-format
+msgid ""
+"No OAuth refresh token for “%s”. Sign in again from Letter to update "
+"Microsoft permissions."
+msgstr ""
+"Nessun refresh token OAuth per «%s». Accedi di nuovo da Lettera per "
+"aggiornare le autorizzazioni Microsoft."
+
+#: src/identity-oauth.vala
+#, c-format
+msgid "OAuth access expired and no refresh token for “%s”."
+msgstr "Accesso OAuth scaduto e nessun refresh token per «%s»."
+
+#: src/identity-oauth.vala
+msgid "Microsoft token response missing id_token."
+msgstr "Nella risposta token Microsoft manca id_token."
+
+#: src/identity-oauth.vala
+msgid "Microsoft id_token is malformed."
+msgstr "id_token Microsoft non valido."
+
+#: src/identity-oauth.vala
+msgid "Could not decode Microsoft id_token."
+msgstr "Impossibile decodificare id_token Microsoft."
+
+#: src/identity-oauth.vala
+msgid "Microsoft id_token has no email."
+msgstr "id_token Microsoft senza email."
+
+#: src/identity-edit-dialog.vala
+msgid "Edit Account"
+msgstr "Modifica account"
+
+#: src/identity-edit-dialog.vala
+#, c-format
+msgid "No Letter Identity account “%s”."
+msgstr "Nessun account Letter Identity «%s»."
+
+#: src/identity-edit-dialog.vala
+msgid ""
+"The account label is only for you — in the account list. The name on sent "
+"mail is what recipients see."
+msgstr ""
+"L’etichetta dell’account è solo per te — nell’elenco account. Il nome sulla "
+"posta inviata è quello che vedono i destinatari."
+
+#: src/identity-edit-dialog.vala
+msgid "Account label"
+msgstr "Etichetta account"
+
+#: src/identity-edit-dialog.vala
+msgid "Name on sent mail"
+msgstr "Nome sulla posta inviata"
+
+#: src/identity-edit-dialog.vala
+msgid "Email"
+msgstr "Email"
+
+#: src/identity-edit-dialog.vala
+msgid ""
+"Signed in with Google (OAuth2). Mail uses IMAP with XOAUTH2 — host and ports "
+"are fixed by Google."
+msgstr ""
+"Accesso effettuato con Google (OAuth2). La posta usa IMAP con XOAUTH2: host "
+"e porte sono fissati da Google."
+
+#: src/identity-edit-dialog.vala
+msgid ""
+"Signed in with Microsoft (OAuth2). Mail uses IMAP with XOAUTH2 — host and "
+"ports are fixed by Microsoft."
+msgstr ""
+"Accesso effettuato con Microsoft (OAuth2). La posta usa IMAP con XOAUTH2: "
+"host e porte sono fissati da Microsoft."
+
+#: src/identity-edit-dialog.vala
+msgid "OAuth2"
+msgstr "OAuth2"
+
+#: src/identity-edit-dialog.vala
+msgid "Signed in with OAuth2. Server settings are managed by the provider."
+msgstr ""
+"Accesso effettuato con OAuth2. Le impostazioni del server sono gestite dal "
+"provider."
+
+#: src/identity-edit-dialog.vala
+msgid "Connection"
+msgstr "Connessione"
+
+#: src/identity-edit-dialog.vala
+msgid ""
+"These settings cannot be changed. Remove the account and sign in again if "
+"you need a different provider."
+msgstr ""
+"Queste impostazioni non si possono modificare. Rimuovi l’account e accedi di "
+"nuovo se ti serve un provider diverso."
+
+#: src/identity-edit-dialog.vala
+msgid "Sign-in"
+msgstr "Accesso"
+
+#: src/identity-edit-dialog.vala
+msgid "Leave the password blank to keep the current one."
+msgstr "Lascia la password vuota per mantenere quella attuale."
+
+#: src/identity-edit-dialog.vala
+msgid "Username"
+msgstr "Nome utente"
+
+#: src/identity-edit-dialog.vala
+msgid "Password"
+msgstr "Password"
+
+#: src/identity-edit-dialog.vala
+msgid "Servers"
+msgstr "Server"
+
+#: src/identity-edit-dialog.vala
+msgid ""
+"Letter checks IMAP and SMTP before saving when these change. Port 587 uses "
+"STARTTLS; 465 uses TLS."
+msgstr ""
+"Lettera verifica IMAP e SMTP prima di salvare quando questi cambiano. La "
+"porta 587 usa STARTTLS; la 465 usa TLS."
+
+#: src/identity-edit-dialog.vala
+msgid "IMAP host"
+msgstr "Host IMAP"
+
+#: src/identity-edit-dialog.vala
+msgid "IMAP port"
+msgstr "Porta IMAP"
+
+#: src/identity-edit-dialog.vala
+msgid "SMTP host"
+msgstr "Host SMTP"
+
+#: src/identity-edit-dialog.vala
+msgid "SMTP port"
+msgstr "Porta SMTP"
+
+#: src/identity-edit-dialog.vala
+msgid "Account"
+msgstr "Account"
+
+#: src/identity-edit-dialog.vala
+msgid "Account disappeared."
+msgstr "L’account non è più disponibile."
+
+#: src/identity-edit-dialog.vala
+msgid "Enter an IMAP host."
+msgstr "Inserisci un host IMAP."
+
+#: src/identity-edit-dialog.vala
+msgid "No password stored. Enter a new password to verify the connection."
+msgstr ""
+"Nessuna password memorizzata. Inserisci una nuova password per verificare la "
+"connessione."
+
+#: src/application.vala
+msgid "GNOME Online Accounts enabled"
+msgstr "GNOME Online Accounts abilitati"
+
+#: src/application.vala
+msgid "Using Letter Identity accounts only"
+msgstr "Solo account Letter Identity"
+
+#: src/application.vala
+msgid "Use GNOME Online Accounts?"
+msgstr "Usare GNOME Online Accounts?"
+
+#: src/application.vala
+msgid ""
+"This system has GNOME Online Accounts.\n"
+"\n"
+"• GNOME accounts — one sign-in shared with Calendar and Contacts; mail uses "
+"the Evolution stack that GNOME already provides.\n"
+"\n"
+"• Letter Identity — accounts added in Letter use Letter’s own engine: more "
+"flexible sync, smoother local search, and cache-first behaviour tailored to "
+"this app.\n"
+"\n"
+"You can use either or both. The same address is shown once. Change this "
+"anytime in Preferences → Accounts."
+msgstr ""
+"Questo sistema ha GNOME Online Accounts.\n"
+"\n"
+"• Account GNOME — un unico accesso condiviso con Calendario e Contatti; la "
+"posta usa lo stack Evolution già fornito da GNOME.\n"
+"\n"
+"• Letter Identity — gli account aggiunti in Lettera usano il motore di "
+"Letter: sincronizzazione più flessibile, ricerca locale più fluida e "
+"comportamento cache-first pensato per questa app.\n"
+"\n"
+"Puoi usare uno, l’altro o entrambi. Lo stesso indirizzo viene mostrato una "
+"sola volta. Puoi cambiare in qualsiasi momento in Preferenze → Account."
+
+#: src/application.vala
+msgid "Letter only"
+msgstr "Solo Letter"
+
+#: src/application.vala
+msgid "Include GNOME accounts"
+msgstr "Includi account GNOME"
+
+#: src/application.vala
+msgid "Account added"
+msgstr "Account aggiunto"
+
+#: src/application.vala src/welcome-tour.vala src/window.blp
+msgid "Add Account"
+msgstr "Aggiungi account"
+
+#: src/account.vala
+msgid "Letter + GNOME"
+msgstr "Letter + GNOME"
+
+#: src/account.vala
+msgid "GNOME"
+msgstr "GNOME"
+
+#: src/account.vala
+msgid ""
+"Letter Identity (same address also in GNOME Online Accounts). Mail uses "
+"Letter’s own sync engine."
+msgstr ""
+"Letter Identity (stesso indirizzo anche in GNOME Online Accounts). La posta "
+"usa il motore di sincronizzazione di Letter."
+
+#: src/account.vala
+msgid ""
+"Letter Identity — mail uses Letter’s own sync engine (flexible sync, faster "
+"local search)."
+msgstr ""
+"Letter Identity — la posta usa il motore di sincronizzazione di Letter "
+"(sync flessibile, ricerca locale più rapida)."
+
+#: src/account.vala
+msgid ""
+"GNOME Online Accounts — mail, calendars, and contacts use the GNOME/"
+"Evolution stack."
+msgstr ""
+"GNOME Online Accounts — posta, calendari e contatti usano lo stack GNOME/"
+"Evolution."
+
+#: src/identity-imap-dialog.vala
+msgid "IMAP account"
+msgstr "Account IMAP"
+
+#: src/identity-imap-dialog.vala
+msgid "IMAP Account"
+msgstr "Account IMAP"
+
+#: src/identity-imap-dialog.vala
+msgid ""
+"Gmail and Outlook are not added here. Many hosts (including Fastmail) want "
+"an app-specific password for IMAP — not the same password as the web login."
+msgstr ""
+"Gmail e Outlook non si aggiungono qui. Molti host (incluso Fastmail) "
+"richiedono una password per le app per IMAP — non la stessa della "
+"webmail."
+
+#: src/identity-imap-dialog.vala
+msgid "Your name"
+msgstr "Il tuo nome"
+
+#: src/identity-imap-dialog.vala
+msgid "Filled for known IMAP hosts. Expand to edit."
+msgstr "Compilato per gli host IMAP noti. Espandi per modificare."
+
+#: src/identity-imap-dialog.vala
+msgid "IMAP and SMTP settings"
+msgstr "Impostazioni IMAP e SMTP"
+
+#: src/identity-imap-dialog.vala
+msgid "Host, port, and username"
+msgstr "Host, porta e nome utente"
+
+#: src/identity-imap-dialog.vala
+msgid "Google OAuth credentials missing"
+msgstr "Credenziali OAuth Google mancanti"
+
+#: src/identity-imap-dialog.vala
+msgid ""
+"Create a Google Cloud Desktop OAuth client, then set LETTER_GOOGLE_CLIENT_ID "
+"and LETTER_GOOGLE_CLIENT_SECRET (both shown on the client page). Add "
+"yourself as an OAuth test user. IMAP remains available for Fastmail and "
+"similar hosts."
+msgstr ""
+"Crea un client OAuth Desktop in Google Cloud, poi imposta "
+"LETTER_GOOGLE_CLIENT_ID e LETTER_GOOGLE_CLIENT_SECRET (entrambi nella "
+"pagina del client). Aggiungiti come utente di test OAuth. IMAP resta "
+"disponibile per Fastmail e host simili."
+
+#: src/identity-imap-dialog.vala
+msgid "Use IMAP instead"
+msgstr "Usa IMAP invece"
+
+#: src/identity-imap-dialog.vala
+msgid "Microsoft client id missing"
+msgstr "Client ID Microsoft mancante"
+
+#: src/identity-imap-dialog.vala
+msgid ""
+"Register a Letter Azure public client named “Letter E-mail Client” (personal "
+"+ work accounts), add redirect http://127.0.0.1:8743/letter-oauth, then set "
+"LETTER_MS_CLIENT_ID. See PLATFORM-MS-AZURE-APP.md. Hotmail needs no IT; work "
+"M365 uses the same Client ID later. LETTER_MS_MAIL=graph enables the Graph "
+"engine (opt-in)."
+msgstr ""
+"Registra un client pubblico Azure Letter chiamato «Letter E-mail Client» "
+"(account personali e di lavoro), aggiungi il redirect "
+"http://127.0.0.1:8743/letter-oauth, poi imposta LETTER_MS_CLIENT_ID. Vedi "
+"PLATFORM-MS-AZURE-APP.md. Hotmail non richiede IT; M365 aziendale usa lo "
+"stesso Client ID. LETTER_MS_MAIL=graph abilita il motore Graph (opt-in)."
+
+#: src/identity-imap-dialog.vala
+msgid "Sign in with Google"
+msgstr "Accedi con Google"
+
+#: src/identity-imap-dialog.vala
+msgid "Complete sign-in in your browser. Letter is waiting for the redirect…"
+msgstr ""
+"Completa l’accesso nel browser. Lettera è in attesa del reindirizzamento…"
+
+#: src/identity-imap-dialog.vala
+msgid "Could not sign in"
+msgstr "Accesso non riuscito"
+
+#: src/identity-imap-dialog.vala
+#, c-format
+msgid "Letter OAuth: %s"
+msgstr "Letter OAuth: %s"
+
+#: src/identity-imap-dialog.vala
+#, c-format
+msgid "Letter OAuth Graph: %s"
+msgstr "Letter OAuth Graph: %s"
+
+#: src/identity-imap-dialog.vala
+#, c-format
+msgid "Letter mail: %s"
+msgstr "Posta Letter: %s"
+
+#: src/identity-imap-dialog.vala
+msgid "Checking…"
+msgstr "Verifica…"
+
+#: src/identity-imap-dialog.vala
+msgid ""
+"Gmail and Outlook are added with Sign in with Google / Microsoft — not IMAP "
+"password. Go back and choose Google or Microsoft, or use an IMAP provider."
+msgstr ""
+"Gmail e Outlook si aggiungono con Accedi con Google / Microsoft — non con "
+"password IMAP. Torna indietro e scegli Google o Microsoft, oppure un "
+"provider IMAP."
+
+#: src/identity-imap-dialog.vala
+msgid ""
+"Gmail and Outlook are not added with IMAP password. Choose Google or "
+"Microsoft on the previous screen when available."
+msgstr ""
+"Gmail e Outlook non si aggiungono con password IMAP. Scegli Google o "
+"Microsoft nella schermata precedente quando disponibile."
+
+#: src/identity-imap-dialog.vala
+msgid "Enter email, password, and IMAP host."
+msgstr "Inserisci email, password e host IMAP."
+
+#: src/identity-imap-dialog.vala
+msgid "Enter an SMTP host."
+msgstr "Inserisci un host SMTP."
+
+#: src/preferences-dialog.vala
+msgid "Change account label, sender name, or connection"
+msgstr "Modifica etichetta account, nome mittente o connessione"
+
+#: src/preferences-dialog.vala
+msgid "Remove this Letter Identity account"
+msgstr "Rimuovi questo account Letter Identity"
+
+#: src/preferences-dialog.vala
+msgid "Could not open account"
+msgstr "Impossibile aprire l’account"
+
+#: src/preferences-dialog.vala
+#, c-format
+msgid "Remove “%s”?"
+msgstr "Rimuovere «%s»?"
+
+#: src/preferences-dialog.vala
+#, c-format
+msgid ""
+"This cannot be undone. Letter deletes the account and its sign-in secrets "
+"(password or OAuth tokens). Mail on the server is not deleted.\n"
+"\n"
+"Local library on disk: %s."
+msgstr ""
+"Questa operazione non si può annullare. Lettera elimina l’account e i "
+"segreti di accesso (password o token OAuth). La posta sul server non viene "
+"eliminata.\n"
+"\n"
+"Libreria locale su disco: %s."
+
+#: src/preferences-dialog.vala
+msgid "Remove, keep cache"
+msgstr "Rimuovi, mantieni cache"
+
+#: src/preferences-dialog.vala
+msgid "Remove and delete cache"
+msgstr "Rimuovi ed elimina cache"
+
+#: src/preferences-dialog.vala
+msgid "Account removed and local cache deleted"
+msgstr "Account rimosso e cache locale eliminata"
+
+#: src/preferences-dialog.vala
+msgid "Account removed (local cache kept)"
+msgstr "Account rimosso (cache locale mantenuta)"
+
+#: src/window.blp
+msgid ""
+"Add Google, Microsoft, or an IMAP mailbox from inside Letter."
+msgstr ""
+"Aggiungi Google, Microsoft o una casella IMAP da dentro Lettera."
+
+#: src/window.blp
+msgid ""
+"Add or change mail accounts with Add Account. On GNOME, Online Accounts can "
+"appear here too."
+msgstr ""
+"Aggiungi o modifica gli account di posta con Aggiungi account. Su GNOME "
+"possono comparire anche gli Account online."
+
 #: src/preferences-dialog.vala
 msgid "Contacts and compose"
 msgstr "Contatti e composizione"
@@ -3419,15 +4025,15 @@ msgstr "Indirizzi recenti"
 
 #: src/preferences-dialog.vala
 msgid ""
-"Addresses gathered from sent mail. Remove ones you do not want in compose "
-"suggestions."
+"Addresses gathered from sent mail. Remove ones you do not want in "
+"suggestions while writing an email."
 msgstr ""
-"Indirizzi raccolti dalla posta inviata. Rimuovi quelli che non vuoi nelle "
-"suggerimenti in composizione."
+"Indirizzi raccolti dalla posta inviata. Rimuovi quelli che non vuoi nei "
+"suggerimenti durante la creazione di una e-mail."
 
 #: src/preferences-dialog.vala
-msgid "Manage…"
-msgstr "Gestisci…"
+msgid "Manage"
+msgstr "Gestisci"
 
 #: src/collected-addresses-dialog.vala
 msgid "Filter addresses"

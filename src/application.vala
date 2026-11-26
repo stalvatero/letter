@@ -198,11 +198,27 @@ public class Mail.Application : Adw.Application {
         try {
             if (!this.accounts.loaded)
                 yield this.accounts.load ();
+            /* Recover existing GOA mail when preference was left on “Letter only”
+             * (common in Flatpak sandbox settings) but Online Accounts has mail. */
+            yield maybe_reenable_goa_for_existing_mail ();
             show_window_for_accounts ();
         } finally {
             this.activate_pending = false;
             release ();
         }
+    }
+
+    private async void maybe_reenable_goa_for_existing_mail () {
+        if (this.accounts.has_mail_accounts ())
+            return;
+        if (Environment.get_variable ("LETTER_SKIP_GOA") == "1")
+            return;
+        if (!Utils.has_gnome_online_accounts ())
+            return;
+        if (this.settings.get_boolean ("use-goa-accounts"))
+            return;
+        message ("Application: no Letter Identity mail — re-enabling GNOME Online Accounts");
+        yield this.accounts.set_use_goa_accounts (true);
     }
 
     /** After Preferences removes an Identity account (may open SetupWindow). */
@@ -365,15 +381,43 @@ public class Mail.Application : Adw.Application {
 
         if (this.setup_window == null) {
             this.setup_window = new SetupWindow (this);
-            this.setup_window.tour_finished.connect (() => {
-                this.settings.set_boolean ("welcome-shown", true);
-            });
+            this.setup_window.tour_finished.connect (on_setup_tour_finished);
             this.setup_window.close_request.connect (() => {
                 this.setup_window = null;
                 return false;
             });
         }
         this.setup_window.present ();
+    }
+
+    private void on_setup_tour_finished () {
+        this.settings.set_boolean ("welcome-shown", true);
+        finish_setup_tour.begin ();
+    }
+
+    private async void finish_setup_tour () {
+        /* Last chance to pick up host GOA mail if preference was left off. */
+        yield maybe_reenable_goa_for_existing_mail ();
+        show_window_for_accounts ();
+        if (this.accounts.has_mail_accounts ())
+            return;
+
+        Gtk.Window? parent = this.setup_window;
+        if (parent == null)
+            parent = get_active_window ();
+        var dialog = new Adw.AlertDialog (
+            _("No mail accounts found"),
+            _("Letter did not detect any mail accounts. Add Google, Microsoft 365, or IMAP in Letter, or on GNOME use Settings → Online Accounts.")
+        );
+        dialog.add_response ("ok", _("OK"));
+        dialog.add_response ("add", _("Add Account"));
+        dialog.set_response_appearance ("add", Adw.ResponseAppearance.SUGGESTED);
+        dialog.default_response = "add";
+        dialog.response.connect ((response) => {
+            if (response == "add")
+                activate_action ("add-mail-account", null);
+        });
+        dialog.present (parent);
     }
 
     private void dismiss_setup_window () {
@@ -587,7 +631,7 @@ public class Mail.Application : Adw.Application {
             application_icon = Config.APP_ID,
             developer_name = "Salvatore Oscurato",
             version = Config.VERSION,
-            comments = _("A GNOME mail client that shares accounts with Calendar and Contacts."),
+            comments = _("A modern email client for your desktop. Letter Identity signs you in from Letter; on GNOME you can also share accounts with Calendar and Contacts."),
             website = "https://github.com/stalvatero/letter",
             issue_url = "https://github.com/stalvatero/letter/issues",
             copyright = "© 2026 Salvatore Oscurato",

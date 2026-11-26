@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Letter — email for your desktop</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --fg: #241f31;
+      --muted: #5e5c64;
+      --bg: #f6f5f4;
+      --card: #fff;
+      --accent: #1a5fb4;
+      --border: #deddda;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #eeeeec;
+        --muted: #c0bfbc;
+        --bg: #1e1e1e;
+        --card: #2d2d2d;
+        --border: #3d3846;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--fg);
+      background:
+        radial-gradient(900px 420px at 50% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+        var(--bg);
+    }
+    .site-header {
+      max-width: 28rem;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 0;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.7rem;
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+    .site-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem 1.1rem;
+      margin: 0.85rem 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.92rem;
+    }
+    .site-nav a { color: var(--muted); text-decoration: none; }
+    .site-nav a:hover,
+    .site-nav a[aria-current="page"] { color: var(--accent); }
+    .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem 1rem 3rem;
+    }
+    .card {
+      width: min(28rem, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      box-shadow: 0 18px 48px rgba(26, 95, 180, 0.12);
+    }
+    h1 { margin: 0.75rem 0 0.35rem; color: var(--accent); font-size: 1.85rem; }
+    p { margin: 0.5rem 0 0; color: var(--muted); line-height: 1.5; }
+    .links { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.65rem; }
+    a { color: var(--accent); }
+    .btn {
+      display: inline-block;
+      padding: 0.65rem 1rem;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff !important;
+      text-decoration: none !important;
+      font-weight: 600;
+    }
+    .links a:not(.btn) {
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .links a:not(.btn):hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-current="page">
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 128 128" aria-hidden="true">
+        <rect x="8" y="8" width="112" height="112" rx="24" fill="#1a5fb4"/>
+        <g transform="translate(8 8) scale(0.875)">
+          <rect x="22" y="30" width="84" height="68" rx="8" fill="#f6f5f4"/>
+          <path d="M22 38.5 L64 68 L106 38.5" fill="none" stroke="#1a5fb4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+      Letter
+    </a>
+    <ul class="site-nav">
+      <li><a href="index.html" aria-current="page">Home</a></li>
+      <li><a href="privacy.html">Privacy</a></li>
+      <li><a href="terms.html">Terms</a></li>
+      <li><a href="https://github.com/stalvatero/letter">GitHub</a></li>
+    </ul>
+  </header>
+  <div class="wrap">
+    <main class="card">
+      <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 128 128" aria-hidden="true">
+        <rect x="8" y="8" width="112" height="112" rx="24" fill="#1a5fb4"/>
+        <g transform="translate(8 8) scale(0.875)">
+          <rect x="22" y="30" width="84" height="68" rx="8" fill="#f6f5f4"/>
+          <path d="M22 38.5 L64 68 L106 38.5" fill="none" stroke="#1a5fb4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+      <h1>Letter</h1>
+      <p>A modern desktop email client with Letter Identity — Google, Microsoft 365, or IMAP from inside the app.</p>
+      <div class="links">
+        <a class="btn" href="https://github.com/stalvatero/letter/releases">Download releases</a>
+        <a href="https://github.com/stalvatero/letter">Source on GitHub</a>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms of Service</a>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

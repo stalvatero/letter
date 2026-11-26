@@ -26,12 +26,9 @@ public class Mail.DependencyListPage : Adw.NavigationPage {
         Object (title: _("Dependencies"));
 
         var header = new Adw.HeaderBar ();
-        var intro_text = _("Letter is made for the GNOME desktop from version 50 onward and makes full use of the GTK 4 and libadwaita libraries. A normal GNOME installation already includes everything needed to make it work. Check the essential packages below, and the optional ones only if you need them.");
-        if (Utils.running_in_flatpak ()) {
-            intro_text += "\n\n"
-                + _("You are running the Flatpak build. Recommended packages are installed on the host system (outside the sandbox); Letter checks the host for them.");
-        }
-        var intro = new Gtk.Label (intro_text) {
+        var intro = new Gtk.Label (
+            _("Letter uses GTK 4 and libadwaita on GNOME. The essential packages below matter when you use GNOME Online Accounts. Letter Identity does not need them for Google, Microsoft 365, or IMAP signed in from Letter. Check the optional packages only if you need them.")
+        ) {
             wrap = true,
             xalign = 0,
             max_width_chars = 56,
@@ -92,7 +89,7 @@ public class Mail.DependencyListPage : Adw.NavigationPage {
         var listed = new GenericArray<SystemPackage> ();
         listed.add (package (
             _("GNOME Online Accounts"),
-            _("Account sign-in for Google, Microsoft 365, Exchange, and IMAP"),
+            _("Sign-in via GNOME Online Accounts for Google, Microsoft 365, Exchange, and IMAP. Not required if you only use Letter Identity."),
             Utils.has_gnome_online_accounts (),
             "gnome-online-accounts",
             "gnome-online-accounts",
@@ -100,7 +97,7 @@ public class Mail.DependencyListPage : Adw.NavigationPage {
         ));
         listed.add (package (
             _("Evolution Data Server"),
-            _("Mail, calendar, and contacts backend used by Letter"),
+            _("Mail, calendar, and contacts backend for GNOME Online Accounts. Not required for Letter Identity alone."),
             Utils.has_evolution_data_server (),
             "evolution-data-server",
             "evolution-data-server",

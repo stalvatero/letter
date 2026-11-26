@@ -1393,7 +1393,36 @@ namespace Mail.Utils {
         return Module.open (name, ModuleFlags.LAZY) != null;
     }
 
+    /** True when the current session reports itself as GNOME (or GNOME Classic). */
+    public static bool is_gnome_session () {
+        string[] keys = {
+            "XDG_CURRENT_DESKTOP",
+            "XDG_SESSION_DESKTOP",
+            "DESKTOP_SESSION",
+            "GDMSESSION",
+        };
+        foreach (unowned string key in keys) {
+            var value = Environment.get_variable (key);
+            if (value == null || value.length == 0)
+                continue;
+            var upper = value.up ();
+            if (upper.contains ("GNOME"))
+                return true;
+        }
+        return false;
+    }
+
+    /**
+     * True when the host session can actually provide Online Accounts.
+     * Flatpak ships libgoa inside the sandbox — that alone must not count,
+     * or KDE / non-GNOME hosts would show a dead GOA toggle.
+     */
     public static bool has_gnome_online_accounts () {
+        if (session_bus_name_available ("org.gnome.OnlineAccounts"))
+            return true;
+        var flatpak_id = Environment.get_variable ("FLATPAK_ID");
+        if (flatpak_id != null && flatpak_id.length > 0)
+            return false;
         return shared_library_loadable ("libgoa-1.0.so.0")
             || shared_library_loadable ("libgoa-1.0.so")
             || FileUtils.test (

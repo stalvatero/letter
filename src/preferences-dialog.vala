@@ -44,14 +44,16 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         this.signatures = new SignatureStore (this.settings);
         this.signatures.migrate_if_needed (store);
 
-        var integration = new Adw.PreferencesGroup () {
-            title = _("GNOME integration"),
-            description = _("Letter reads the same Evolution Data Server used by Calendar and Contacts, and the same GNOME Online Accounts for Google, Microsoft 365, and IMAP."),
-        };
-
-        add_prefs_row (integration, count_row (_("Mail accounts"), store.items.get_n_items ()));
-        add_prefs_row (integration, count_row (_("Calendars"), store.calendar_count));
-        add_prefs_row (integration, count_row (_("Address books"), store.contact_count));
+        Adw.PreferencesGroup? integration = null;
+        if (Utils.is_gnome_session ()) {
+            integration = new Adw.PreferencesGroup () {
+                title = _("GNOME integration"),
+                description = _("These counts are for GNOME Online Accounts with Evolution Data Server (Calendar and Contacts). If you only use Letter Identity, you can ignore this section."),
+            };
+            add_prefs_row (integration, count_row (_("Mail accounts"), store.items.get_n_items ()));
+            add_prefs_row (integration, count_row (_("Calendars"), store.calendar_count));
+            add_prefs_row (integration, count_row (_("Address books"), store.contact_count));
+        }
 
         var appearance = new Adw.PreferencesGroup () {
             title = _("Appearance"),
@@ -299,7 +301,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
 
         var sync = new Adw.PreferencesGroup () {
             title = _("Synchronization"),
-            description = _("Headers stay local for every folder. Bodies and attachments are kept only for the period you choose. The first sync can take a while; after that, folders stay up to date."),
+            description = _("Headers stay local for every folder. Bodies and attachments are kept only for the period you choose. The first sync can take a while; after that, folders stay up to date. Letter Microsoft accounts use on-demand attachments for smarter disk use."),
         };
 
         this.interval_row = new Adw.ComboRow () {
@@ -430,21 +432,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
             fill_cache_accounts ();
         });
 
-        var deps_group = new Adw.PreferencesGroup ();
-        var deps_row = new Adw.ActionRow () {
-            title = _("Dependencies and recommended packages"),
-            subtitle = _("Check the software requirements for Letter to work correctly."),
-            activatable = true,
-        };
-        deps_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic") {
-            valign = Gtk.Align.CENTER,
-        });
-        deps_row.activated.connect (() => {
-            push_subpage (new DependencyListPage ());
-        });
-        add_prefs_row (deps_group, deps_row);
-
-        /* Four top-level pages — Adw.PreferencesDialog shows a ViewSwitcher
+        /* Top-level pages — Adw.PreferencesDialog shows a ViewSwitcher
          * in the header (same pattern as GNOME Terminal / Settings). */
         var accounts_page = new Adw.PreferencesPage () {
             name = "accounts",
@@ -480,10 +468,10 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
 
         var collected_row = new Adw.ActionRow () {
             title = _("Recent addresses"),
-            subtitle = _("Addresses gathered from sent mail. Remove ones you do not want in compose suggestions."),
+            subtitle = _("Addresses gathered from sent mail. Remove ones you do not want in suggestions while writing an email."),
             activatable = true,
         };
-        var manage_collected = new Gtk.Button.with_label (_("Manage…")) {
+        var manage_collected = new Gtk.Button.with_label (_("Manage")) {
             valign = Gtk.Align.CENTER,
         };
         manage_collected.add_css_class ("flat");
@@ -501,22 +489,39 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         behavior_page.add (contacts_compose);
         behavior_page.add (notifications);
 
-        var integrations_page = new Adw.PreferencesPage () {
-            name = "integrations",
-            title = _("Integrations"),
-            icon_name = "application-x-addon-symbolic",
-        };
-        integrations_page.add (integration);
-        integrations_page.add (deps_group);
-
         add (accounts_page);
         add (appearance_page);
         add (behavior_page);
-        add (integrations_page);
         widen_page_content (accounts_page, PAGE_CONTENT_WIDTH);
         widen_page_content (appearance_page, PAGE_CONTENT_WIDTH);
         widen_page_content (behavior_page, PAGE_CONTENT_WIDTH);
-        widen_page_content (integrations_page, PAGE_CONTENT_WIDTH);
+
+        /* GNOME-only for now — other desktops use Letter Identity without this tab. */
+        if (integration != null) {
+            var deps_group = new Adw.PreferencesGroup ();
+            var deps_row = new Adw.ActionRow () {
+                title = _("Dependencies and recommended packages"),
+                subtitle = _("Check the software requirements for Letter to work correctly."),
+                activatable = true,
+            };
+            deps_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic") {
+                valign = Gtk.Align.CENTER,
+            });
+            deps_row.activated.connect (() => {
+                push_subpage (new DependencyListPage ());
+            });
+            add_prefs_row (deps_group, deps_row);
+
+            var integrations_page = new Adw.PreferencesPage () {
+                name = "integrations",
+                title = _("Integrations"),
+                icon_name = "application-x-addon-symbolic",
+            };
+            integrations_page.add (integration);
+            integrations_page.add (deps_group);
+            add (integrations_page);
+            widen_page_content (integrations_page, PAGE_CONTENT_WIDTH);
+        }
         /* PreferencesDialog has no widget tree until mapped — polish then. */
         this.map.connect (() => {
             polish_prefs_rows_under (this);

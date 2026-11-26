@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Terms of Service — Letter</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --fg: #241f31;
+      --muted: #5e5c64;
+      --bg: #f6f5f4;
+      --card: #fff;
+      --accent: #1a5fb4;
+      --border: #deddda;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #eeeeec;
+        --muted: #c0bfbc;
+        --bg: #1e1e1e;
+        --card: #2d2d2d;
+        --border: #3d3846;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.55;
+      color: var(--fg);
+      background:
+        radial-gradient(900px 380px at 50% -20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
+        var(--bg);
+    }
+    .site-header {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 1.25rem 1.25rem 0;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.7rem;
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+    .brand svg { flex-shrink: 0; }
+    .brand:hover { opacity: 0.9; }
+    .site-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem 1.1rem;
+      margin: 0.85rem 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.92rem;
+    }
+    .site-nav a { color: var(--muted); text-decoration: none; }
+    .site-nav a:hover,
+    .site-nav a[aria-current="page"] { color: var(--accent); }
+    main {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 1.15rem 1.25rem 4rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 1.35rem;
+    }
+    h1 { font-size: 1.65rem; margin: 0 0 0.35rem; color: var(--accent); }
+    h2 { font-size: 1.15rem; margin: 1.75rem 0 0.5rem; }
+    .meta { color: var(--muted); font-size: 0.95rem; margin: 0 0 1.25rem; }
+    a { color: var(--accent); }
+    ul { padding-left: 1.2rem; }
+    footer.page-nav { margin-top: 1.5rem; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 128 128" aria-hidden="true">
+        <rect x="8" y="8" width="112" height="112" rx="24" fill="#1a5fb4"/>
+        <g transform="translate(8 8) scale(0.875)">
+          <rect x="22" y="30" width="84" height="68" rx="8" fill="#f6f5f4"/>
+          <path d="M22 38.5 L64 68 L106 38.5" fill="none" stroke="#1a5fb4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+      Letter
+    </a>
+    <ul class="site-nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="privacy.html">Privacy</a></li>
+      <li><a href="terms.html" aria-current="page">Terms</a></li>
+      <li><a href="https://github.com/stalvatero/letter">GitHub</a></li>
+    </ul>
+  </header>
+  <main class="card">
+    <h1>Terms of Service</h1>
+    <p class="meta">Letter (also shown as “Lettera”) · Effective 26 November 2026 · Developer: Salvatore Oscurato</p>
+
+    <p>
+      These Terms of Service (“Terms”) govern your use of the <strong>Letter</strong> desktop email application
+      and related project pages. By downloading, installing, or using Letter, you agree to these Terms.
+      If you do not agree, do not use the app.
+    </p>
+
+    <h2>1. What Letter is</h2>
+    <p>
+      Letter is a free and open-source email client for Linux desktops (GTK 4 / libadwaita), developed as a
+      personal project by Salvatore Oscurato. Source code and releases are published at
+      <a href="https://github.com/stalvatero/letter">https://github.com/stalvatero/letter</a>.
+      Letter helps you read and send email using accounts you control (Letter Identity and/or optional
+      GNOME Online Accounts).
+    </p>
+
+    <h2>2. Licence of the software</h2>
+    <p>
+      The Letter program is licensed under the <strong>GNU General Public License version 3 or later</strong>
+      (GPL-3.0-or-later), as stated in the project repository. These Terms do not replace the GPL for
+      your rights to copy, modify, and redistribute the software. Where these Terms and the GPL conflict
+      regarding software licensing, the GPL controls for those rights.
+    </p>
+
+    <h2>3. Your accounts and providers</h2>
+    <ul>
+      <li>You must have the right to use any Google, Microsoft, IMAP, or other account you connect.</li>
+      <li>Your use of Google, Microsoft, or other third-party services remains subject to <strong>their</strong> terms and policies.</li>
+      <li>Letter is not affiliated with or endorsed by Google LLC or Microsoft Corporation.</li>
+      <li>You are responsible for keeping credentials and device access secure.</li>
+    </ul>
+
+    <h2>4. Acceptable use</h2>
+    <p>You agree not to use Letter to:</p>
+    <ul>
+      <li>Violate applicable law or third-party rights</li>
+      <li>Abuse mail providers (spam, unauthorized access, scraping beyond normal personal mail use)</li>
+      <li>Attempt to bypass security or OAuth protections of Letter or of identity providers</li>
+    </ul>
+
+    <h2>5. No warranty</h2>
+    <p>
+      Letter is provided <strong>“as is”</strong> and <strong>“as available”</strong>, without warranty of any kind,
+      to the maximum extent permitted by law. This includes implied warranties of merchantability,
+      fitness for a particular purpose, and non-infringement. Mail sync, search, and notifications may fail;
+      always keep important mail available through your provider’s own interfaces as well.
+    </p>
+
+    <h2>6. Limitation of liability</h2>
+    <p>
+      To the maximum extent permitted by law, Salvatore Oscurato and contributors are not liable for any
+      indirect, incidental, special, consequential, or punitive damages, or for loss of data, mail, profits,
+      or business, arising from your use of Letter—even if advised of the possibility. Liability for direct
+      damages, where it cannot be excluded, is limited to zero euros because Letter is provided free of charge.
+    </p>
+
+    <h2>7. Privacy</h2>
+    <p>
+      How Letter handles information is described in the
+      <a href="privacy.html">Privacy Policy</a>. By using Letter you also acknowledge that policy.
+    </p>
+
+    <h2>8. Updates and changes</h2>
+    <p>
+      Letter may change through new releases. These Terms may be updated; the effective date above will change.
+      Continued use after an update constitutes acceptance of the revised Terms. You may stop using Letter at any time
+      by uninstalling it and revoking app access in your Google / Microsoft account settings if you signed in with them.
+    </p>
+
+    <h2>9. Termination</h2>
+    <p>
+      You may stop using Letter at any time. We may stop distributing builds or change the project scope.
+      Provider-side access can be revoked by you or by the provider under their rules.
+    </p>
+
+    <h2>10. Governing law</h2>
+    <p>
+      These Terms are governed by the laws of Italy, without regard to conflict-of-law rules,
+      except where mandatory consumer protections in your country of residence apply and cannot be waived.
+    </p>
+
+    <h2>11. Contact</h2>
+    <p>
+      Questions about these Terms:
+      <a href="mailto:soscurato@gmail.com">soscurato@gmail.com</a><br/>
+      Project issues:
+      <a href="https://github.com/stalvatero/letter/issues">https://github.com/stalvatero/letter/issues</a>
+    </p>
+
+    <footer class="page-nav">
+      <a href="index.html">Home</a> ·
+      <a href="privacy.html">Privacy Policy</a>
+    </footer>
+  </main>
+</body>
+</html>
