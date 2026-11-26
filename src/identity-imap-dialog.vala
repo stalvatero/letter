@@ -227,7 +227,7 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
         if (provider == "microsoft" && IdentityOAuth.microsoft_client_id () == null) {
             var alert = new Adw.AlertDialog (
                 _("Microsoft client id missing"),
-                _("Register a Letter Azure public client (personal + work accounts), add redirect http://127.0.0.1:8743/letter-oauth, then set LETTER_MS_CLIENT_ID. See PLATFORM-MS-AZURE-APP.md. Hotmail needs no IT; work M365 uses the same Client ID later.")
+                _("Register a Letter Azure public client named “Letter E-mail Client” (personal + work accounts), add redirect http://127.0.0.1:8743/letter-oauth, then set LETTER_MS_CLIENT_ID. See PLATFORM-MS-AZURE-APP.md. Hotmail needs no IT; work M365 uses the same Client ID later. LETTER_MS_MAIL=graph enables the Graph engine (opt-in).")
             );
             alert.add_response ("ok", _("OK"));
             alert.add_response ("imap", _("Use IMAP instead"));
@@ -273,6 +273,8 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
                     profile.email,
                     profile.display_name ?? profile.email
                 );
+                if (IdentityOAuth.microsoft_mail_uses_graph ())
+                    acc.graph_scope_stamp = IdentityOAuth.MICROSOFT_GRAPH_SCOPE;
             }
             catalog.save ();
             IdentitySecrets.store_oauth_tokens (
@@ -280,6 +282,13 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
                 _("Letter OAuth: %s").printf (profile.email),
                 profile.tokens
             );
+            if (provider == "microsoft" && IdentityOAuth.microsoft_mail_uses_graph ()) {
+                IdentitySecrets.store_oauth_tokens (
+                    IdentityOAuth.graph_secret_id (acc.id),
+                    _("Letter OAuth Graph: %s").printf (profile.email),
+                    profile.tokens
+                );
+            }
             account_added (acc.id);
             close ();
         } catch (Error e) {

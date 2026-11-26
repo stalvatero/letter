@@ -7,6 +7,13 @@ option(
 )
 
 option(
+  'tests',
+  type: 'boolean',
+  value: true,
+  description: 'Build unit tests (disable for Flatpak / release packaging)',
+)
+
+option(
   'imap_spike',
   type: 'boolean',
   value: true,

@@ -13,6 +13,9 @@ public class Mail.PendingMail : Object {
     public bool is_forward { get; set; }
     public string? reply_message_id { get; set; }
     public string? reply_in_reply_to { get; set; }
+    /** Graph/Camel parent uid for createForward/createReply threading. */
+    public string? reply_uid { get; set; }
+    public string? reply_conversation_id { get; set; }
     public uint attempts { get; set; }
     public int64 next_attempt_us { get; set; }
     public string? last_error { get; set; }
@@ -131,6 +134,10 @@ public class Mail.OutboxStore : Object {
         if (thread_of != null) {
             item.reply_message_id = thread_of.message_id;
             item.reply_in_reply_to = thread_of.in_reply_to ?? thread_of.message_id;
+            if (thread_of.uid != null && thread_of.uid.length > 0)
+                item.reply_uid = thread_of.uid;
+            if (thread_of.conversation_id != null && thread_of.conversation_id.length > 0)
+                item.reply_conversation_id = thread_of.conversation_id;
         }
         write_bodies (dir, item.plain, item.html);
         item.attachment_names = yield snapshot_attachments (dir, attachments);
@@ -181,12 +188,17 @@ public class Mail.OutboxStore : Object {
     }
 
     public MessageContent? thread_content_for (PendingMail item) {
-        if (item.reply_message_id == null || item.reply_message_id.length == 0)
+        var has_msgid = item.reply_message_id != null && item.reply_message_id.length > 0;
+        var has_uid = item.reply_uid != null && item.reply_uid.length > 0;
+        var has_conv = item.reply_conversation_id != null
+            && item.reply_conversation_id.length > 0;
+        if (!has_msgid && !has_uid && !has_conv)
             return null;
         return new MessageContent () {
-            uid = "outbox-thread",
+            uid = has_uid ? item.reply_uid : "outbox-thread",
             message_id = item.reply_message_id,
             in_reply_to = item.reply_in_reply_to,
+            conversation_id = item.reply_conversation_id,
         };
     }
 
@@ -402,6 +414,9 @@ public class Mail.OutboxStore : Object {
                 last_error = key.has_key ("mail", "error") ? key.get_string ("mail", "error") : null,
                 reply_message_id = key.has_key ("mail", "reply-id") ? key.get_string ("mail", "reply-id") : null,
                 reply_in_reply_to = key.has_key ("mail", "reply-irt") ? key.get_string ("mail", "reply-irt") : null,
+                reply_uid = key.has_key ("mail", "reply-uid") ? key.get_string ("mail", "reply-uid") : null,
+                reply_conversation_id = key.has_key ("mail", "reply-cid")
+                    ? key.get_string ("mail", "reply-cid") : null,
             };
             try {
                 string plain;
@@ -450,6 +465,10 @@ public class Mail.OutboxStore : Object {
             key.set_string ("mail", "reply-id", item.reply_message_id);
         if (item.reply_in_reply_to != null)
             key.set_string ("mail", "reply-irt", item.reply_in_reply_to);
+        if (item.reply_uid != null)
+            key.set_string ("mail", "reply-uid", item.reply_uid);
+        if (item.reply_conversation_id != null)
+            key.set_string ("mail", "reply-cid", item.reply_conversation_id);
         if (item.attachment_names.length > 0) {
             string[] names = {};
             for (uint i = 0; i < item.attachment_names.length; i++)

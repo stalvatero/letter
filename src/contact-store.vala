@@ -26,6 +26,12 @@ public class Mail.ContactStore : Object {
     private HashTable<string, uint8> harvested_sent;
     private uint save_source;
     private string? prefer_key;
+    private Settings settings;
+    /** Lowercased emails present in EDS / Graph contacts (not Sent harvest). */
+    private HashTable<string, uint8> book_emails =
+        new HashTable<string, uint8> (str_hash, str_equal);
+    private bool book_emails_ready;
+    private bool book_emails_loading;
 
     private class Collected {
         public string email = "";
@@ -43,9 +49,162 @@ public class Mail.ContactStore : Object {
     }
 
     public ContactStore () {
+        this.settings = new Settings (Config.APP_ID);
         this.collected = new HashTable<string, Collected> (str_hash, str_equal);
         this.harvested_sent = new HashTable<string, uint8> (str_hash, str_equal);
         load_collected ();
+    }
+
+    /** Preferences → Contacts and compose (default true). */
+    public bool search_all_accounts () {
+        return this.settings.get_boolean ("compose-contacts-all-accounts");
+    }
+
+    /**
+     * Gathered recent addresses that are not in any address book.
+     * Call refresh_book_email_index() first so Graph/EDS matches are pruned.
+     */
+    public GenericArray<ContactHit> list_collected () {
+        var hits = new GenericArray<ContactHit> ();
+        this.collected.foreach ((key, entry) => {
+            if (this.book_emails_ready && this.book_emails.contains (key))
+                return;
+            hits.add (new ContactHit () {
+                name = entry.name ?? "",
+                email = entry.email ?? "",
+                from_book = false,
+                last_used = entry.last_used,
+                uses = entry.uses,
+                account_key = entry.account_key,
+            });
+        });
+        hits.sort_with_data ((a, b) => {
+            if (a.last_used != b.last_used)
+                return a.last_used > b.last_used ? -1 : 1;
+            return a.email.collate (b.email);
+        });
+        return hits;
+    }
+
+    /**
+     * Rebuild the address-book email index (EDS + Graph contacts) and drop
+     * collected “recent” rows that already exist in a rubrica.
+     */
+    public async uint refresh_book_email_index (Cancellable? cancellable = null) {
+        while (this.book_emails_loading) {
+            Timeout.add (50, refresh_book_email_index.callback);
+            yield;
+            if (cancellable != null && cancellable.is_cancelled ())
+                return 0;
+        }
+        this.book_emails_loading = true;
+        var next = new HashTable<string, uint8> (str_hash, str_equal);
+        Error? err = null;
+        SourceFunc callback = refresh_book_email_index.callback;
+        new Thread<void*> ("letter-book-emails", () => {
+            try {
+                if (IdentityOAuth.microsoft_mail_uses_graph ()) {
+                    IdentityCatalog catalog;
+                    try {
+                        catalog = IdentityCatalog.load ();
+                    } catch (Error e) {
+                        catalog = new IdentityCatalog ();
+                    }
+                    for (uint i = 0; i < catalog.accounts.length; i++) {
+                        if (cancellable != null && cancellable.is_cancelled ())
+                            break;
+                        var acc = catalog.accounts[i];
+                        if (!acc.enabled)
+                            continue;
+                        var kind = (acc.kind ?? "").down ();
+                        if (kind != "microsoft" && kind != "ms365")
+                            continue;
+                        try {
+                            var token = IdentityOAuth.ensure_microsoft_graph_access_sync (acc);
+                            var client = new LetterGraph.Client (token);
+                            client.collect_contact_emails_sync (next, cancellable);
+                        } catch (Error e) {
+                            warning ("Graph contacts index “%s”: %s", acc.email, e.message);
+                        }
+                        try {
+                            var token = IdentityOAuth.ensure_microsoft_graph_access_sync (acc);
+                            var client = new LetterGraph.Client (token);
+                            client.collect_gal_emails_sync (next, cancellable);
+                        } catch (Error e) {
+                            /* Personal MSA / missing User.ReadBasic.All — contacts still apply. */
+                            warning ("Graph GAL index “%s”: %s", acc.email, e.message);
+                        }
+                    }
+                }
+            } catch (Error e) {
+                err = e;
+            }
+            Idle.add (() => {
+                callback ();
+                return Source.REMOVE;
+            });
+            return null;
+        });
+        yield;
+        this.book_emails_loading = false;
+        if (err != null)
+            warning ("Address-book email index: %s", err.message);
+
+        yield ensure_books (cancellable);
+        if (cancellable == null || !cancellable.is_cancelled ()) {
+            for (uint i = 0; i < this.books.length; i++) {
+                if (cancellable != null && cancellable.is_cancelled ())
+                    break;
+                try {
+                    SList<E.Contact>? listed = null;
+                    yield this.books[i].client.get_contacts (
+                        "(exists \"email\")",
+                        cancellable,
+                        out listed
+                    );
+                    if (listed == null)
+                        continue;
+                    foreach (var contact in listed) {
+                        if (contact == null)
+                            continue;
+                        string?[] emails = {
+                            contact.email_1,
+                            contact.email_2,
+                            contact.email_3,
+                            contact.email_4,
+                        };
+                        for (uint e = 0; e < emails.length; e++) {
+                            var key = Utils.sanitize_recipient_text (emails[e]).down ();
+                            if (key.length > 0 && key.contains ("@"))
+                                next.set (key, 1);
+                        }
+                    }
+                } catch (Error e) {
+                    if (e is IOError.CANCELLED)
+                        break;
+                    debug ("EDS contacts index: %s", e.message);
+                }
+            }
+        }
+
+        this.book_emails = next;
+        this.book_emails_ready = true;
+        return prune_collected_in_books ();
+    }
+
+    private uint prune_collected_in_books () {
+        if (!this.book_emails_ready)
+            return 0;
+        var drop = new GenericArray<string> ();
+        this.collected.foreach ((key, entry) => {
+            if (this.book_emails.contains (key))
+                drop.add (key);
+        });
+        for (uint i = 0; i < drop.length; i++)
+            this.collected.remove (drop[i]);
+        if (drop.length > 0)
+            queue_save ();
+        return drop.length;
     }
 
     public void bind_registry (E.SourceRegistry? registry) {
@@ -93,6 +252,12 @@ public class Mail.ContactStore : Object {
             return trim_hits (hits, limit);
         }
 
+        /* Graph Contacts/People/GAL first — do not wait on EDS books (SKIP_GOA
+         * often has no registry; a slow EDS connect used to starve Graph). */
+        yield query_graph_directory (prefer, needle, hits, seen, cancellable);
+        if (cancellable != null && cancellable.is_cancelled ())
+            return trim_hits (hits, limit);
+
         yield ensure_books (cancellable);
         if (cancellable != null && cancellable.is_cancelled ())
             return trim_hits (hits, limit);
@@ -110,10 +275,143 @@ public class Mail.ContactStore : Object {
         /* Preferred-account books first — never starve them behind another
          * account's full personal book. Cap only after both passes + sort. */
         yield query_books (prefer_slots, sexp, needle, hits, seen, cancellable, this.prefer_key);
-        yield query_books (other_slots, sexp, needle, hits, seen, cancellable, null);
+        if (search_all_accounts ())
+            yield query_books (other_slots, sexp, needle, hits, seen, cancellable, null);
 
         sort_hits (hits, needle);
         return trim_hits (hits, limit);
+    }
+
+    private async void query_graph_directory (
+        Account? prefer,
+        string needle,
+        GenericArray<ContactHit> hits,
+        HashTable<string, uint8> seen,
+        Cancellable? cancellable
+    ) {
+        if (!IdentityOAuth.microsoft_mail_uses_graph ())
+            return;
+        if (needle.length < 2)
+            return;
+
+        GenericArray<LetterGraph.PersonHit>? people = null;
+        string? score_key = account_key (prefer);
+        Error? graph_error = null;
+        SourceFunc callback = query_graph_directory.callback;
+        var prefer_uid = prefer != null ? (prefer.source_uid ?? prefer.uid) : null;
+        var all_accounts = search_all_accounts ();
+        var q = needle;
+        new Thread<void*> ("letter-graph-contacts", () => {
+            try {
+                IdentityCatalog catalog;
+                try {
+                    catalog = IdentityCatalog.load ();
+                } catch (Error e) {
+                    catalog = new IdentityCatalog ();
+                }
+                var id_accounts = new GenericArray<IdentityAccount> ();
+                IdentityAccount? preferred = null;
+                for (uint i = 0; i < catalog.accounts.length; i++) {
+                    var acc = catalog.accounts[i];
+                    if (!acc.enabled)
+                        continue;
+                    var kind = (acc.kind ?? "").down ();
+                    if (kind != "microsoft" && kind != "ms365")
+                        continue;
+                    if (prefer_uid != null && acc.id == prefer_uid)
+                        preferred = acc;
+                    else if (all_accounts)
+                        id_accounts.add (acc);
+                }
+                /* Prefer From: first; other Microsoft rows only when the
+                 * “all accounts” preference is on. */
+                if (preferred != null) {
+                    var ordered = new GenericArray<IdentityAccount> ();
+                    ordered.add (preferred);
+                    for (uint i = 0; i < id_accounts.length; i++)
+                        ordered.add (id_accounts[i]);
+                    id_accounts = ordered;
+                }
+                people = new GenericArray<LetterGraph.PersonHit> ();
+                if (id_accounts.length == 0) {
+                    Idle.add (() => {
+                        callback ();
+                        return Source.REMOVE;
+                    });
+                    return null;
+                }
+                var merge_seen = new HashTable<string, uint8> (str_hash, str_equal);
+                for (uint i = 0; i < id_accounts.length; i++) {
+                    if (cancellable != null && cancellable.is_cancelled ())
+                        break;
+                    try {
+                        var token = IdentityOAuth.ensure_microsoft_graph_access_sync (id_accounts[i]);
+                        var client = new LetterGraph.Client (token);
+                        var batch = client.search_people_for_compose_sync (q, 12, cancellable);
+                        for (uint j = 0; j < batch.length; j++) {
+                            var email = Utils.sanitize_recipient_text (batch[j].email).down ();
+                            if (email.length == 0 || !email.contains ("@") || merge_seen.contains (email))
+                                continue;
+                            merge_seen.set (email, 1);
+                            people.add (batch[j]);
+                        }
+                    } catch (Error e) {
+                        warning (
+                            "Graph directory search “%s”: %s",
+                            id_accounts[i].email,
+                            e.message
+                        );
+                    }
+                }
+            } catch (Error e) {
+                graph_error = e;
+            }
+            Idle.add (() => {
+                callback ();
+                return Source.REMOVE;
+            });
+            return null;
+        });
+        yield;
+        if (cancellable != null && cancellable.is_cancelled ())
+            return;
+        if (graph_error != null) {
+            warning ("Graph directory search: %s", graph_error.message);
+            return;
+        }
+        if (people == null)
+            return;
+        for (uint i = 0; i < people.length; i++) {
+            var email = Utils.sanitize_recipient_text (people[i].email).down ();
+            if (email.length == 0 || !email.contains ("@"))
+                continue;
+            var name = Utils.sanitize_recipient_text (people[i].name);
+            if (seen.contains (email)) {
+                /* Upgrade a recent-only row to address-book when Graph confirms. */
+                for (uint h = 0; h < hits.length; h++) {
+                    if (hits[h].email.down () != email)
+                        continue;
+                    hits[h].from_book = true;
+                    if (name.length > 0
+                        && (hits[h].name.length == 0
+                            || hits[h].name.down () == email))
+                        hits[h].name = name;
+                    if (score_key != null && hits[h].account_key == null)
+                        hits[h].account_key = score_key;
+                    break;
+                }
+                continue;
+            }
+            seen.set (email, 1);
+            hits.add (new ContactHit () {
+                name = name,
+                email = email,
+                from_book = true,
+                account_key = score_key,
+                uses = 0,
+                last_used = 0,
+            });
+        }
     }
 
     public async bool has_book_email (string email, Cancellable? cancellable = null) {
@@ -253,22 +551,41 @@ public class Mail.ContactStore : Object {
             return;
         if (this.harvested_sent.contains (key))
             return;
-        this.harvested_sent.set (key, 1);
 
         var changed = false;
+        var saw_address_field = false;
         for (uint i = 0; i < messages.length; i++) {
             var message = messages[i];
             if (!message.outgoing)
                 continue;
-            /* Prefer raw To/Cc (with addresses). message.to/cc are display-only
-             * name lists — parsing those glued every chip into one “name”. */
-            if (remember_header_field (message.to_header ?? "", account, message.date, true))
+            /* Prefer raw To/Cc (with addresses). Fall back to to/cc when they
+             * already carry mailboxes (Graph list headers / disk cache) —
+             * display-only name lists without @ are still skipped. */
+            var to_raw = harvest_address_field (message.to_header, message.to);
+            var cc_raw = harvest_address_field (message.cc_header, message.cc);
+            if (to_raw.length > 0 || cc_raw.length > 0)
+                saw_address_field = true;
+            if (remember_header_field (to_raw, account, message.date, true))
                 changed = true;
-            if (remember_header_field (message.cc_header ?? "", account, message.date, true))
+            if (remember_header_field (cc_raw, account, message.date, true))
                 changed = true;
         }
-        if (changed)
+        /* Seal the one-shot only after a useful scan. If Sent tip/disk lacked
+         * address fields (old Graph rows without to_header), retry later. */
+        if (changed) {
+            this.harvested_sent.set (key, 1);
             queue_save ();
+        } else if (saw_address_field) {
+            this.harvested_sent.set (key, 1);
+        }
+    }
+
+    private static string harvest_address_field (string? preferred, string? fallback) {
+        if (preferred != null && preferred.contains ("@"))
+            return preferred;
+        if (fallback != null && fallback.contains ("@"))
+            return fallback;
+        return "";
     }
 
     public void remember_outgoing_headers (
@@ -558,6 +875,10 @@ public class Mail.ContactStore : Object {
                 return;
             if (seen.contains (key))
                 return;
+            if (!collected_allowed_for_prefer (entry))
+                return;
+            if (this.book_emails_ready && this.book_emails.contains (key))
+                return;
             /* History is keyed by mailbox: match the address (and a name only
              * when it actually belongs to that address). Never surface
              * “Lupo Giovanni” glued onto advertising@…. */
@@ -573,6 +894,15 @@ public class Mail.ContactStore : Object {
                 account_key = entry.account_key,
             });
         });
+    }
+
+    private bool collected_allowed_for_prefer (Collected entry) {
+        if (search_all_accounts ())
+            return true;
+        if (this.prefer_key == null || this.prefer_key.length == 0)
+            return true;
+        var key = entry.account_key ?? "";
+        return key.length > 0 && key == this.prefer_key;
     }
 
     private static bool contact_has_email (E.Contact contact, string needle) {

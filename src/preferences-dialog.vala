@@ -347,7 +347,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
 
         this.cache_group = new Adw.PreferencesGroup () {
             title = _("Local library"),
-            description = _("Letter caches headers and full messages (bodies and attachments) for every folder in the window below. First fill can take hours; Inbox checks and sending stay responsive. Progress resumes after restart."),
+            description = _("Letter caches headers and message bodies for every folder below. Attachments download when you open a message and then stay on disk until you Reset. First fill can take hours; Inbox checks and sending stay responsive."),
         };
         this.total_row = new Adw.ActionRow () {
             title = _("Disk used"),
@@ -462,12 +462,43 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         appearance_page.add (appearance);
         appearance_page.add (reading);
 
+        var contacts_compose = new Adw.PreferencesGroup () {
+            title = _("Contacts and compose"),
+        };
+        var all_contacts_row = new Adw.SwitchRow () {
+            title = _("Use contacts from all accounts"),
+            subtitle = _("Search address books and directories for every mail account, not only the account selected in From."),
+            active = this.settings.get_boolean ("compose-contacts-all-accounts"),
+        };
+        all_contacts_row.notify["active"].connect (() => {
+            this.settings.set_boolean (
+                "compose-contacts-all-accounts",
+                all_contacts_row.active
+            );
+        });
+        add_prefs_row (contacts_compose, all_contacts_row);
+
+        var collected_row = new Adw.ActionRow () {
+            title = _("Recent addresses"),
+            subtitle = _("Addresses gathered from sent mail. Remove ones you do not want in compose suggestions."),
+            activatable = true,
+        };
+        var manage_collected = new Gtk.Button.with_label (_("Manage…")) {
+            valign = Gtk.Align.CENTER,
+        };
+        manage_collected.add_css_class ("flat");
+        manage_collected.clicked.connect (open_collected_addresses);
+        collected_row.activated.connect (open_collected_addresses);
+        collected_row.add_suffix (manage_collected);
+        add_prefs_row (contacts_compose, collected_row);
+
         var behavior_page = new Adw.PreferencesPage () {
             name = "behavior",
             title = _("Behavior"),
             icon_name = "preferences-system-symbolic",
         };
         behavior_page.add (sync);
+        behavior_page.add (contacts_compose);
         behavior_page.add (notifications);
 
         var integrations_page = new Adw.PreferencesPage () {
@@ -490,6 +521,14 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         this.map.connect (() => {
             polish_prefs_rows_under (this);
         });
+    }
+
+    private void open_collected_addresses () {
+        var app = this.host?.get_application () as Application;
+        if (app == null)
+            return;
+        var dialog = new CollectedAddressesDialog (app.contacts);
+        dialog.present (this);
     }
 
     private static void add_prefs_row (Adw.PreferencesGroup group, Adw.ActionRow row) {

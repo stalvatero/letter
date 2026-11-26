@@ -63,6 +63,10 @@ public class Mail.ImapMailBackend : Object, MailBackend {
     private uint prefetch_cursor_save_source = 0;
     /* Until-done header walk: next to_seq (descending) per folder. */
     private HashTable<string, uint> header_walk_to_seq;
+    /* UIDs accumulated across until-done slices (like Graph header_list_accum).
+     * Without this the final slice alone replaces the list and shrinks
+     * Importanti 9k → 1.6k every timer. */
+    private HashTable<string, GenericArray<Message>> header_walk_accum;
     private bool header_walk_loaded = false;
     private uint header_walk_save_source = 0;
     /* Serialize connect / catalog / libsecret / OAuth (not thread-safe). */
@@ -128,6 +132,7 @@ public class Mail.ImapMailBackend : Object, MailBackend {
         this.idle_watches = new HashTable<string, IdleWatch> (str_hash, str_equal);
         this.prefetch_cursor = new HashTable<string, int> (str_hash, str_equal);
         this.header_walk_to_seq = new HashTable<string, uint> (str_hash, str_equal);
+        this.header_walk_accum = new HashTable<string, GenericArray<Message>> (str_hash, str_equal);
         this.imap_io_lock = Mutex ();
         this.idle_state_lock = Mutex ();
         try {
@@ -239,6 +244,7 @@ public class Mail.ImapMailBackend : Object, MailBackend {
                         folder,
                         cancellable,
                         refresh_timeout_seconds,
+                        previous,
                         out incomplete
                     );
                 } catch (Error e) {
@@ -261,8 +267,11 @@ public class Mail.ImapMailBackend : Object, MailBackend {
             var listed = result ?? new GenericArray<Message> ();
             sort_by_date_desc (listed);
             /* Tip (incomplete): merge into prior Letter headers so a 2500-cap
-             * FETCH never drops older UIDs already on disk/RAM. */
-            if (incomplete && previous != null && previous.length > 0)
+             * FETCH never drops older UIDs already on disk/RAM.
+             * Until-done slices accumulate inside list_messages_sync — do not
+             * tip-merge on the finished walk (that would keep deleted ghosts). */
+            var until_done = refresh_timeout_seconds == MailSession.REFRESH_INFO_FORCE_UNTIL_DONE;
+            if (incomplete && !until_done && previous != null && previous.length > 0)
                 listed = merge_tip_into_previous (previous, listed);
             /* Keep local-sent-* until the server UID lands (subject/date match). */
             listed = retain_local_placeholders (listed, previous);
@@ -282,18 +291,28 @@ public class Mail.ImapMailBackend : Object, MailBackend {
         Folder folder,
         Cancellable? cancellable,
         uint refresh_timeout_seconds,
+        GenericArray<Message>? previous,
         out bool incomplete
     ) throws Error {
         incomplete = false;
         var until_done = refresh_timeout_seconds == MailSession.REFRESH_INFO_FORCE_UNTIL_DONE;
+        if (Account.looks_like_graph_folder_id (folder.full_name)) {
+            throw new IOError.FAILED (
+                _("Folder “%s” still has a Graph id (AQMk…). Re-open the account with LETTER_MS_MAIL=graph, or clear the folder cache and use IMAP.")
+                    .printf (folder.name ?? folder.full_name)
+            );
+        }
         var client = open_client (account, cancellable);
         try {
             var exists = client.select (folder.full_name, cancellable);
             /* EXISTS updates the STATUS total floor; UNSEEN stays from STATUS. */
             this.folder_exists.set (folder_key (account, folder), (int) exists);
             var listed = new GenericArray<Message> ();
-            if (exists == 0)
+            if (exists == 0) {
+                var walk_key_empty = prefetch_cursor_key (account, folder);
+                clear_header_walk (walk_key_empty);
                 return listed;
+            }
 
             var walk_key = prefetch_cursor_key (account, folder);
             ensure_header_walk_loaded ();
@@ -322,23 +341,31 @@ public class Mail.ImapMailBackend : Object, MailBackend {
                     to_seq = from_seq - 1;
                 }
                 incomplete = tip_from > 1 || listed.length < exists;
-                /* Seed until-done so the next pass walks older than the tip. */
+                /* Seed until-done so the next pass walks older than the tip.
+                 * Drop any stale until-done accum — tip heads are in Letter RAM. */
+                this.header_walk_accum.remove (walk_key);
                 if (tip_from > 1)
                     set_header_walk_to_seq (walk_key, tip_from - 1);
                 else
-                    clear_header_walk_to_seq (walk_key);
+                    clear_header_walk (walk_key);
                 return listed;
             }
 
             /* Full walk in slices (All Mail / Important). Window re-calls
-             * until-done while incomplete so each slice can hit disk/UI. */
+             * until-done while incomplete so each slice can hit disk/UI.
+             * Accumulate like Graph — never return only the last page. */
             uint to_seq = exists;
+            var resuming = false;
             if (this.header_walk_to_seq.contains (walk_key)) {
                 var resume = this.header_walk_to_seq.get (walk_key);
-                if (resume >= 1 && resume <= exists)
+                if (resume >= 1 && resume <= exists) {
                     to_seq = resume;
+                    resuming = true;
+                }
             }
+            var accum = ensure_header_walk_accum (walk_key, resuming, previous);
             uint slices = 0;
+            uint fetched_this_call = 0;
             while (to_seq >= 1 && slices < LIST_HEADER_UNTIL_DONE_SLICES) {
                 if (cancellable != null && cancellable.is_cancelled ()) {
                     incomplete = true;
@@ -348,7 +375,11 @@ public class Mail.ImapMailBackend : Object, MailBackend {
                 uint from_seq = to_seq > LIST_HEADER_CHUNK
                     ? to_seq - LIST_HEADER_CHUNK + 1
                     : 1;
-                append_header_range (client, folder, from_seq, to_seq, listed, cancellable);
+                var slice = new GenericArray<Message> ();
+                append_header_range (client, folder, from_seq, to_seq, slice, cancellable);
+                fetched_this_call += slice.length;
+                accum = merge_tip_into_previous (accum, slice);
+                this.header_walk_accum.set (walk_key, accum);
                 slices++;
                 if (from_seq <= 1) {
                     to_seq = 0;
@@ -362,23 +393,52 @@ public class Mail.ImapMailBackend : Object, MailBackend {
                     set_header_walk_to_seq (walk_key, to_seq);
                 } else {
                     clear_header_walk_to_seq (walk_key);
+                    this.header_walk_accum.remove (walk_key);
                 }
             }
             if (slices > 0 || incomplete) {
                 Utils.sync_log (
-                    "imap headers until-done “%s” +%u this slice (exists %u, next_to=%u%s)".printf (
+                    "imap headers until-done “%s” +%u this slice (accum %u, exists %u, next_to=%u%s)".printf (
                         folder.name,
-                        listed.length,
+                        fetched_this_call,
+                        accum.length,
                         exists,
                         to_seq,
                         incomplete ? ", incomplete" : ""
                     )
                 );
             }
-            return listed;
+            return copy_message_array (accum);
         } finally {
             client.logout (null);
         }
+    }
+
+    private GenericArray<Message> ensure_header_walk_accum (
+        string walk_key,
+        bool resuming,
+        GenericArray<Message>? previous
+    ) {
+        if (!resuming || !this.header_walk_accum.contains (walk_key)) {
+            var accum = new GenericArray<Message> ();
+            /* Resume after restart: RAM accum is gone but Letter disk/RAM
+             * still has earlier slices — seed so the final page cannot
+             * shrink the index back to one chunk. */
+            if (resuming && previous != null) {
+                for (uint i = 0; i < previous.length; i++)
+                    accum.add (previous[i]);
+            }
+            this.header_walk_accum.set (walk_key, accum);
+            return accum;
+        }
+        return this.header_walk_accum.get (walk_key);
+    }
+
+    private static GenericArray<Message> copy_message_array (GenericArray<Message> source) {
+        var copy = new GenericArray<Message> (source.length);
+        for (uint i = 0; i < source.length; i++)
+            copy.add (source[i]);
+        return copy;
     }
 
     private void set_header_walk_to_seq (string walk_key, uint to_seq) {
@@ -389,6 +449,11 @@ public class Mail.ImapMailBackend : Object, MailBackend {
     private void clear_header_walk_to_seq (string walk_key) {
         if (this.header_walk_to_seq.remove (walk_key))
             schedule_header_walk_save ();
+    }
+
+    private void clear_header_walk (string walk_key) {
+        clear_header_walk_to_seq (walk_key);
+        this.header_walk_accum.remove (walk_key);
     }
 
     private static string header_walk_cache_dir () {
@@ -470,18 +535,25 @@ public class Mail.ImapMailBackend : Object, MailBackend {
             var date = parse_mail_date (h.date);
             if (date <= 0)
                 date = parse_imap_internaldate (h.internal_date);
+            var to_raw = decode_rfc2047 (h.to) ?? "";
+            var outgoing_folder = folder.kind == FolderKind.SENT
+                || folder.kind == FolderKind.DRAFTS;
             listed.add (new Message () {
                 uid = uid,
                 subject = decode_rfc2047 (h.subject) ?? _("(No subject)"),
                 from = format_from_display (from_raw),
-                to = decode_rfc2047 (h.to) ?? "",
+                to = to_raw,
+                to_header = to_raw.length > 0 ? to_raw : null,
                 date = date,
                 seen = h.seen,
                 flagged = h.flagged,
                 has_attachment = h.has_attachment,
                 folder_name = folder.name,
                 folder_full_name = folder.full_name,
-                list_address = format_from_display (from_raw),
+                outgoing = outgoing_folder,
+                list_address = outgoing_folder && to_raw.length > 0
+                    ? to_raw
+                    : format_from_display (from_raw),
                 msgid_hash = MailSession.hash_message_id_raw (msgid),
                 msgid_refs = MailSession.msgid_refs_from_raw_headers (in_reply, references),
             });
@@ -952,6 +1024,16 @@ public class Mail.ImapMailBackend : Object, MailBackend {
         this.body_ram.set (body_key (account, folder, uid), content);
         index_body_content (account, folder, uid, content);
         return content;
+    }
+
+    public async void hydrate_message_attachments (
+        Account account,
+        Folder folder,
+        string uid,
+        MessageContent content,
+        Cancellable? cancellable = null
+    ) throws Error {
+        /* RFC822 parse already filled attachments / cid images. */
     }
 
     public async void export_message_eml (
@@ -1529,13 +1611,29 @@ public class Mail.ImapMailBackend : Object, MailBackend {
 
     public async void flush_pending_local_changes_async () {
         try {
-            yield flush_queues_async (null);
+            yield flush_queues_async (null, null, null);
             if (!has_pending_local_flushes ())
                 clear_registry_file ();
             else
                 persist_mutation_registry_now ();
         } catch (Error e) {
             warning ("ImapMailBackend flush async: %s", e.message);
+            persist_mutation_registry_now ();
+        }
+    }
+
+    public async void flush_pending_local_changes_for_folder (
+        Account account,
+        Folder folder
+    ) {
+        try {
+            yield flush_queues_async (null, account, folder);
+            if (!has_pending_local_flushes ())
+                clear_registry_file ();
+            else
+                persist_mutation_registry_now ();
+        } catch (Error e) {
+            warning ("ImapMailBackend scoped flush: %s", e.message);
             persist_mutation_registry_now ();
         }
     }
@@ -1910,15 +2008,45 @@ public class Mail.ImapMailBackend : Object, MailBackend {
             throw error;
     }
 
-    private async void flush_queues_async (Cancellable? cancellable) throws Error {
+    private static bool imap_job_touches_folder (
+        Account? scope_account,
+        Folder? scope_folder,
+        Account job_account,
+        Folder a,
+        Folder? b = null
+    ) {
+        if (scope_account == null || scope_folder == null)
+            return true;
+        var acc = scope_account.source_uid ?? scope_account.uid;
+        var job_acc = job_account.source_uid ?? job_account.uid;
+        if (acc != job_acc)
+            return false;
+        if (a.full_name == scope_folder.full_name)
+            return true;
+        if (b != null && b.full_name == scope_folder.full_name)
+            return true;
+        return false;
+    }
+
+    private async void flush_queues_async (
+        Cancellable? cancellable,
+        Account? scope_account = null,
+        Folder? scope_folder = null
+    ) throws Error {
         if (this.flush_running)
             return;
         this.flush_running = true;
         try {
-            while (this.flag_queue.length > 0) {
+            uint fi = 0;
+            while (fi < this.flag_queue.length) {
                 if (cancellable != null && cancellable.is_cancelled ())
                     throw new IOError.CANCELLED ("Cancelled");
-                var job = this.flag_queue[0];
+                var job = this.flag_queue[fi];
+                if (!imap_job_touches_folder (scope_account, scope_folder, job.account, job.folder)) {
+                    fi++;
+                    continue;
+                }
+                this.flag_queue.remove_index (fi);
                 yield run_on_imap_thread (() => {
                     var client = open_client (job.account, cancellable);
                     try {
@@ -1928,7 +2056,6 @@ public class Mail.ImapMailBackend : Object, MailBackend {
                         client.logout (null);
                     }
                 });
-                this.flag_queue.remove_index (0);
                 maybe_clear_folder_pending_flags (job.account, job.folder);
                 Utils.sync_log ("imap flag flushed %s %s %u in “%s”".printf (
                     job.add ? "+" : "-",
@@ -1937,10 +2064,16 @@ public class Mail.ImapMailBackend : Object, MailBackend {
                     job.folder.name
                 ));
             }
-            while (this.transfer_queue.length > 0) {
+            uint ti = 0;
+            while (ti < this.transfer_queue.length) {
                 if (cancellable != null && cancellable.is_cancelled ())
                     throw new IOError.CANCELLED ("Cancelled");
-                var job = this.transfer_queue[0];
+                var job = this.transfer_queue[ti];
+                if (!imap_job_touches_folder (
+                        scope_account, scope_folder, job.account, job.from, job.destination)) {
+                    ti++;
+                    continue;
+                }
                 var chunk = new GenericArray<string> ();
                 uint limit = uint.min (job.uids.length, 25);
                 for (uint i = 0; i < limit; i++)
@@ -1961,11 +2094,12 @@ public class Mail.ImapMailBackend : Object, MailBackend {
                     unretire_moved_uid (job.account, job.from, chunk[i]);
                     if (job.delete_original)
                         drop_body_files (job.account, job.from, chunk[i]);
-                    /* Drop flushed UIDs from the front. */
                     job.uids.remove_index (0);
                 }
                 if (job.uids.length == 0)
-                    this.transfer_queue.remove_index (0);
+                    this.transfer_queue.remove_index (ti);
+                else
+                    ti++;
                 Utils.sync_log ("imap transfer flushed “%s” → “%s” %u (left %u)".printf (
                     job.from.name,
                     job.destination.name,

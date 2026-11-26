@@ -16,7 +16,7 @@ private static int main (string[] args) {
         try {
             status = run.end (res);
         } catch (GLib.Error e) {
-            stderr.printf ("Graph spike failed: %s\n", e.message);
+            stderr.printf ("Graph check failed: %s\n", e.message);
             status = 1;
         }
         loop.quit ();
@@ -87,7 +87,7 @@ private async int run () throws GLib.Error {
 
     if (headers.length == 0) {
         stdout.printf ("Inbox empty; done.\n");
-        stdout.printf ("OK — Graph spike succeeded without Camel/evolution-ews.\n");
+        stdout.printf ("OK — Graph check succeeded without Camel/evolution-ews.\n");
         return 0;
     }
 
@@ -96,6 +96,6 @@ private async int run () throws GLib.Error {
     var preview = body.length > 400 ? body.substring (0, 400) + "\n…" : body;
     stdout.printf ("---- body preview ----\n%s\n----------------------\n", preview);
 
-    stdout.printf ("OK — Graph spike succeeded without Camel/evolution-ews.\n");
+    stdout.printf ("OK — Graph check succeeded without Camel/evolution-ews.\n");
     return 0;
 }

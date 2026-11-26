@@ -248,7 +248,7 @@ public class Mail.AccountStore : Object {
             into.email = from.email;
 
         /* Keep Letter Identity as the mail engine when the same address
-         * exists in GOA — RoutingMailBackend keys off letter-imap. */
+         * exists in GOA — RoutingMailBackend keys off letter-imap / letter-graph. */
         var identity = into.is_letter_identity || from.is_letter_identity;
 
         if (from.provider_icon != null) {
@@ -279,10 +279,18 @@ public class Mail.AccountStore : Object {
         if (into.goa_id == null)
             into.goa_id = from.goa_id;
 
-        if (identity)
-            into.backend_name = "letter-imap";
-        else if (into.backend_name == null)
+        if (identity) {
+            /* Prefer the Identity row’s engine (imap vs graph). */
+            if (from.is_letter_identity && from.backend_name != null)
+                into.backend_name = from.backend_name;
+            else if (into.is_letter_identity && into.backend_name != null) {
+                /* keep */
+            } else {
+                into.backend_name = "letter-imap";
+            }
+        } else if (into.backend_name == null) {
             into.backend_name = from.backend_name;
+        }
 
         if (!identity && (into.kind == AccountKind.OTHER || into.kind == AccountKind.IMAP))
             into.kind = from.kind;

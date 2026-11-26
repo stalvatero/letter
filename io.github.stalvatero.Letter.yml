@@ -7,6 +7,7 @@
 # Quick test (from the repo root):
 #   ./scripts/build-flatpak.sh
 #   flatpak run io.github.stalvatero.Letter
+# No --env needed: LETTER_MS_CLIENT_ID + LETTER_MS_MAIL=graph are baked below.
 
 app-id: io.github.stalvatero.Letter
 runtime: org.gnome.Platform
@@ -40,6 +41,11 @@ finish-args:
   - --filesystem=xdg-download:rw
   - --filesystem=/tmp
   - --metadata=X-DConf=migrate-path=/io/github/stalvatero/Letter/
+  # Letter Azure public client (“Letter E-mail Client”) + Graph mail for
+  # Microsoft Identity. End users: flatpak run with no --env. Do not bake
+  # LETTER_SKIP_GOA — Preferences / GOA stay available.
+  - --env=LETTER_MS_CLIENT_ID=46b343fc-caa4-4629-b50a-87f1c27fa162
+  - --env=LETTER_MS_MAIL=graph
 
 cleanup:
   - /include
@@ -230,6 +236,10 @@ modules:
     config-opts:
       - --buildtype=release
       - -Dprofile=default
+      - -Dtests=false
+      - -Dimap_spike=false
+      - -Dgraph_spike=false
+      - -Didentity_spike=false
     sources:
       - type: dir
         path: .

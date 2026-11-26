@@ -49,7 +49,7 @@ public class LetterGraph.OAuthPkce : Object {
                 oauth_error = query.lookup ("error");
             }
 
-            var body = "<html><body><h1>Letter Graph spike</h1><p>You can close this tab.</p></body></html>";
+            var body = "<html><body><h1>Letter E-mail Client</h1><p>You can close this tab.</p></body></html>";
             msg.set_status (Soup.Status.OK, null);
             msg.set_response ("text/html; charset=utf-8", Soup.MemoryUse.COPY, body.data);
             Idle.add (() => {

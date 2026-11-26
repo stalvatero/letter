@@ -139,7 +139,9 @@ add_project_arguments(
 subdir('data')
 subdir('src')
 subdir('po')
-subdir('tests')
+if get_option('tests')
+  subdir('tests')
+endif
 
 if get_option('imap_spike')
   subdir('spikes/imap')

@@ -116,6 +116,18 @@ public interface Mail.MailBackend : Object {
         Cancellable? cancellable = null
     ) throws Error;
 
+    /**
+     * Fill file attachments / cid: inlines for an already-shown body (Graph).
+     * No-op on Camel / letter-imap when MIME already has parts.
+     */
+    public abstract async void hydrate_message_attachments (
+        Account account,
+        Folder folder,
+        string uid,
+        MessageContent content,
+        Cancellable? cancellable = null
+    ) throws Error;
+
     public abstract async void export_message_eml (
         Account account,
         Folder folder,
@@ -189,6 +201,15 @@ public interface Mail.MailBackend : Object {
     public abstract void foreach_queued_move_hide (QueuedMoveHideFunc func);
     public abstract bool has_pending_local_flushes ();
     public abstract async void flush_pending_local_changes_async ();
+
+    /**
+     * R4.1 scoped flush — only jobs whose from/dest (or flag folder) matches.
+     * Timer / startup / quit / F5 keep using the full async flush.
+     */
+    public abstract async void flush_pending_local_changes_for_folder (
+        Account account,
+        Folder folder
+    );
 
     public abstract async void delete_message (
         Account account,
@@ -314,12 +335,17 @@ public interface Mail.MailBackend : Object {
         return new ImapMailBackend ();
     }
 
+    /** Letter Graph engine (Phase 2) — no Camel / evolution-ews. */
+    public static MailBackend open_graph () {
+        return new GraphMailBackend ();
+    }
+
     /**
-     * Pick backend(s) for this session: Identity letter-imap always gets
-     * ImapMailBackend; GOA/EDS accounts keep Camel when a registry exists.
+     * Pick backend(s) for this session: Identity letter-imap / letter-graph
+     * use Letter engines; GOA/EDS accounts keep Camel when a registry exists.
      */
-    public static MailBackend open_for_store (E.SourceRegistry? registry, bool has_letter_imap) {
-        if (registry != null && has_letter_imap)
+    public static MailBackend open_for_store (E.SourceRegistry? registry, bool has_letter_engine) {
+        if (has_letter_engine)
             return new RoutingMailBackend (registry);
         if (registry != null)
             return new MailSession (registry);

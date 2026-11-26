@@ -19,6 +19,10 @@ public class Mail.Application : Adw.Application {
     private string? update_url;
     /* Quiet idle check found a newer release — windows show menu badges. */
     public bool update_available { get; private set; }
+    /* Microsoft Graph scope upgrade — at most one prompt per account per session. */
+    private HashTable<string, bool> graph_reconsent_prompted =
+        new HashTable<string, bool> (str_hash, str_equal);
+    private bool graph_reconsent_running;
 
     private const ActionEntry[] ACTION_ENTRIES = {
         { "quit", on_quit },
@@ -77,6 +81,8 @@ public class Mail.Application : Adw.Application {
         this.accounts.load.begin ((obj, res) => {
             this.accounts.load.end (res);
             queue_goa_accounts_prompt ();
+            /* Drop Sent-harvested addresses that already live in rubriche. */
+            this.contacts.refresh_book_email_index.begin ();
         });
         this.accounts.changed.connect (on_accounts_changed);
         this.accounts.changed.connect (on_accounts_changed_ui);
@@ -238,6 +244,63 @@ public class Mail.Application : Adw.Application {
         });
     }
 
+    /** After main window is up: offer in-place Graph scope re-consent if needed. */
+    private void queue_microsoft_graph_reconsent () {
+        if (!IdentityOAuth.microsoft_mail_uses_graph ())
+            return;
+        Idle.add (() => {
+            present_microsoft_graph_reconsent.begin ();
+            return Source.REMOVE;
+        });
+    }
+
+    private async void present_microsoft_graph_reconsent () {
+        if (this.graph_reconsent_running)
+            return;
+        if (!IdentityOAuth.microsoft_mail_uses_graph ())
+            return;
+
+        IdentityCatalog catalog;
+        try {
+            catalog = IdentityCatalog.load ();
+        } catch (Error e) {
+            warning ("Graph re-consent catalog: %s", e.message);
+            return;
+        }
+
+        Gtk.Window? parent = get_active_window ();
+        if (parent == null)
+            parent = main_window ();
+
+        this.graph_reconsent_running = true;
+        try {
+            var needing = new GenericArray<IdentityAccount> ();
+            for (uint i = 0; i < catalog.accounts.length; i++) {
+                var acc = catalog.accounts[i];
+                if (!acc.enabled)
+                    continue;
+                if (!IdentityOAuth.graph_scopes_need_reconsent (acc))
+                    continue;
+                if (this.graph_reconsent_prompted.contains (acc.id))
+                    continue;
+                this.graph_reconsent_prompted.set (acc.id, true);
+                needing.add (acc);
+            }
+            if (needing.length == 0)
+                return;
+
+            var updated = yield IdentityMicrosoftReconsent.prompt_and_reconsent_all (
+                parent, needing
+            );
+            if (updated > 0) {
+                show_mail_toast (_("Microsoft permissions updated"));
+                this.accounts.reload_identity ();
+            }
+        } finally {
+            this.graph_reconsent_running = false;
+        }
+    }
+
     private void present_goa_accounts_prompt () {
         if (this.settings.get_boolean ("goa-accounts-prompted"))
             return;
@@ -289,6 +352,7 @@ public class Mail.Application : Adw.Application {
             dismiss_setup_window ();
             queue_welcome (window);
             schedule_idle_update_check ();
+            queue_microsoft_graph_reconsent ();
             return;
         }
 

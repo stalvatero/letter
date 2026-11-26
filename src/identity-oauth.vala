@@ -8,6 +8,7 @@
  *   LETTER_MS_CLIENT_ID — Letter Azure public app (same id for Hotmail + M365)
  *   LETTER_MS_CLIENT_SECRET — optional (public clients omit it)
  *   LETTER_MS_TENANT — default common (Hotmail + work); consumers|organizations OK
+ *   LETTER_MS_MAIL=graph — Microsoft Identity uses GraphMailBackend (opt-in)
  *
  * Microsoft loopback is a fixed port so the Azure redirect URI is registered once:
  *   http://127.0.0.1:8743/letter-oauth
@@ -38,20 +39,36 @@ public class Mail.IdentityOAuth : Object {
     public const string GOOGLE_SCOPE =
         "openid email profile https://mail.google.com/";
     /**
-     * One resource per token (Microsoft rule). Hotmail/IMAP today uses
-     * outlook.office.com; Graph Mail.* is a later refresh with Graph scopes
-     * on the same Azure app (already registered for IT consent).
+     * One resource per token (Microsoft rule). Hotmail/IMAP uses
+     * outlook.office.com; Graph uses graph.microsoft.com scopes on the
+     * same Azure app (frozen for IT consent — PLATFORM-MS-AZURE-APP.md).
      */
     public const string MICROSOFT_SCOPE =
         "offline_access openid email profile "
         + "https://outlook.office.com/IMAP.AccessAsUser.All "
         + "https://outlook.office.com/SMTP.Send";
+    /** Graph resource — separate access token; same refresh token when consented.
+     * Contacts/People/User.ReadBasic.All: compose autocomplete + GAL. Register
+     * once on the Azure app; work tenants grant admin consent once. */
+    public const string MICROSOFT_GRAPH_SCOPE =
+        "offline_access openid email profile "
+        + "User.Read Mail.ReadWrite Mail.Send "
+        + "Contacts.Read People.Read User.ReadBasic.All";
     /** Fixed loopback — register this exact URI on the Letter Azure app. */
     public const uint16 MICROSOFT_REDIRECT_PORT = 8743;
     public const string MICROSOFT_REDIRECT_URI =
         "http://127.0.0.1:8743/letter-oauth";
 
     private Soup.Session session = new Soup.Session ();
+
+    /** Opt-in Graph mail engine for Microsoft Identity (`LETTER_MS_MAIL=graph`). */
+    public static bool microsoft_mail_uses_graph () {
+        var v = Environment.get_variable ("LETTER_MS_MAIL");
+        if (v == null || v.length == 0)
+            return false;
+        var down = v.down ();
+        return down == "graph" || down == "1" || down == "true" || down == "yes";
+    }
 
     public static string? google_client_id () {
         var id = Environment.get_variable ("LETTER_GOOGLE_CLIENT_ID");
@@ -188,6 +205,28 @@ public class Mail.IdentityOAuth : Object {
     }
 
     public async IdentityOAuthProfile sign_in_microsoft (Cancellable? cancellable = null) throws Error {
+        return yield sign_in_microsoft_with_prompt (false, cancellable);
+    }
+
+    /**
+     * Interactive Graph sign-in for in-place scope upgrades (same account id).
+     *
+     * Uses select_account + login_hint — not prompt=consent. Forcing consent
+     * on work tenants re-opens “admin approval required” even after IT already
+     * granted admin consent in Azure; the user then cannot finish as themselves.
+     */
+    public async IdentityOAuthProfile sign_in_microsoft_reconsent (
+        string? login_hint = null,
+        Cancellable? cancellable = null
+    ) throws Error {
+        return yield sign_in_microsoft_with_prompt (false, cancellable, login_hint);
+    }
+
+    private async IdentityOAuthProfile sign_in_microsoft_with_prompt (
+        bool force_consent,
+        Cancellable? cancellable,
+        string? login_hint = null
+    ) throws Error {
         var client_id = microsoft_client_id ();
         if (client_id == null) {
             throw new IdentityOAuthError.CONFIG (
@@ -195,25 +234,325 @@ public class Mail.IdentityOAuth : Object {
             );
         }
         var tenant = microsoft_tenant ();
+        var scope = microsoft_mail_uses_graph () ? MICROSOFT_GRAPH_SCOPE : MICROSOFT_SCOPE;
         var tokens = yield authorize_pkce (
             "https://login.microsoftonline.com/%s/oauth2/v2.0/authorize".printf (tenant),
             "https://login.microsoftonline.com/%s/oauth2/v2.0/token".printf (tenant),
             client_id,
             microsoft_client_secret (),
-            MICROSOFT_SCOPE,
+            scope,
             false,
             MICROSOFT_REDIRECT_PORT,
-            cancellable
+            cancellable,
+            force_consent,
+            login_hint
         );
         remember_oauth_client ("microsoft", client_id);
-        /* IMAP audience token cannot call Graph /me — use OIDC id_token. */
+        /* Resource-specific access tokens cannot call Graph /me — use OIDC id_token. */
         var profile = profile_from_microsoft_id_token (tokens.id_token);
         profile.tokens = tokens;
         return profile;
     }
 
+    /** Delegated Graph scopes Letter requires beyond OIDC (Mail + Contacts/GAL). */
+    public static string[] microsoft_graph_required_delegated_scopes () {
+        return {
+            "User.Read",
+            "Mail.ReadWrite",
+            "Mail.Send",
+            "Contacts.Read",
+            "People.Read",
+            "User.ReadBasic.All",
+        };
+    }
+
+    /**
+     * Scopes introduced after the mail-only Graph baseline — shown in the
+     * re-consent dialog as the human-readable “what’s new” list.
+     */
+    public static string[] microsoft_graph_upgrade_delegated_scopes () {
+        return {
+            "Contacts.Read",
+            "People.Read",
+            "User.ReadBasic.All",
+        };
+    }
+
+    public static string human_label_for_graph_scope (string scope) {
+        switch (scope) {
+        case "Contacts.Read":
+            return _("Read contacts");
+        case "People.Read":
+            return _("Read people");
+        case "User.ReadBasic.All":
+            return _("Read global address list");
+        case "User.Read":
+            return _("Read user profile");
+        case "Mail.ReadWrite":
+            return _("Read and write mail");
+        case "Mail.Send":
+            return _("Send mail");
+        default:
+            return scope;
+        }
+    }
+
+    /**
+     * Upgrade scopes still missing from this account’s Graph access token
+     * (JWT scp). Opaque MSA tokens → all upgrade scopes (cannot inspect).
+     */
+    public static GenericArray<string> graph_missing_upgrade_scopes (IdentityAccount account) {
+        string? access = null;
+        try {
+            var graph = IdentitySecrets.lookup_oauth_tokens (graph_secret_id (account.id));
+            if (graph != null && graph.access_token != null && graph.access_token.length > 0)
+                access = graph.access_token;
+            if (access == null) {
+                var primary = IdentitySecrets.lookup_oauth_tokens (account.id);
+                if (primary != null && primary.access_token != null
+                    && primary.access_token.length > 0)
+                    access = primary.access_token;
+            }
+        } catch (Error e) {
+        }
+
+        var missing = new GenericArray<string> ();
+        if (access == null || !access_token_is_jwt (access)) {
+            foreach (var s in microsoft_graph_upgrade_delegated_scopes ())
+                missing.add (s);
+            return missing;
+        }
+
+        var scp = jwt_string_claim (access, "scp") ?? "";
+        foreach (var need in microsoft_graph_upgrade_delegated_scopes ()) {
+            if (!scope_list_contains (scp, need))
+                missing.add (need);
+        }
+        return missing;
+    }
+
+    /**
+     * True when LETTER_MS_MAIL=graph and this Microsoft account still needs an
+     * interactive consent for the current MICROSOFT_GRAPH_SCOPE. Same UUID —
+     * does not remove the account or wipe the library.
+     */
+    public static bool graph_scopes_need_reconsent (IdentityAccount account) {
+        if (!microsoft_mail_uses_graph ())
+            return false;
+        var kind = (account.kind ?? "").down ();
+        if (kind != "microsoft" && kind != "ms365")
+            return false;
+
+        string? access = null;
+        try {
+            var graph = IdentitySecrets.lookup_oauth_tokens (graph_secret_id (account.id));
+            if (graph != null && graph.access_token != null && graph.access_token.length > 0)
+                access = graph.access_token;
+            if (access == null) {
+                var primary = IdentitySecrets.lookup_oauth_tokens (account.id);
+                if (primary != null && primary.access_token != null
+                    && primary.access_token.length > 0)
+                    access = primary.access_token;
+            }
+        } catch (Error e) {
+        }
+
+        if (jwt_access_missing_required_scopes (access))
+            return true;
+
+        var stamp = account.graph_scope_stamp ?? "";
+        if (stamp == MICROSOFT_GRAPH_SCOPE)
+            return false;
+
+        /* Work JWT already has every required scp — quiet stamp, no dialog. */
+        if (access != null && access_token_is_jwt (access)
+            && !jwt_access_missing_required_scopes (access)) {
+            try {
+                IdentityCatalog.set_graph_scope_stamp (account.id, MICROSOFT_GRAPH_SCOPE);
+                account.graph_scope_stamp = MICROSOFT_GRAPH_SCOPE;
+            } catch (Error e) {
+                warning ("Could not persist Graph scope stamp: %s", e.message);
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Refresh or browser re-auth; store tokens under the existing account id.
+     * Verifies the signed-in email matches the catalog row.
+     */
+    public static async void reconsent_microsoft_graph_inplace (
+        IdentityAccount account,
+        Cancellable? cancellable = null
+    ) throws Error {
+        var kind = (account.kind ?? "").down ();
+        if (kind != "microsoft" && kind != "ms365") {
+            throw new IdentityOAuthError.CONFIG (
+                _("Graph re-consent is only for Microsoft accounts (“%s”).")
+                    .printf (account.email)
+            );
+        }
+        if (!microsoft_mail_uses_graph ()) {
+            throw new IdentityOAuthError.CONFIG (
+                _("Set LETTER_MS_MAIL=graph before updating Microsoft Graph permissions.")
+            );
+        }
+
+        /* After IT grants admin consent in Azure, a silent refresh often picks
+         * up Contacts/People/GAL without opening the browser. */
+        if (try_silent_graph_scope_upgrade (account)) {
+            message (
+                "Microsoft Graph scopes upgraded via refresh for %s (no browser)",
+                account.email
+            );
+            return;
+        }
+
+        var oauth = new IdentityOAuth ();
+        var profile = yield oauth.sign_in_microsoft_reconsent (account.email, cancellable);
+        var signed = IdentityCatalog.normalize_account_email (profile.email ?? "");
+        var expect = IdentityCatalog.normalize_account_email (account.email ?? "");
+        if (signed.length == 0 || expect.length == 0 || signed != expect) {
+            throw new IdentityOAuthError.TOKEN (
+                _("Signed in as “%s”, but this Letter account is “%s”.\n\nFor work/school: IT must click “Grant admin consent” on the Letter app in Azure (do not sign in as the admin inside Letter). Then you sign in again as “%s”.")
+                    .printf (profile.email ?? "", account.email ?? "", account.email ?? "")
+            );
+        }
+
+        IdentitySecrets.store_oauth_tokens (
+            account.id,
+            _("Letter OAuth: %s").printf (account.email),
+            profile.tokens
+        );
+        IdentitySecrets.store_oauth_tokens (
+            graph_secret_id (account.id),
+            _("Letter OAuth Graph: %s").printf (account.email),
+            profile.tokens
+        );
+
+        if (access_token_is_jwt (profile.tokens.access_token)
+            && jwt_access_missing_required_scopes (profile.tokens.access_token)) {
+            throw new IdentityOAuthError.TOKEN (
+                _("Signed in as “%s”, but Microsoft still did not issue the new permissions (contacts / directory).\n\nAsk IT to open the Letter app in Azure → API permissions → “Grant admin consent for …”, then use Sign in again in Letter as “%s”.")
+                    .printf (account.email ?? "", account.email ?? "")
+            );
+        }
+
+        IdentityCatalog.set_graph_scope_stamp (account.id, MICROSOFT_GRAPH_SCOPE);
+        account.graph_scope_stamp = MICROSOFT_GRAPH_SCOPE;
+        message (
+            "Microsoft Graph re-consent OK for %s (stamp updated, same account id)",
+            account.email
+        );
+    }
+
+    /**
+     * Force a Graph token refresh with MICROSOFT_GRAPH_SCOPE. Returns true when
+     * the new access token covers required delegated scopes (work JWT).
+     */
+    private static bool try_silent_graph_scope_upgrade (IdentityAccount account) {
+        try {
+            IdentityOAuthTokens? graph = null;
+            try {
+                graph = IdentitySecrets.lookup_oauth_tokens (graph_secret_id (account.id));
+            } catch (Error e) {
+            }
+            var stored = IdentitySecrets.lookup_oauth_tokens (account.id);
+            string? refresh = null;
+            if (graph != null && graph.refresh_token != null && graph.refresh_token.length > 0)
+                refresh = graph.refresh_token;
+            else if (stored != null && stored.refresh_token != null
+                     && stored.refresh_token.length > 0)
+                refresh = stored.refresh_token;
+            if (refresh == null)
+                return false;
+
+            var seed = new IdentityOAuthTokens () {
+                access_token = graph != null && graph.access_token != null
+                    ? graph.access_token
+                    : (stored != null ? stored.access_token : ""),
+                refresh_token = refresh,
+                expires_at = 0,
+                token_type = "Bearer",
+            };
+            var access = refresh_access_token_sync (account, seed, MICROSOFT_GRAPH_SCOPE);
+            if (!access_token_is_jwt (access))
+                return false;
+            if (jwt_access_missing_required_scopes (access))
+                return false;
+            IdentityCatalog.set_graph_scope_stamp (account.id, MICROSOFT_GRAPH_SCOPE);
+            account.graph_scope_stamp = MICROSOFT_GRAPH_SCOPE;
+            return true;
+        } catch (Error e) {
+            debug ("Silent Graph scope upgrade failed: %s", e.message);
+            return false;
+        }
+    }
+
+    private static bool access_token_is_jwt (string access_token) {
+        return access_token.split (".").length == 3;
+    }
+
+    /**
+     * Work/school Graph access JWTs expose scp. Opaque MSA tokens → false
+     * (unknown; rely on graph_scope_stamp).
+     */
+    private static bool jwt_access_missing_required_scopes (string? access_token) {
+        if (access_token == null || access_token.length == 0)
+            return false;
+        if (!access_token_is_jwt (access_token))
+            return false;
+        var scp = jwt_string_claim (access_token, "scp");
+        if (scp == null || scp.length == 0)
+            return true;
+        foreach (var need in microsoft_graph_required_delegated_scopes ()) {
+            if (!scope_list_contains (scp, need))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool scope_list_contains (string haystack, string needle) {
+        foreach (var part in haystack.split (" ")) {
+            if (part == needle)
+                return true;
+        }
+        return false;
+    }
+
+    private static string? jwt_string_claim (string jwt, string claim) {
+        var parts = jwt.split (".");
+        if (parts.length < 2)
+            return null;
+        var payload_b64 = parts[1].replace ("-", "+").replace ("_", "/");
+        while (payload_b64.length % 4 != 0)
+            payload_b64 += "=";
+        uchar[] decoded;
+        try {
+            decoded = Base64.decode (payload_b64);
+        } catch (Error e) {
+            return null;
+        }
+        try {
+            var parser = new Json.Parser ();
+            parser.load_from_data ((string) decoded, decoded.length);
+            var root = parser.get_root ();
+            if (root == null || root.get_node_type () != Json.NodeType.OBJECT)
+                return null;
+            var obj = root.get_object ();
+            if (!obj.has_member (claim))
+                return null;
+            return obj.get_string_member (claim);
+        } catch (Error e) {
+            return null;
+        }
+    }
+
     /**
      * Return a usable access token, refreshing via libsecret when needed.
+     * Microsoft IMAP/SMTP path — outlook.office.com resource.
      */
     public static string ensure_access_token_sync (IdentityAccount account) throws Error {
         var stored = IdentitySecrets.lookup_oauth_tokens (account.id);
@@ -225,7 +564,70 @@ public class Mail.IdentityOAuth : Object {
         var now = new DateTime.now_utc ().to_unix ();
         if (stored.expires_at > now + 60)
             return stored.access_token;
-        return refresh_access_token_sync (account, stored);
+        return refresh_access_token_sync (account, stored, null);
+    }
+
+    /**
+     * Graph resource access token (separate from IMAP). Uses the same refresh
+     * token; stores Graph access under account_id:graph so IMAP tokens stay.
+     * On interaction_required, in-place re-consent (same account id).
+     */
+    public static string ensure_microsoft_graph_access_sync (IdentityAccount account) throws Error {
+        var kind = (account.kind ?? "").down ();
+        if (kind != "microsoft" && kind != "ms365") {
+            throw new IdentityOAuthError.CONFIG (
+                _("Graph tokens are only for Microsoft accounts (“%s”).").printf (account.email)
+            );
+        }
+        var graph = IdentitySecrets.lookup_oauth_tokens (graph_secret_id (account.id));
+        var now = new DateTime.now_utc ().to_unix ();
+        if (graph != null && graph.access_token != null && graph.access_token.length > 0
+            && graph.expires_at > now + 60)
+            return graph.access_token;
+
+        /* Never reuse the primary (IMAP) access token for Graph — Microsoft
+         * issues one resource per token. A still-valid outlook.office.com
+         * access token yields Graph 401 “Bearer … could not be read”. */
+        var stored = IdentitySecrets.lookup_oauth_tokens (account.id);
+        string? refresh = null;
+        if (graph != null && graph.refresh_token != null && graph.refresh_token.length > 0)
+            refresh = graph.refresh_token;
+        else if (stored != null && stored.refresh_token != null && stored.refresh_token.length > 0)
+            refresh = stored.refresh_token;
+        if (refresh == null) {
+            throw new IdentityOAuthError.TOKEN (
+                _("No OAuth refresh token for “%s”. Sign in again from Letter to update Microsoft permissions.")
+                    .printf (account.email)
+            );
+        }
+        var seed = new IdentityOAuthTokens () {
+            access_token = graph != null && graph.access_token != null
+                ? graph.access_token
+                : (stored != null ? stored.access_token : ""),
+            refresh_token = refresh,
+            expires_at = 0,
+            token_type = "Bearer",
+        };
+
+        try {
+            return refresh_access_token_sync (account, seed, MICROSOFT_GRAPH_SCOPE);
+        } catch (Error e) {
+            var msg = (e.message ?? "").down ();
+            if (msg.contains ("interaction_required")
+                || msg.contains ("consent_required")
+                || msg.contains ("invalid_grant")
+                || msg.contains ("aadsts65001")) {
+                throw new IdentityOAuthError.TOKEN (
+                    _("Microsoft Graph needs updated permissions for “%s”. Letter will ask you to sign in again — your local mail stays on this device.")
+                        .printf (account.email)
+                );
+            }
+            throw e;
+        }
+    }
+
+    public static string graph_secret_id (string account_id) {
+        return "%s:graph".printf (account_id);
     }
 
     /** Ignore expires_at and refresh (XOAUTH2 rejected a still-cached access token). */
@@ -236,12 +638,18 @@ public class Mail.IdentityOAuth : Object {
                 _("OAuth access expired and no refresh token for “%s”.").printf (account.email)
             );
         }
-        return refresh_access_token_sync (account, stored);
+        return refresh_access_token_sync (account, stored, null);
     }
 
+    /**
+     * @param force_scope null → Google default / Microsoft IMAP scopes;
+     *                    MICROSOFT_GRAPH_SCOPE → store under :graph without
+     *                    overwriting the IMAP access token.
+     */
     private static string refresh_access_token_sync (
         IdentityAccount account,
-        IdentityOAuthTokens stored
+        IdentityOAuthTokens stored,
+        string? force_scope
     ) throws Error {
         if (stored.refresh_token == null || stored.refresh_token.length == 0) {
             throw new IdentityOAuthError.TOKEN (
@@ -252,6 +660,7 @@ public class Mail.IdentityOAuth : Object {
         var oauth = new IdentityOAuth ();
         IdentityOAuthTokens refreshed;
         var kind = (account.kind ?? "").down ();
+        var graph_refresh = force_scope != null && force_scope == MICROSOFT_GRAPH_SCOPE;
         if (kind == "google") {
             var client_id = google_client_id ();
             if (client_id == null)
@@ -271,12 +680,13 @@ public class Mail.IdentityOAuth : Object {
             if (client_id == null)
                 throw new IdentityOAuthError.CONFIG (_("LETTER_MS_CLIENT_ID is not set."));
             var tenant = microsoft_tenant ();
+            var scope = force_scope ?? MICROSOFT_SCOPE;
             refreshed = oauth.refresh_sync (
                 "https://login.microsoftonline.com/%s/oauth2/v2.0/token".printf (tenant),
                 client_id,
                 microsoft_client_secret (),
                 stored.refresh_token,
-                MICROSOFT_SCOPE
+                scope
             );
         } else {
             throw new IdentityOAuthError.CONFIG (
@@ -285,11 +695,40 @@ public class Mail.IdentityOAuth : Object {
         }
         if (refreshed.refresh_token == null || refreshed.refresh_token.length == 0)
             refreshed.refresh_token = stored.refresh_token;
-        IdentitySecrets.store_oauth_tokens (
-            account.id,
-            _("Letter OAuth: %s").printf (account.email),
-            refreshed
-        );
+
+        if (graph_refresh) {
+            /* Keep IMAP primary secret; only persist Graph access (+ refresh copy). */
+            IdentitySecrets.store_oauth_tokens (
+                graph_secret_id (account.id),
+                _("Letter OAuth Graph: %s").printf (account.email),
+                refreshed
+            );
+            /* If primary was Graph-first login, refresh it too so expires_at stays warm. */
+            if (microsoft_mail_uses_graph ()) {
+                IdentitySecrets.store_oauth_tokens (
+                    account.id,
+                    _("Letter OAuth: %s").printf (account.email),
+                    refreshed
+                );
+            }
+            /* Stamp only when we can see full scp (work JWT). Opaque MSA keeps
+             * prior stamp until interactive re-consent. */
+            if (!jwt_access_missing_required_scopes (refreshed.access_token)
+                && access_token_is_jwt (refreshed.access_token)) {
+                try {
+                    IdentityCatalog.set_graph_scope_stamp (account.id, MICROSOFT_GRAPH_SCOPE);
+                    account.graph_scope_stamp = MICROSOFT_GRAPH_SCOPE;
+                } catch (Error stamp_err) {
+                    warning ("Graph scope stamp after refresh: %s", stamp_err.message);
+                }
+            }
+        } else {
+            IdentitySecrets.store_oauth_tokens (
+                account.id,
+                _("Letter OAuth: %s").printf (account.email),
+                refreshed
+            );
+        }
         return refreshed.access_token;
     }
 
@@ -339,7 +778,9 @@ public class Mail.IdentityOAuth : Object {
         string scope,
         bool include_access_type_offline,
         uint16 preferred_port,
-        Cancellable? cancellable
+        Cancellable? cancellable,
+        bool force_consent = false,
+        string? login_hint = null
     ) throws Error {
         var verifier = IdentityPkce.create_verifier ();
         var challenge = IdentityPkce.challenge_s256 (verifier);
@@ -394,9 +835,16 @@ public class Mail.IdentityOAuth : Object {
         if (include_access_type_offline) {
             q.append ("&access_type=offline");
             q.append ("&prompt=consent");
+        } else if (force_consent) {
+            /* Rare: force consent UI (MSA). Work tenants: prefer select_account
+             * after IT admin consent — prompt=consent re-blocks on admin. */
+            q.append ("&prompt=consent");
         } else {
-            /* Microsoft: pick account; consent when new scopes appear. */
+            /* Microsoft: pick account (re-consent uses this + login_hint). */
             q.append ("&prompt=select_account");
+        }
+        if (login_hint != null && login_hint.strip ().length > 0) {
+            q.append_printf ("&login_hint=%s", Uri.escape_string (login_hint.strip ()));
         }
         var auth_url = "%s?%s".printf (authorize_url, q.str);
 

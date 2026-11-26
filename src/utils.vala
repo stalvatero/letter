@@ -2924,7 +2924,7 @@ namespace Mail.Utils {
         /* GOA/EDS rows use source_uid; Letter Identity may only have uid. */
         if (account.source_uid != null && account.source_uid.length > 0)
             return true;
-        return account.backend_name == "letter-imap"
+        return Account.is_letter_engine_backend (account.backend_name)
             && account.uid != null
             && account.uid.length > 0;
     }

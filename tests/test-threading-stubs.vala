@@ -12,4 +12,10 @@ namespace Mail.Utils {
             return null;
         return raw;
     }
+
+    public static Gtk.Image account_provenance_image (Account account, int pixel_size = 16) {
+        var image = new Gtk.Image.from_icon_name (account.provenance_icon_name);
+        image.pixel_size = pixel_size;
+        return image;
+    }
 }

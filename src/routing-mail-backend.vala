@@ -1,16 +1,21 @@
 /**
- * Routes mail I/O by account: letter-imap → ImapMailBackend, else Camel MailSession.
+ * Routes mail I/O by account:
+ *   letter-imap → ImapMailBackend
+ *   letter-graph → GraphMailBackend
+ *   else → Camel MailSession (when a registry exists)
  * Lets Identity accounts use the Letter engine while GOA/EDS accounts keep Camel
  * in the same session (no LETTER_SKIP_GOA required for Identity mail).
  */
 public class Mail.RoutingMailBackend : Object, MailBackend {
     private MailSession? camel;
     private ImapMailBackend imap;
+    private GraphMailBackend graph;
     private MailBackend? last_list_backend;
 
     public bool header_sync_busy {
         get {
             return this.imap.header_sync_busy
+                || this.graph.header_sync_busy
                 || (this.camel != null && this.camel.header_sync_busy);
         }
     }
@@ -43,11 +48,15 @@ public class Mail.RoutingMailBackend : Object, MailBackend {
         }
     }
 
-    public RoutingMailBackend (E.SourceRegistry registry) {
-        this.camel = new MailSession (registry);
+    public RoutingMailBackend (E.SourceRegistry? registry) {
+        if (registry != null)
+            this.camel = new MailSession (registry);
         this.imap = new ImapMailBackend ();
-        wire_signals (this.camel);
+        this.graph = new GraphMailBackend ();
+        if (this.camel != null)
+            wire_signals (this.camel);
         wire_signals (this.imap);
+        wire_signals (this.graph);
     }
 
     private void wire_signals (MailBackend backend) {
@@ -75,6 +84,8 @@ public class Mail.RoutingMailBackend : Object, MailBackend {
     }
 
     private MailBackend engine (Account account) {
+        if (account.backend_name == "letter-graph")
+            return this.graph;
         if (account.backend_name == "letter-imap")
             return this.imap;
         if (this.camel != null)
@@ -167,6 +178,7 @@ public class Mail.RoutingMailBackend : Object, MailBackend {
 
     public void unwatch_all_folders () {
         this.imap.unwatch_all_folders ();
+        this.graph.unwatch_all_folders ();
         this.camel?.unwatch_all_folders ();
     }
 
@@ -218,6 +230,18 @@ public class Mail.RoutingMailBackend : Object, MailBackend {
         return yield engine (account).load_message (account, folder, uid, cancellable);
     }
 
+    public async void hydrate_message_attachments (
+        Account account,
+        Folder folder,
+        string uid,
+        MessageContent content,
+        Cancellable? cancellable = null
+    ) throws Error {
+        yield engine (account).hydrate_message_attachments (
+            account, folder, uid, content, cancellable
+        );
+    }
+
     public async void export_message_eml (
         Account account,
         Folder folder,
@@ -262,21 +286,25 @@ public class Mail.RoutingMailBackend : Object, MailBackend {
 
     public void reset_prefetch_progress (Account? account = null) {
         this.imap.reset_prefetch_progress (account);
+        this.graph.reset_prefetch_progress (account);
         this.camel?.reset_prefetch_progress (account);
     }
 
     public void flush_prefetch_progress () {
         this.imap.flush_prefetch_progress ();
+        this.graph.flush_prefetch_progress ();
         this.camel?.flush_prefetch_progress ();
     }
 
     public void release_transient_memory () {
         this.imap.release_transient_memory ();
+        this.graph.release_transient_memory ();
         this.camel?.release_transient_memory ();
     }
 
     public void relieve_memory_pressure () {
         this.imap.relieve_memory_pressure ();
+        this.graph.relieve_memory_pressure ();
         this.camel?.relieve_memory_pressure ();
     }
 
@@ -322,34 +350,40 @@ public class Mail.RoutingMailBackend : Object, MailBackend {
 
     public void flush_pending_local_changes () {
         this.imap.flush_pending_local_changes ();
+        this.graph.flush_pending_local_changes ();
         this.camel?.flush_pending_local_changes ();
     }
 
     public bool has_blocking_local_flushes () {
         return this.imap.has_blocking_local_flushes ()
+            || this.graph.has_blocking_local_flushes ()
             || (this.camel != null && this.camel.has_blocking_local_flushes ());
     }
 
     public void unpark_heavy_transfers () {
         this.imap.unpark_heavy_transfers ();
+        this.graph.unpark_heavy_transfers ();
         this.camel?.unpark_heavy_transfers ();
     }
 
     public async bool flush_pending_local_changes_with_timeout (uint seconds) {
         var imap_ok = yield this.imap.flush_pending_local_changes_with_timeout (seconds);
+        var graph_ok = yield this.graph.flush_pending_local_changes_with_timeout (seconds);
         var camel_ok = true;
         if (this.camel != null)
             camel_ok = yield this.camel.flush_pending_local_changes_with_timeout (seconds);
-        return imap_ok && camel_ok;
+        return imap_ok && graph_ok && camel_ok;
     }
 
     public void persist_mutation_registry_now () {
         this.imap.persist_mutation_registry_now ();
+        this.graph.persist_mutation_registry_now ();
         this.camel?.persist_mutation_registry_now ();
     }
 
     public uint load_mutation_registry () {
         uint n = this.imap.load_mutation_registry ();
+        n += this.graph.load_mutation_registry ();
         if (this.camel != null)
             n += this.camel.load_mutation_registry ();
         return n;
@@ -357,18 +391,44 @@ public class Mail.RoutingMailBackend : Object, MailBackend {
 
     public void foreach_queued_move_hide (QueuedMoveHideFunc func) {
         this.imap.foreach_queued_move_hide (func);
+        this.graph.foreach_queued_move_hide (func);
         this.camel?.foreach_queued_move_hide (func);
     }
 
     public bool has_pending_local_flushes () {
         return this.imap.has_pending_local_flushes ()
+            || this.graph.has_pending_local_flushes ()
             || (this.camel != null && this.camel.has_pending_local_flushes ());
     }
 
     public async void flush_pending_local_changes_async () {
         yield this.imap.flush_pending_local_changes_async ();
+        yield this.graph.flush_pending_local_changes_async ();
         if (this.camel != null)
             yield this.camel.flush_pending_local_changes_async ();
+    }
+
+    public async void flush_pending_local_changes_for_folder (
+        Account account,
+        Folder folder
+    ) {
+        yield engine (account).flush_pending_local_changes_for_folder (account, folder);
+    }
+
+    public async bool refresh_graph_folder_counts (
+        Account account,
+        Folder folder,
+        Cancellable? cancellable = null
+    ) throws Error {
+        if (account.backend_name != "letter-graph")
+            return false;
+        return yield this.graph.refresh_folder_counts (account, folder, cancellable);
+    }
+
+    public GraphBodyWorker? graph_body_worker (Account account) {
+        if (account.backend_name != "letter-graph")
+            return null;
+        return this.graph.body_worker;
     }
 
     public async void delete_message (
@@ -548,5 +608,17 @@ public class Mail.RoutingMailBackend : Object, MailBackend {
 
     public async void reset_account_storage (Account account) throws Error {
         yield engine (account).reset_account_storage (account);
+    }
+
+    /** Graph body-cache-days prune (no-op for Camel / letter-imap). */
+    public uint prune_graph_stale_bodies (
+        Account account,
+        Folder folder,
+        GenericArray<Message> listed,
+        int days
+    ) {
+        if (account.backend_name != "letter-graph")
+            return 0;
+        return this.graph.prune_stale_bodies (account, folder, listed, days);
     }
 }

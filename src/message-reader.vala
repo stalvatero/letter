@@ -454,6 +454,52 @@ html, body { margin: 0; height: 100%; background: %s; }
             resolve_book_trust.begin (content, sender, epoch);
     }
 
+    /** Body already on screen — spinner only in the attachment strip. */
+    public void show_attachments_loading () {
+        clear_attachments_box ();
+        var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
+            valign = Gtk.Align.CENTER,
+            hexpand = false,
+        };
+        row.append (new Gtk.Spinner () {
+            spinning = true,
+            width_request = 16,
+            height_request = 16,
+        });
+        row.append (new Gtk.Label (_("Downloading attachments…")) {
+            use_markup = false,
+            xalign = 0,
+        });
+        this.attachments_box.append (row);
+        this.attachments_box.visible = true;
+    }
+
+    /**
+     * After Graph hydrate: refresh chips, cid→letterimg body, trust banner.
+     * Keeps the same MessageContent instance when possible.
+     */
+    public void apply_attachment_hydrate (MessageContent content, bool outgoing = false) {
+        if (this.current != null && this.current.uid == content.uid)
+            this.current = content;
+        else
+            this.current = content;
+
+        bind_attachments (content.attachments);
+
+        var sender = content.from_email ?? Utils.email_from_header (content.from);
+        var trusted = Utils.remote_content_allowed (
+            this.settings,
+            sender,
+            this.mailbox,
+            this.mailbox_identity,
+            outgoing
+        );
+        var needs_trust = content.has_remote_images && !trusted;
+        this.trust_banner.revealed = needs_trust;
+        this.load_remote_images = trusted;
+        load_body_html (content.html);
+    }
+
     public void show_error (string message) {
         this.current = null;
         this.trust_epoch++;
@@ -1344,13 +1390,17 @@ html { color-scheme: dark; }
         load_body_html (content.html);
     }
 
-    private void bind_attachments (GenericArray<Attachment>? attachments) {
+    private void clear_attachments_box () {
         Gtk.Widget? child = this.attachments_box.get_first_child ();
         while (child != null) {
             var next = child.get_next_sibling ();
             this.attachments_box.remove (child);
             child = next;
         }
+    }
+
+    private void bind_attachments (GenericArray<Attachment>? attachments) {
+        clear_attachments_box ();
 
         if (attachments == null || attachments.length == 0) {
             this.attachments_box.visible = false;

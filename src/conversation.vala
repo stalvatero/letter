@@ -453,7 +453,7 @@ public class Mail.Conversation : Object {
     public static string display_subject (string? raw) {
         var text = raw ?? "";
         text = text.strip ();
-        while (strip_reply_prefix (ref text)) {
+        while (strip_reply_prefix (ref text) || strip_delivery_prefix (ref text)) {
         }
 
         text = text.strip ();
@@ -639,6 +639,31 @@ public class Mail.Conversation : Object {
         }
 
         return builder.str;
+    }
+
+    /* Outlook NDRs: "Undeliverable: Fwd: …" / "Non recapitabile: …" */
+    private static bool strip_delivery_prefix (ref string text) {
+        var folded = text.casefold ().strip ();
+        string[] prefixes = {
+            "undeliverable:",
+            "undelivered:",
+            "non recapitabile:",
+            "impossibile recapitare:",
+            "delivery status notification:",
+            "returned mail:",
+        };
+        foreach (var prefix in prefixes) {
+            if (!folded.has_prefix (prefix))
+                continue;
+            /* Map fold offset back via byte length of the matched prefix on
+             * the stripped original (ASCII prefixes only). */
+            var stripped = text.strip ();
+            if (stripped.length < prefix.length)
+                continue;
+            text = stripped.substring (prefix.length).strip ();
+            return true;
+        }
+        return false;
     }
 
     private static bool strip_reply_prefix (ref string text) {

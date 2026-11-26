@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Letter E-mail Client (Graph)
+Name[it]=Letter E-mail Client (Graph)
+Comment=Letter Flatpak with Letter Identity + Microsoft Graph
+Comment[it]=Letter Flatpak con Letter Identity e Microsoft Graph
+# Distinct from the official drawer entry so both can coexist.
+TryExec=flatpak
+Exec=flatpak run --env=LETTER_MS_MAIL=graph --env=LETTER_SKIP_GOA=1 --env=LETTER_MS_CLIENT_ID=46b343fc-caa4-4629-b50a-87f1c27fa162 io.github.stalvatero.Letter
+Icon=io.github.stalvatero.Letter
+Terminal=false
+Categories=Network;Email;Office;
+Keywords=email;mail;graph;microsoft;m365;
+StartupNotify=true
+# Avoid stealing the official app's single-instance D-Bus name confusion in menus.
+X-GNOME-UsesNotifications=true

@@ -3280,6 +3280,183 @@ msgstr "Nessun contatto corrispondente"
 msgid "Try a different name or email address."
 msgstr "Prova un nome o un indirizzo email diverso."
 
+#: src/identity-oauth.vala
+msgid "Read contacts"
+msgstr "Lettura contatti"
+
+#: src/identity-oauth.vala
+msgid "Read people"
+msgstr "Lettura persone"
+
+#: src/identity-oauth.vala
+msgid "Read global address list"
+msgstr "Lettura directory globale"
+
+#: src/identity-oauth.vala
+msgid "Read user profile"
+msgstr "Lettura profilo utente"
+
+#: src/identity-oauth.vala
+msgid "Read and write mail"
+msgstr "Lettura e scrittura della posta"
+
+#: src/identity-oauth.vala
+msgid "Send mail"
+msgstr "Invio posta"
+
+#: src/identity-reconsent.vala
+msgid "Microsoft permissions update"
+msgstr "Aggiornamento autorizzazioni Microsoft"
+
+#: src/identity-reconsent.vala
+msgid ""
+"Letter has introduced features that need an update to the Microsoft "
+"permissions already granted. Specifically:\n"
+"\n"
+"%s\n"
+"You need to sign in again to refresh these permissions for:\n"
+"\n"
+"%s\n"
+"\n"
+"Your mail library stays protected on this device; after sign-in you can keep "
+"using Letter with the new features. Choose Sign in now, or Later — if you "
+"wait, the new features stay unavailable until you sign in again, and this "
+"dialog will appear the next time you start Letter."
+msgstr ""
+"Letter ha introdotto delle novità che necessitano di un aggiornamento dei "
+"permessi Microsoft già concessi. Nello specifico:\n"
+"\n"
+"%s\n"
+"Dovrai effettuare nuovamente un nuovo accesso per aggiornare le "
+"autorizzazioni per:\n"
+"\n"
+"%s\n"
+"\n"
+"La tua libreria resta tutelata e dopo il login potrai continuare ad "
+"utilizzare Letter con le nuove funzionalità. Puoi farlo ora cliccando su "
+"«Accedi» o più tardi, ma in tal caso non potrai utilizzare le nuove "
+"funzionalità finché non effettuerai un nuovo accesso e questa finestra di "
+"dialogo ti sarà mostrata al prossimo riavvio di Letter."
+
+#: src/identity-reconsent.vala
+msgid "Later"
+msgstr "Più tardi"
+
+#: src/identity-reconsent.vala
+msgid "Sign in"
+msgstr "Accedi"
+
+#: src/identity-reconsent.vala
+msgid "Sign in with Microsoft"
+msgstr "Accedi con Microsoft"
+
+#: src/identity-reconsent.vala
+#, c-format
+msgid ""
+"Complete sign-in in your browser for “%s”. Letter is waiting for the "
+"redirect…"
+msgstr ""
+"Completa l’accesso nel browser per «%s». Letter è in attesa del redirect…"
+
+#: src/identity-reconsent.vala
+msgid "Could not update permissions"
+msgstr "Impossibile aggiornare le autorizzazioni"
+
+#: src/application.vala
+msgid "Microsoft permissions updated"
+msgstr "Autorizzazioni Microsoft aggiornate"
+
+#: src/identity-oauth.vala
+#, c-format
+msgid ""
+"Signed in as “%s”, but this Letter account is “%s”.\n"
+"\n"
+"For work/school: IT must click “Grant admin consent” on the Letter app in "
+"Azure (do not sign in as the admin inside Letter). Then you sign in again as "
+"“%s”."
+msgstr ""
+"Accesso effettuato come «%s», ma questo account Letter è «%s».\n"
+"\n"
+"Per account aziendali: IT deve cliccare «Concedi consenso amministratore» "
+"sull’app Letter in Azure (non accedere come amministratore dentro Letter). "
+"Poi effettua di nuovo l’accesso come «%s»."
+
+#: src/identity-oauth.vala
+#, c-format
+msgid ""
+"Signed in as “%s”, but Microsoft still did not issue the new permissions "
+"(contacts / directory).\n"
+"\n"
+"Ask IT to open the Letter app in Azure → API permissions → “Grant admin "
+"consent for …”, then use Sign in again in Letter as “%s”."
+msgstr ""
+"Accesso effettuato come «%s», ma Microsoft non ha ancora emesso i nuovi "
+"permessi (contatti / directory).\n"
+"\n"
+"Chiedi a IT di aprire l’app Letter in Azure → Autorizzazioni API → "
+"«Concedi consenso amministratore per …», poi usa di nuovo Accedi in Letter "
+"come «%s»."
+
+#: src/preferences-dialog.vala
+msgid "Contacts and compose"
+msgstr "Contatti e composizione"
+
+#: src/preferences-dialog.vala
+msgid "Use contacts from all accounts"
+msgstr "Utilizza contatti da tutti gli account"
+
+#: src/preferences-dialog.vala
+msgid ""
+"Search address books and directories for every mail account, not only the "
+"account selected in From."
+msgstr ""
+"Cerca nelle rubriche e nelle directory di tutti gli account di posta, non "
+"solo dell’account selezionato in Da."
+
+#: src/preferences-dialog.vala src/collected-addresses-dialog.vala
+msgid "Recent addresses"
+msgstr "Indirizzi recenti"
+
+#: src/preferences-dialog.vala
+msgid ""
+"Addresses gathered from sent mail. Remove ones you do not want in compose "
+"suggestions."
+msgstr ""
+"Indirizzi raccolti dalla posta inviata. Rimuovi quelli che non vuoi nelle "
+"suggerimenti in composizione."
+
+#: src/preferences-dialog.vala
+msgid "Manage…"
+msgstr "Gestisci…"
+
+#: src/collected-addresses-dialog.vala
+msgid "Filter addresses"
+msgstr "Filtra indirizzi"
+
+#: src/collected-addresses-dialog.vala
+msgid "No recent addresses"
+msgstr "Nessun indirizzo recente"
+
+#: src/collected-addresses-dialog.vala
+msgid ""
+"Only addresses that are not already in your address books appear here. "
+"Letter gathers them from mail you send."
+msgstr ""
+"Qui compaiono solo gli indirizzi che non sono già nelle tue rubriche. "
+"Letter li raccoglie dalla posta che invii."
+
+#: src/collected-addresses-dialog.vala
+msgid "Comparing with address books…"
+msgstr "Confronto con le rubriche…"
+
+#: src/collected-addresses-dialog.vala
+msgid ""
+"Removing addresses that already exist in your contacts or organization "
+"directory (GAL)."
+msgstr ""
+"Rimozione degli indirizzi già presenti nei contatti o nella directory "
+"aziendale (GAL)."
+
 #~ msgid "Hide Search"
 #~ msgstr "Nascondi ricerca"
 

@@ -1,6 +1,7 @@
 test_provider = executable(
   'test-provider',
   [
+    meson.project_source_root() / 'src' / 'config.vapi',
     meson.project_source_root() / 'src' / 'account.vala',
     'test-provider.vala',
   ],
@@ -17,6 +18,7 @@ test('provider', test_provider)
 test_threading = executable(
   'test-threading',
   [
+    meson.project_source_root() / 'src' / 'config.vapi',
     meson.project_source_root() / 'src' / 'account.vala',
     meson.project_source_root() / 'src' / 'conversation.vala',
     'test-threading-stubs.vala',
@@ -53,6 +55,7 @@ test(
 test_rows = executable(
   'test-rows',
   [
+    meson.project_source_root() / 'src' / 'config.vapi',
     meson.project_source_root() / 'src' / 'account.vala',
     meson.project_source_root() / 'src' / 'account-row.vala',
     meson.project_source_root() / 'src' / 'conversation.vala',

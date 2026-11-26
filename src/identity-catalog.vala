@@ -28,6 +28,12 @@ public class Mail.IdentityAccount : Object {
     public uint smtp_port { get; set; default = 465; }
     public bool smtp_tls { get; set; default = true; }
     public bool enabled { get; set; default = true; }
+    /**
+     * Last Microsoft Graph scope string successfully consented for this
+     * account (IdentityOAuth.MICROSOFT_GRAPH_SCOPE). Null/stale → in-place
+     * re-consent; library stays on the same id.
+     */
+    public string? graph_scope_stamp { get; set; }
 
     public bool uses_oauth2 () {
         return (this.auth_method ?? "password").down () == "oauth2";
@@ -59,6 +65,11 @@ public class Mail.IdentityAccount : Object {
 
         /* Omit nullables set to null (Vala `_g_free0 (NULL)`). source_uid must
          * be the Identity id — Utils.is_sendable / outbox keys require it. */
+        string backend = "letter-imap";
+        if ((k == "microsoft" || k == "ms365")
+            && IdentityOAuth.microsoft_mail_uses_graph ())
+            backend = "letter-graph";
+
         return new Account () {
             uid = this.id,
             source_uid = this.id,
@@ -68,7 +79,7 @@ public class Mail.IdentityAccount : Object {
             has_mail = this.enabled,
             has_calendar = false,
             has_contacts = false,
-            backend_name = "letter-imap",
+            backend_name = backend,
             enabled = this.enabled,
         };
     }
@@ -138,6 +149,8 @@ public class Mail.IdentityCatalog : Object {
                     ? (uint) o.get_int_member ("smtp_port") : 465,
                 smtp_tls = !o.has_member ("smtp_tls") || o.get_boolean_member ("smtp_tls"),
                 enabled = !o.has_member ("enabled") || o.get_boolean_member ("enabled"),
+                graph_scope_stamp = o.has_member ("graph_scope_stamp")
+                    ? o.get_string_member ("graph_scope_stamp") : null,
             };
             catalog.accounts.add (acc);
         }
@@ -194,6 +207,10 @@ public class Mail.IdentityCatalog : Object {
             builder.add_boolean_value (a.smtp_tls);
             builder.set_member_name ("enabled");
             builder.add_boolean_value (a.enabled);
+            if (a.graph_scope_stamp != null && a.graph_scope_stamp.length > 0) {
+                builder.set_member_name ("graph_scope_stamp");
+                builder.add_string_value (a.graph_scope_stamp);
+            }
             builder.end_object ();
         }
         builder.end_array ();
@@ -238,8 +255,9 @@ public class Mail.IdentityCatalog : Object {
     }
 
     public IdentityAccount add_oauth_google (string email, string display_name) {
+        var id = take_orphan_id (email) ?? Uuid.string_random ();
         var acc = new IdentityAccount () {
-            id = Uuid.string_random (),
+            id = id,
             kind = "google",
             auth_method = "oauth2",
             email = email,
@@ -259,8 +277,9 @@ public class Mail.IdentityCatalog : Object {
     }
 
     public IdentityAccount add_oauth_microsoft (string email, string display_name) {
+        var id = take_orphan_id (email) ?? Uuid.string_random ();
         var acc = new IdentityAccount () {
-            id = Uuid.string_random (),
+            id = id,
             kind = "microsoft",
             auth_method = "oauth2",
             email = email,
@@ -296,6 +315,13 @@ public class Mail.IdentityCatalog : Object {
      */
     public static void remove_account (string account_id, bool wipe_local_library) throws Error {
         var catalog = load ();
+        string? email = null;
+        for (uint i = 0; i < catalog.accounts.length; i++) {
+            if (catalog.accounts[i].id == account_id) {
+                email = catalog.accounts[i].email;
+                break;
+            }
+        }
         if (!catalog.remove_by_id (account_id)) {
             throw new IOError.NOT_FOUND (
                 _("No Letter Identity account “%s”.").printf (account_id)
@@ -313,9 +339,174 @@ public class Mail.IdentityCatalog : Object {
         } catch (Error e) {
             warning ("Clear Identity OAuth: %s", e.message);
         }
+        try {
+            IdentitySecrets.clear_oauth_tokens (IdentityOAuth.graph_secret_id (account_id));
+        } catch (Error e) {
+            warning ("Clear Identity Graph OAuth: %s", e.message);
+        }
 
-        if (wipe_local_library)
+        if (wipe_local_library) {
             wipe_local_library_files (account_id);
+            clear_orphan_id (account_id);
+            if (email != null)
+                clear_orphan_email (email);
+        } else if (email != null && email.length > 0) {
+            /* Keep-cache: remember id so a later Add Account reuses the library. */
+            remember_orphan (email, account_id);
+        }
+    }
+
+    public static string orphans_path () {
+        return Path.build_filename (directory (), "orphans.json");
+    }
+
+    public static string normalize_account_email (string email) {
+        return email.strip ().down ();
+    }
+
+    /** Map email → account_id for Remove + keep cache. */
+    public static void remember_orphan (string email, string account_id) {
+        var key = normalize_account_email (email);
+        if (key.length == 0 || account_id.length == 0)
+            return;
+        try {
+            var map = load_orphans ();
+            /* Drop any other email pointing at this id. */
+            var drop = new GenericArray<string> ();
+            map.foreach ((k, v) => {
+                if (v == account_id)
+                    drop.add (k);
+            });
+            for (uint i = 0; i < drop.length; i++)
+                map.remove (drop[i]);
+            map.set (key, account_id);
+            save_orphans (map);
+        } catch (Error e) {
+            warning ("Identity orphan remember: %s", e.message);
+        }
+    }
+
+    public static void clear_orphan_email (string email) {
+        var key = normalize_account_email (email);
+        if (key.length == 0)
+            return;
+        try {
+            var map = load_orphans ();
+            if (!map.remove (key))
+                return;
+            save_orphans (map);
+        } catch (Error e) {
+            warning ("Identity orphan clear email: %s", e.message);
+        }
+    }
+
+    public static void clear_orphan_id (string account_id) {
+        if (account_id.length == 0)
+            return;
+        try {
+            var map = load_orphans ();
+            var drop = new GenericArray<string> ();
+            map.foreach ((k, v) => {
+                if (v == account_id)
+                    drop.add (k);
+            });
+            if (drop.length == 0)
+                return;
+            for (uint i = 0; i < drop.length; i++)
+                map.remove (drop[i]);
+            save_orphans (map);
+        } catch (Error e) {
+            warning ("Identity orphan clear id: %s", e.message);
+        }
+    }
+
+    /**
+     * Peek + remove orphan id for this email (reclaim local library on re-add).
+     */
+    public static string? take_orphan_id (string email) {
+        var key = normalize_account_email (email);
+        if (key.length == 0)
+            return null;
+        try {
+            var map = load_orphans ();
+            var id = map.get (key);
+            if (id == null || id.length == 0)
+                return null;
+            map.remove (key);
+            save_orphans (map);
+            return id;
+        } catch (Error e) {
+            warning ("Identity orphan take: %s", e.message);
+            return null;
+        }
+    }
+
+    private static HashTable<string, string> load_orphans () throws Error {
+        var map = new HashTable<string, string> (str_hash, str_equal);
+        var file = File.new_for_path (orphans_path ());
+        if (!file.query_exists ())
+            return map;
+        uint8[] data;
+        file.load_contents (null, out data, null);
+        var parser = new Json.Parser ();
+        parser.load_from_data ((string) data, data.length);
+        var root = parser.get_root ();
+        if (root == null || root.get_node_type () != Json.NodeType.OBJECT)
+            return map;
+        var obj = root.get_object ();
+        foreach (var name in obj.get_members ()) {
+            var node = obj.get_member (name);
+            if (node != null && node.get_node_type () == Json.NodeType.VALUE) {
+                var id = node.get_string ();
+                if (id != null && id.length > 0)
+                    map.set (name, id);
+            }
+        }
+        return map;
+    }
+
+    private static void save_orphans (HashTable<string, string> map) throws Error {
+        var dir = File.new_for_path (directory ());
+        try {
+            dir.make_directory_with_parents ();
+        } catch (Error e) {
+            if (!(e is IOError.EXISTS))
+                throw e;
+        }
+        var builder = new Json.Builder ();
+        builder.begin_object ();
+        var keys = new GenericArray<string> ();
+        map.foreach ((k, v) => {
+            keys.add (k);
+        });
+        keys.sort_with_data ((a, b) => {
+            return strcmp (a, b);
+        });
+        for (uint i = 0; i < keys.length; i++) {
+            builder.set_member_name (keys[i]);
+            builder.add_string_value (map.get (keys[i]));
+        }
+        builder.end_object ();
+        var gen = new Json.Generator ();
+        gen.set_root (builder.get_root ());
+        gen.pretty = true;
+        gen.indent = 2;
+        gen.to_file (orphans_path ());
+    }
+
+    /** Persist graph_scope_stamp on an existing catalog row. */
+    public static void set_graph_scope_stamp (string account_id, string stamp) throws Error {
+        var catalog = load ();
+        for (uint i = 0; i < catalog.accounts.length; i++) {
+            if (catalog.accounts[i].id != account_id)
+                continue;
+            catalog.accounts[i].graph_scope_stamp = stamp;
+            catalog.save ();
+            return;
+        }
+        throw new IOError.NOT_FOUND (
+            _("No Letter Identity account “%s”.").printf (account_id)
+        );
     }
 
     public static string engine_imap_dir (string account_id) {
@@ -328,12 +519,23 @@ public class Mail.IdentityCatalog : Object {
         );
     }
 
+    public static string engine_graph_dir (string account_id) {
+        return Path.build_filename (
+            Environment.get_user_data_dir (),
+            "letter",
+            "engine",
+            "graph",
+            account_id
+        );
+    }
+
     public static uint64 local_library_bytes (string account_id) {
         var headers = Path.build_filename (
             MailSession.header_list_cache_dir (),
             Checksum.compute_for_string (ChecksumType.SHA256, account_id)
         );
         uint64 total = directory_size (engine_imap_dir (account_id))
+            + directory_size (engine_graph_dir (account_id))
             + directory_size (headers);
         var tree = MailSession.folder_tree_cache_file (account_id);
         if (FileUtils.test (tree, FileTest.IS_REGULAR)) {
@@ -350,6 +552,7 @@ public class Mail.IdentityCatalog : Object {
 
     public static void wipe_local_library_files (string account_id) {
         delete_tree_quiet (engine_imap_dir (account_id));
+        delete_tree_quiet (engine_graph_dir (account_id));
         MailSession.delete_header_list_cache (account_id);
         MailSession.delete_folder_tree_cache (account_id);
         /* Prefetch / misc under cache/letter/mail/<id> if present. */

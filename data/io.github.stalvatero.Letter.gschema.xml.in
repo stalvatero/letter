@@ -223,5 +223,11 @@
       <summary>Settings migrated</summary>
       <description>Whether settings have been migrated from the previous app name (Mail).</description>
     </key>
+
+    <key name="compose-contacts-all-accounts" type="b">
+      <default>true</default>
+      <summary>Use contacts from all accounts</summary>
+      <description>When enabled, compose autocomplete searches address books and directories for every mail account. When disabled, only the selected From account is searched.</description>
+    </key>
   </schema>
 </schemalist>

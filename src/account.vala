@@ -150,11 +150,25 @@ public class Mail.Account : Object {
         }
     }
 
-    /** Letter Identity catalog (`backend_name == letter-imap`). */
+    /** Letter Identity catalog (`letter-imap` or `letter-graph`). */
     public bool is_letter_identity {
         get {
-            return this.backend_name == "letter-imap";
+            return Account.is_letter_engine_backend (this.backend_name);
         }
+    }
+
+    public static bool is_letter_engine_backend (string? backend_name) {
+        return backend_name == "letter-imap" || backend_name == "letter-graph";
+    }
+
+    /**
+     * Microsoft Graph mailFolder id (not an IMAP mailbox name). Using these
+     * with letter-imap SELECT yields “NO AQMk… doesn't exist”.
+     */
+    public static bool looks_like_graph_folder_id (string? full_name) {
+        if (full_name == null || full_name.length < 12)
+            return false;
+        return full_name.has_prefix ("AQMk");
     }
 
     /** Linked to a GNOME Online Accounts object (possibly merged onto Identity). */

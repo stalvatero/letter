@@ -69,8 +69,8 @@ else
   echo "To install on this machine as well: FLATPAK_INSTALL=1 $0"
 fi
 echo
-echo "Notes for this experimental Flatpak:"
-echo "  - Accounts still come from the host: Settings → Online Accounts."
-echo "  - Microsoft 365 Graph mail uses evolution-ews bundled in the Flatpak."
-echo "  - Host evolution-ews is still useful for Calendar/Contacts on the desktop."
+echo "Notes for this Flatpak:"
+echo "  - Run: flatpak run io.github.stalvatero.Letter  (no --env needed)."
+echo "  - LETTER_MS_CLIENT_ID + LETTER_MS_MAIL=graph are baked in finish-args."
+echo "  - GOA remains optional (Preferences); LETTER_SKIP_GOA is not forced."
 echo "  - Not published to Flathub yet."

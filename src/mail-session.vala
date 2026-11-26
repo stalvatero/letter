@@ -2966,6 +2966,16 @@ public class Mail.MailSession : Camel.Session, MailBackend {
         return fetched;
     }
 
+    public async void hydrate_message_attachments (
+        Account account,
+        Folder folder,
+        string uid,
+        MessageContent content,
+        Cancellable? cancellable = null
+    ) throws Error {
+        /* Camel MIME already carries attachments / cid images. */
+    }
+
     public async void export_message_eml (
         Account account,
         Folder folder,
@@ -4284,6 +4294,14 @@ public class Mail.MailSession : Camel.Session, MailBackend {
         } else if (!has_blocking_local_flushes ()) {
             this.flush_force = false;
         }
+    }
+
+    /* Camel has no R4.1 scoped registry — full flush is the safe subset. */
+    public async void flush_pending_local_changes_for_folder (
+        Account account,
+        Folder folder
+    ) {
+        yield flush_pending_local_changes_async ();
     }
 
     /* Push DELETED flags then optionally Camel.Folder.expunge.
@@ -6250,7 +6268,7 @@ public class Mail.MailSession : Camel.Session, MailBackend {
         if (uid == null || uid.length == 0)
             return 0;
 
-        if (account.backend_name == "letter-imap")
+        if (Account.is_letter_engine_backend (account.backend_name))
             return IdentityCatalog.local_library_bytes (uid);
 
         return directory_size (Path.build_filename (mail_cache_root (), uid))
@@ -7488,6 +7506,8 @@ public class Mail.Attachment : Object {
     public File? file { get; set; }
     public string? content_id { get; set; }
     public bool inline_part { get; set; }
+    /* Display size when data is not held in RAM (disk sidecar / pending). */
+    public int64 size_bytes { get; set; default = -1; }
 
     public bool is_message {
         get {
@@ -7511,8 +7531,29 @@ public class Mail.Attachment : Object {
 
     public string size_label {
         owned get {
-            return format_size (this.data.get_size ());
+            var n = resolved_size_bytes ();
+            if (n <= 0)
+                return "";
+            return format_size (n);
         }
+    }
+
+    public int64 resolved_size_bytes () {
+        if (this.data != null && this.data.get_size () > 0)
+            return (int64) this.data.get_size ();
+        if (this.size_bytes > 0)
+            return this.size_bytes;
+        if (this.file != null) {
+            try {
+                return (int64) this.file.query_info (
+                    FileAttribute.STANDARD_SIZE,
+                    FileQueryInfoFlags.NONE,
+                    null
+                ).get_size ();
+            } catch (Error e) {
+            }
+        }
+        return 0;
     }
 }
 
