@@ -1077,8 +1077,7 @@ text.mail-search-input:focus-within {
   padding: 6px 8px;
 }
 
-/* Quiet idle update check — red dot on the native header MenuButton only.
- * Do not set MenuButton.child (that made the button look permanently pressed). */
+/* Quiet idle update check — red dot on the native header MenuButton. */
 menubutton.has-update-badge > button {
   background-image: radial-gradient(
     circle 3.5px at calc(100% - 7px) 7px,

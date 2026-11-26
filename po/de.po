@@ -1528,6 +1528,9 @@ msgstr "Neu"
 #: src/window.blp:338
 msgid "Main Menu"
 msgstr "Hauptmenü"
+msgid "Main Menu — update available"
+msgstr ""
+
 
 #: src/window.blp:346
 msgid "Updating…"

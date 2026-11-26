@@ -1537,6 +1537,9 @@ msgstr "Νέο"
 #: src/window.blp:338
 msgid "Main Menu"
 msgstr "Κύριο μενού"
+msgid "Main Menu — update available"
+msgstr ""
+
 
 #: src/window.blp:346
 msgid "Updating…"

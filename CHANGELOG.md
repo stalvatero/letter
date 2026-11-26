@@ -19,6 +19,12 @@ refactors unless they affect behaviour.
 
 ## [Unreleased](https://github.com/stalvatero/letter/compare/v1.8.0...HEAD)
 
+### Fixed
+
+- Update-available menu row stays native GMenu (correct padding); a 🔴 prefix
+  marks **Check for Updates…** when a release is waiting. Italian translation
+  for the main-menu “update available” tooltip.
+
 ## [1.8.0](https://github.com/stalvatero/letter/compare/v1.7.1...v1.8.0) - 2026-11-23
 
 ### Translations

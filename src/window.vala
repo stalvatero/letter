@@ -90,6 +90,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     private Gtk.SearchBar message_search_bar;
     [GtkChild]
     private unowned Gtk.MenuButton menu_button;
+    /* Blueprint menu model — keep a ref so badge label edits hit the live GMenu. */
+    private MenuModel? primary_menu_model;
     [GtkChild]
     private unowned Gtk.Paned message_split;
     [GtkChild]
@@ -7750,7 +7752,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void bind_primary_menu () {
-        var popover = new Gtk.PopoverMenu.from_model (this.menu_button.menu_model);
+        this.primary_menu_model = this.menu_button.menu_model;
+        var popover = new Gtk.PopoverMenu.from_model (this.primary_menu_model);
         popover.add_child (new ThemeSelector (this.settings), "theme");
         this.menu_button.popover = popover;
 
@@ -7760,7 +7763,6 @@ public class Mail.Window : Adw.ApplicationWindow {
         sync_update_badges ();
     }
 
-    /* Keep the native MenuButton / GMenu chrome; badge via CSS + label prefix. */
     private void sync_update_badges () {
         var app = get_application () as Application;
         var show = app != null && app.update_available;
@@ -7774,33 +7776,43 @@ public class Mail.Window : Adw.ApplicationWindow {
         set_updates_menu_badged (show);
     }
 
+    /* Native GMenu row keeps Adw padding; badge is a label prefix when needed. */
     private void set_updates_menu_badged (bool badged) {
-        var root = this.menu_button.menu_model as Menu;
-        if (root == null)
-            return;
-
         var plain = _("Check for _Updates…");
-        /* Red circle keeps native GMenu weight/alignment (no custom Button). */
         var marked = "🔴 " + _("Check for _Updates…");
-        for (int s = 0; s < root.get_n_items (); s++) {
-            var section = root.get_item_link (s, Menu.LINK_SECTION) as Menu;
-            if (section == null)
+        var want = badged ? marked : plain;
+        if (this.primary_menu_model != null)
+            replace_updates_menu_label (this.primary_menu_model, want);
+    }
+
+    private bool replace_updates_menu_label (MenuModel model, string want) {
+        var menu = model as Menu;
+        var n = model.get_n_items ();
+        for (int i = 0; i < n; i++) {
+            var section = model.get_item_link (i, Menu.LINK_SECTION);
+            if (section != null) {
+                if (replace_updates_menu_label (section, want))
+                    return true;
                 continue;
-            for (int i = 0; i < section.get_n_items (); i++) {
-                var action = section.get_item_attribute_value (i, Menu.ATTRIBUTE_ACTION, VariantType.STRING);
-                if (action == null || action.get_string () != "app.check-updates")
-                    continue;
-                var label = section.get_item_attribute_value (i, Menu.ATTRIBUTE_LABEL, VariantType.STRING);
-                var current = label != null ? label.get_string () : "";
-                var want = badged ? marked : plain;
-                if (current == want)
-                    return;
-                var item = new MenuItem (want, "app.check-updates");
-                section.remove (i);
-                section.insert_item (i, item);
-                return;
             }
+
+            var action = model.get_item_attribute_value (i, Menu.ATTRIBUTE_ACTION, VariantType.STRING);
+            if (action == null || action.get_string () != "app.check-updates")
+                continue;
+
+            var label = model.get_item_attribute_value (i, Menu.ATTRIBUTE_LABEL, VariantType.STRING);
+            var current = label != null ? label.get_string () : "";
+            if (current == want)
+                return true;
+            if (menu == null)
+                return false;
+
+            var item = new MenuItem (want, "app.check-updates");
+            menu.remove (i);
+            menu.insert_item (i, item);
+            return true;
         }
+        return false;
     }
 
     private void on_fullscreen () {

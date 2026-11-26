@@ -1540,6 +1540,10 @@ msgstr "Nuova"
 msgid "Main Menu"
 msgstr "Menu principale"
 
+#: src/window.vala:7772
+msgid "Main Menu — update available"
+msgstr "Menu principale — aggiornamento disponibile"
+
 #: src/window.blp:346
 msgid "Updating…"
 msgstr "Aggiornamento…"
