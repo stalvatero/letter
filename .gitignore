@@ -19,4 +19,4 @@ meson-logs/
 *.log
 
 # Local working notes (not part of the repo)
-/docs/
+/internal/

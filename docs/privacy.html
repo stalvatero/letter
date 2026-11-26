@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Privacy Policy — Letter</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --fg: #241f31;
+      --muted: #5e5c64;
+      --bg: #f6f5f4;
+      --card: #fff;
+      --accent: #1a5fb4;
+      --border: #deddda;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #eeeeec;
+        --muted: #c0bfbc;
+        --bg: #1e1e1e;
+        --card: #2d2d2d;
+        --border: #3d3846;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.55;
+      color: var(--fg);
+      background:
+        radial-gradient(900px 380px at 50% -20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
+        var(--bg);
+    }
+    .site-header {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 1.25rem 1.25rem 0;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.7rem;
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+    .brand svg { flex-shrink: 0; }
+    .brand:hover { opacity: 0.9; }
+    .site-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem 1.1rem;
+      margin: 0.85rem 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.92rem;
+    }
+    .site-nav a { color: var(--muted); text-decoration: none; }
+    .site-nav a:hover,
+    .site-nav a[aria-current="page"] { color: var(--accent); }
+    main {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 1.15rem 1.25rem 4rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 1.35rem;
+    }
+    h1 { font-size: 1.65rem; margin: 0 0 0.35rem; color: var(--accent); }
+    h2 { font-size: 1.15rem; margin: 1.75rem 0 0.5rem; }
+    p, li { color: var(--fg); }
+    .meta { color: var(--muted); font-size: 0.95rem; margin: 0 0 1.25rem; }
+    a { color: var(--accent); }
+    ul { padding-left: 1.2rem; }
+    footer.page-nav { margin-top: 1.5rem; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 128 128" aria-hidden="true">
+        <rect x="8" y="8" width="112" height="112" rx="24" fill="#1a5fb4"/>
+        <g transform="translate(8 8) scale(0.875)">
+          <rect x="22" y="30" width="84" height="68" rx="8" fill="#f6f5f4"/>
+          <path d="M22 38.5 L64 68 L106 38.5" fill="none" stroke="#1a5fb4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+      Letter
+    </a>
+    <ul class="site-nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="privacy.html" aria-current="page">Privacy</a></li>
+      <li><a href="terms.html">Terms</a></li>
+      <li><a href="https://github.com/stalvatero/letter">GitHub</a></li>
+    </ul>
+  </header>
+  <main class="card">
+    <h1>Privacy Policy</h1>
+    <p class="meta">Letter (also shown as “Lettera”) · Effective 26 November 2026 · Developer: Salvatore Oscurato</p>
+
+    <p>
+      This Privacy Policy explains how the <strong>Letter</strong> desktop email application
+      (“Letter”, “we”, “the app”) handles information when you install and use it on your computer.
+      Letter is an open-source personal project distributed primarily as a Flatpak and from
+      <a href="https://github.com/stalvatero/letter">github.com/stalvatero/letter</a>.
+    </p>
+
+    <h2>1. Summary</h2>
+    <ul>
+      <li>Letter is a <strong>local desktop mail client</strong>. It does not run a Letter cloud mailbox service.</li>
+      <li>Mail, tokens, and preferences stay on <strong>your device</strong> (and, if you choose them, in your desktop account providers).</li>
+      <li>When you sign in with <strong>Google</strong> or <strong>Microsoft</strong> through Letter Identity, those providers authenticate you; Letter receives tokens needed to access your mail on your behalf.</li>
+      <li>We do <strong>not</strong> sell your personal data and we do not operate ads in Letter.</li>
+    </ul>
+
+    <h2>2. Who is responsible</h2>
+    <p>
+      Letter is developed by <strong>Salvatore Oscurato</strong>.
+      Contact for privacy questions:
+      <a href="mailto:soscurato@gmail.com">soscurato@gmail.com</a>
+      or
+      <a href="https://github.com/stalvatero/letter/issues">GitHub Issues</a>.
+    </p>
+
+    <h2>3. Data Letter processes on your device</h2>
+    <p>Depending on how you use the app, Letter may store locally:</p>
+    <ul>
+      <li><strong>Account details</strong> you add in Letter Identity (display name, email address, provider, IMAP/SMTP settings when used).</li>
+      <li><strong>OAuth tokens</strong> (access and refresh tokens) for Google or Microsoft sign-in, typically in the system secret store / keyring.</li>
+      <li><strong>Mail content and metadata</strong> cached for offline use and performance (headers, message bodies, attachments you open or that are prefetched according to your preferences).</li>
+      <li><strong>Preferences</strong> (theme, sync interval, folder layout, and similar settings) via desktop settings storage.</li>
+      <li><strong>Optional collected addresses</strong> from mail you send, used only for compose suggestions on your device.</li>
+    </ul>
+    <p>
+      Local cache and accounts can be removed from Letter’s Preferences (for example by removing an
+      Identity account and optionally deleting its local library). Uninstalling the Flatpak or
+      clearing the app’s data directory also removes sandbox-local data.
+    </p>
+
+    <h2>4. Google sign-in (Letter Identity)</h2>
+    <p>
+      If you choose <strong>Sign in with Google</strong>, Letter uses Google OAuth 2.0 (PKCE / loopback)
+      and requests scopes needed to identify you and access Gmail for IMAP/mail use in the app, including:
+    </p>
+    <ul>
+      <li><code>openid</code>, <code>email</code>, <code>profile</code></li>
+      <li><code>https://mail.google.com/</code> (Gmail / IMAP access required for the mail client)</li>
+    </ul>
+    <p>
+      Google’s own privacy policy applies to the authentication and to data Google holds in your Google Account:
+      <a href="https://policies.google.com/privacy">https://policies.google.com/privacy</a>.
+      Letter uses the resulting tokens only to provide mail features on your device. Letter does not receive your Google password.
+    </p>
+
+    <h2>5. Microsoft sign-in (Letter Identity)</h2>
+    <p>
+      If you choose <strong>Sign in with Microsoft</strong>, Letter uses Microsoft identity / Graph (or related mail APIs)
+      according to the permissions shown on Microsoft’s consent screen. Microsoft’s privacy statement applies to that sign-in:
+      <a href="https://privacy.microsoft.com/">https://privacy.microsoft.com/</a>.
+      Tokens are stored locally like Google tokens and used to sync and send mail from Letter on your device.
+    </p>
+
+    <h2>6. GNOME Online Accounts (optional)</h2>
+    <p>
+      On GNOME desktops you may enable accounts that already exist in
+      <strong>GNOME Online Accounts</strong> / Evolution Data Server. In that mode, sign-in and some account
+      data are managed by the desktop stack, not only by Letter. Letter reads the mail sources those
+      services expose. You can turn this off in Letter Preferences and use Letter Identity only.
+    </p>
+
+    <h2>7. Network use</h2>
+    <p>Letter contacts third-party servers only as needed to provide the product, for example:</p>
+    <ul>
+      <li>Google or Microsoft identity and mail endpoints when you use those accounts</li>
+      <li>Your IMAP/SMTP host when you use a password-based IMAP account</li>
+      <li>Optional update checks against Letter’s GitHub Releases (version metadata), if that feature is used</li>
+    </ul>
+    <p>Letter does not send your mailbox contents to the Letter developer for analytics or advertising.</p>
+
+    <h2>8. Sharing</h2>
+    <p>
+      We do not sell personal information. Data leaves your device toward Google, Microsoft, or your mail host
+      only because you configured those providers and Letter must talk to them to fetch or send mail.
+      If you open a support issue on GitHub, anything you paste there is public unless you use a private channel.
+    </p>
+
+    <h2>9. Retention</h2>
+    <p>
+      Letter retains local data until you delete accounts/cache, clear app data, or uninstall.
+      Provider-side retention (Gmail, Microsoft 365, IMAP host) is controlled by those providers and your account settings with them.
+    </p>
+
+    <h2>10. Security</h2>
+    <p>
+      OAuth tokens are stored with the desktop secret service when available. Mail cache lives in the
+      application’s local data directories. No method of storage is perfect; protect your user account
+      and device encryption as you would for any mail client.
+    </p>
+
+    <h2>11. Children</h2>
+    <p>
+      Letter is a general-purpose email client and is not directed at children under 13
+      (or the minimum age required in your country). Do not use Letter Identity sign-in for such users.
+    </p>
+
+    <h2>12. International users</h2>
+    <p>
+      Processing happens on your computer and at the locations of your chosen mail providers.
+      If you are in the EEA/UK, your providers’ and this policy’s descriptions are intended to help you understand
+      the purposes of local processing (providing the mail client you requested).
+    </p>
+
+    <h2>13. Changes</h2>
+    <p>
+      We may update this Privacy Policy when Letter’s behaviour or legal requirements change.
+      The “Effective” date at the top will be revised. Continued use after an update means you accept the revised policy.
+    </p>
+
+    <h2>14. Contact</h2>
+    <p>
+      Privacy questions: <a href="mailto:soscurato@gmail.com">soscurato@gmail.com</a><br/>
+      Project: <a href="https://github.com/stalvatero/letter">https://github.com/stalvatero/letter</a>
+    </p>
+
+    <footer class="page-nav">
+      <a href="index.html">Home</a> ·
+      <a href="terms.html">Terms of Service</a>
+    </footer>
+  </main>
+</body>
+</html>
