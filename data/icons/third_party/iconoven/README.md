@@ -56,6 +56,7 @@ into black squares. Artwork is optically scaled (~1.12) to match Adwaita size.
 | reply-all.svg | letter-mail-reply-all |
 | reply.svg | letter-mail-reply-sender |
 | send.svg | letter-mail-send |
+| send.svg (stroke #fff) | letter-mail-send-on-accent |
 | refresh.svg | letter-mail-send-receive |
 | mail.svg | letter-mail-unread |
 | play.svg | letter-media-playback-start |

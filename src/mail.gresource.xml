@@ -46,6 +46,7 @@
     <file alias="icons/scalable/actions/letter-mail-reply-all.svg">letter-mail-reply-all.svg</file>
     <file alias="icons/scalable/actions/letter-mail-reply-sender.svg">letter-mail-reply-sender.svg</file>
     <file alias="icons/scalable/actions/letter-mail-send-receive.svg">letter-mail-send-receive.svg</file>
+    <file alias="icons/scalable/actions/letter-mail-send-on-accent.svg">letter-mail-send-on-accent.svg</file>
     <file alias="icons/scalable/actions/letter-mail-send.svg">letter-mail-send.svg</file>
     <file alias="icons/scalable/actions/letter-mail-unread.svg">letter-mail-unread.svg</file>
     <file alias="icons/scalable/actions/letter-media-playback-start.svg">letter-media-playback-start.svg</file>

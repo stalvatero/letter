@@ -2972,6 +2972,16 @@ namespace Mail.Utils {
     }
 
     /**
+     * Compose “Send” on the suggested-action button: white IconOven stroke
+     * when Letter chrome is on; otherwise stock symbolic (theme recolors it).
+     */
+    public static string icon_compose_send_on_accent () {
+        if (letter_chrome_enabled ())
+            return "letter-mail-send-on-accent";
+        return "mail-send-symbolic";
+    }
+
+    /**
      * Chrome icon for UI. When Letter chrome is enabled, prefers shipped
      * `letter-<base>` (no `-symbolic` — GTK symbolic CSS blanks strokes).
      * Otherwise returns the stock theme name.

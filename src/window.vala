@@ -4653,11 +4653,11 @@ public class Mail.Window : Adw.ApplicationWindow {
         /* Update Folder always until-done (product rule). */
         var force_full = lag_status || server_shrunk || undated_repair || user_force;
         var graph_has_resume = letter_graph && graph_next_link_exists (account, folder);
-        /* M365 Online Archive / retention: mail ages out of the primary
-         * Archive so totalItemCount and the local msgid-deduped index stay
-         * permanently skewed at the tail. I1/I3 must not until-done from
-         * that noise every launch — tip the head only. Deep reconcile stays
-         * on folder click (I4) and Update Folder. */
+        var graph_has_delta = letter_graph && graph_delta_link_exists (account, folder);
+        /* With a saved @odata.deltaLink, I1/I3 tip is an incremental delta
+         * round (upserts + @removed) — prefer that over until-done from
+         * totalItemCount lag/shrink noise. Without .graph-delta, keep the
+         * legacy soft tip that ignores Online Archive / msgid-dedupe skew. */
         var graph_soft_i1_i3 = letter_graph
             && warm
             && !user_force
@@ -4666,12 +4666,19 @@ public class Mail.Window : Adw.ApplicationWindow {
                 || this.sync_log_name == "scheduled sync");
         if (graph_soft_i1_i3 && (lag_status || server_shrunk) && !undated_repair) {
             Utils.sync_log_detail (
-                "%s headers “%s” soft tip (Graph warm — lag/shrink ignored on I1/I3, local %u Graph %d)".printf (
-                    this.sync_log_name,
-                    folder.name,
-                    cached.length,
-                    folder.server_total
-                )
+                graph_has_delta
+                    ? "%s headers “%s” delta tip (checkpoint — lag/shrink via Graph delta, local %u Graph %d)".printf (
+                        this.sync_log_name,
+                        folder.name,
+                        cached.length,
+                        folder.server_total
+                    )
+                    : "%s headers “%s” soft tip (Graph warm — lag/shrink ignored on I1/I3, local %u Graph %d)".printf (
+                        this.sync_log_name,
+                        folder.name,
+                        cached.length,
+                        folder.server_total
+                    )
             );
             force_full = false;
         }
@@ -6163,9 +6170,9 @@ public class Mail.Window : Adw.ApplicationWindow {
 
         var flags = int.parse (parts[2]);
         var subject = header_cache_unescape (parts[4]);
-        var from = header_cache_unescape (parts[5]);
-        var to = header_cache_unescape (parts[6]);
-        var cc = parts.length > 7 ? header_cache_unescape (parts[7]) : "";
+        var from_raw = header_cache_unescape (parts[5]);
+        var to_raw = header_cache_unescape (parts[6]);
+        var cc_raw = parts.length > 7 ? header_cache_unescape (parts[7]) : "";
         var preview = Utils.sanitize_message_preview (
             parts.length > 8 ? header_cache_unescape (parts[8]) : null
         );
@@ -6174,27 +6181,34 @@ public class Mail.Window : Adw.ApplicationWindow {
             conversation_key = null;
         var refs_raw = parts.length > 10 ? parts[10] : "";
 
+        /* Graph once stored "Name <email>" in the index; strip for list UI
+         * (Camel parity) while keeping raw for search + Sent harvest. */
+        var from = Utils.display_address (from_raw);
+        var to = Utils.display_address_list (to_raw);
+        var cc = Utils.display_address_list (cc_raw);
+
         var from_blob = new StringBuilder ();
         Utils.append_search_part (from_blob, from);
+        Utils.append_search_part (from_blob, from_raw);
         var to_blob = new StringBuilder ();
         Utils.append_search_part (to_blob, to);
+        Utils.append_search_part (to_blob, to_raw);
         Utils.append_search_part (to_blob, cc);
+        Utils.append_search_part (to_blob, cc_raw);
         var search = new StringBuilder ();
         Utils.append_search_part (search, subject);
-        Utils.append_search_part (search, from);
-        Utils.append_search_part (search, to);
-        Utils.append_search_part (search, cc);
+        Utils.append_search_part (search, from_raw);
+        Utils.append_search_part (search, to_raw);
+        Utils.append_search_part (search, cc_raw);
         Utils.append_search_part (search, preview);
 
         var msg_outgoing = (flags & (1 << 4)) != 0 || outgoing;
-        /* Disk cache stores a single to/cc column. When it already has @
-         * (Graph / IMAP raw), expose it as to_header for Sent harvest. */
         string? to_header = null;
         string? cc_header = null;
-        if (to.contains ("@"))
-            to_header = to;
-        if (cc.contains ("@"))
-            cc_header = cc;
+        if (to_raw.contains ("@"))
+            to_header = to_raw;
+        if (cc_raw.contains ("@"))
+            cc_header = cc_raw;
         return new Message () {
             uid = parts[0],
             date = int64.parse (parts[1]),
@@ -6300,6 +6314,13 @@ public class Mail.Window : Adw.ApplicationWindow {
         ) + ".graph-next";
     }
 
+    private static string graph_delta_link_path (Account account, Folder folder) {
+        return MailSession.header_list_cache_file (
+            account.source_uid ?? account.uid,
+            folder.full_name
+        ) + ".graph-delta";
+    }
+
     private static string graph_synced_total_path (Account account, Folder folder) {
         return MailSession.header_list_cache_file (
             account.source_uid ?? account.uid,
@@ -6309,6 +6330,10 @@ public class Mail.Window : Adw.ApplicationWindow {
 
     private static bool graph_next_link_exists (Account account, Folder folder) {
         return FileUtils.test (graph_next_link_path (account, folder), FileTest.IS_REGULAR);
+    }
+
+    private static bool graph_delta_link_exists (Account account, Folder folder) {
+        return FileUtils.test (graph_delta_link_path (account, folder), FileTest.IS_REGULAR);
     }
 
     private static int load_graph_synced_total (Account account, Folder folder) {
@@ -6338,8 +6363,10 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     /* True when a finished Graph walk already matched this totalItemCount
-     * (msgid dedupe may leave local count slightly under Graph). Also migrates
-     * pre-marker installs that have a large warm cache and no nextLink. */
+     * (msgid dedupe may leave local count slightly under Graph), or when a
+     * .graph-delta checkpoint means incremental tips see remote deletes.
+     * Also migrates pre-marker installs that have a large warm cache and no
+     * nextLink. */
     private static bool graph_folder_caught_up (
         Account account,
         Folder folder,
@@ -6347,6 +6374,9 @@ public class Mail.Window : Adw.ApplicationWindow {
     ) {
         if (cached == null || cached.length == 0 || folder.server_total < 0)
             return false;
+        if (graph_delta_link_exists (account, folder)
+            && !graph_next_link_exists (account, folder))
+            return true;
         var synced = load_graph_synced_total (account, folder);
         if (synced >= folder.server_total)
             return true;
@@ -6390,6 +6420,9 @@ public class Mail.Window : Adw.ApplicationWindow {
             var next = path + ".graph-next";
             if (FileUtils.test (next, FileTest.IS_REGULAR))
                 move_aside_cache_file (next, next + ".corrupt");
+            var delta = path + ".graph-delta";
+            if (FileUtils.test (delta, FileTest.IS_REGULAR))
+                move_aside_cache_file (delta, delta + ".corrupt");
             var synced = path + ".graph-synced";
             if (FileUtils.test (synced, FileTest.IS_REGULAR))
                 move_aside_cache_file (synced, synced + ".corrupt");

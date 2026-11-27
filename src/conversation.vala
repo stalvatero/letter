@@ -220,6 +220,9 @@ public class Mail.Conversation : Object {
             var name = message.list_address;
             if (name == null || name.length == 0)
                 name = message.from;
+            name = message.outgoing
+                ? Utils.display_address_list (name)
+                : Utils.display_address (name);
             var key = name.casefold ();
             if (seen_names.contains (key))
                 continue;
@@ -904,6 +907,7 @@ public class Mail.ThreadRow : Gtk.ListBoxRow {
             var from = this.message.from != null && this.message.from.length > 0
                 ? this.message.from
                 : this.message.list_address;
+            from = Utils.display_address (from);
             this.from_label.label = from;
             this.from_label.attributes = Utils.search_highlight_attrs (from, this.highlight_tokens);
         }

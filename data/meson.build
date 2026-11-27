@@ -142,6 +142,7 @@ install_data(
     'icons/hicolor/symbolic/actions/letter-mail-reply-all.svg',
     'icons/hicolor/symbolic/actions/letter-mail-reply-sender.svg',
     'icons/hicolor/symbolic/actions/letter-mail-send-receive.svg',
+    'icons/hicolor/symbolic/actions/letter-mail-send-on-accent.svg',
     'icons/hicolor/symbolic/actions/letter-mail-send.svg',
     'icons/hicolor/symbolic/actions/letter-mail-unread.svg',
     'icons/hicolor/symbolic/actions/letter-media-playback-start.svg',

@@ -4,7 +4,9 @@
  */
 public errordomain LetterGraph.ApiError {
     HTTP,
-    JSON
+    JSON,
+    /** Delta token expired / invalid — caller must clear cursor and re-seed. */
+    DELTA_GONE
 }
 
 public class LetterGraph.FolderInfo : Object {
@@ -534,6 +536,89 @@ public class LetterGraph.Client : Object {
         if (url == null) {
             more = false;
             next_url = null;
+        }
+        return list;
+    }
+
+    /**
+     * Message delta for one folder. @resume_url is a prior @odata.nextLink /
+     * @odata.deltaLink, or null to start a new round.
+     * Upserts go in the returned array; @removed ids in @removed_ids.
+     * When the round finishes, @delta_complete is true and @next_url is the
+     * new @odata.deltaLink to persist.
+     */
+    public GenericArray<MessageHeader> list_folder_headers_delta_sync (
+        string folder_id,
+        uint top = 50,
+        uint max_pages = 1,
+        out bool more = null,
+        string? resume_url = null,
+        out string? next_url = null,
+        out bool delta_complete = null,
+        out GenericArray<string> removed_ids = null,
+        Cancellable? cancellable = null
+    ) throws GLib.Error {
+        more = false;
+        next_url = null;
+        delta_complete = false;
+        removed_ids = new GenericArray<string> ();
+        if (max_pages == 0)
+            max_pages = 1;
+        var list = new GenericArray<MessageHeader> ();
+        string? url = resume_url;
+        if (url == null || url.length == 0) {
+            url = ("https://graph.microsoft.com/v1.0/me/mailFolders/%s/messages/delta"
+                + "?$top=%u&$orderby=receivedDateTime%%20desc"
+                + "&$select=id,subject,from,toRecipients,receivedDateTime,isRead,flag,"
+                + "hasAttachments,internetMessageId,conversationId,bodyPreview").printf (
+                Uri.escape_string (folder_id, null, false),
+                top
+            );
+        }
+        uint pages = 0;
+        while (url != null && pages < max_pages) {
+            if (cancellable != null && cancellable.is_cancelled ()) {
+                more = true;
+                next_url = url;
+                delta_complete = false;
+                break;
+            }
+            var obj = get_json_sync (url, cancellable);
+            pages++;
+            if (obj.has_member ("value")) {
+                foreach (var node in obj.get_array_member ("value").get_elements ()) {
+                    var o = node.get_object ();
+                    var id = string_member_or_null (o, "id");
+                    if (id == null || id.length == 0)
+                        continue;
+                    if (o.has_member ("@removed")
+                        && o.get_member ("@removed") != null
+                        && !o.get_member ("@removed").is_null ()) {
+                        removed_ids.add (id);
+                        continue;
+                    }
+                    list.add (header_from_object (o));
+                }
+            }
+            if (obj.has_member ("@odata.nextLink")) {
+                url = obj.get_string_member ("@odata.nextLink");
+                more = true;
+                next_url = url;
+                delta_complete = false;
+            } else if (obj.has_member ("@odata.deltaLink")) {
+                url = null;
+                more = false;
+                next_url = obj.get_string_member ("@odata.deltaLink");
+                delta_complete = true;
+            } else {
+                url = null;
+                more = false;
+                next_url = null;
+                delta_complete = false;
+            }
+        }
+        if (url == null && !delta_complete) {
+            more = false;
         }
         return list;
     }
@@ -1296,6 +1381,11 @@ public class LetterGraph.Client : Object {
         if (bytes == null)
             throw new ApiError.HTTP ("Graph GET returned empty body");
         unowned uint8[] data = bytes.get_data ();
+        if (msg.status_code == 410) {
+            throw new ApiError.DELTA_GONE (
+                "Graph HTTP 410: delta token gone — %s".printf (bytes_to_utf8 (data))
+            );
+        }
         if (msg.status_code < 200 || msg.status_code >= 300) {
             throw new ApiError.HTTP (
                 "Graph HTTP %u: %s".printf (msg.status_code, bytes_to_utf8 (data))

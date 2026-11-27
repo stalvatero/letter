@@ -390,8 +390,13 @@ headerbar.letter-toolbar .mail-search-clear {
 headerbar button.compose-send {
   margin-left: 6px;
   min-height: 28px;
+  min-width: 0;
   padding: 2px 10px;
   border-radius: 8px;
+}
+
+headerbar button.compose-send image {
+  -gtk-icon-size: 16px;
 }
 
 headerbar button.unread-filter:checked,

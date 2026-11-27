@@ -263,6 +263,7 @@ public class Mail.GraphMailBackend : Object, MailBackend {
         GenericArray<Message>? result = null;
         Error? error = null;
         bool incomplete = false;
+        bool delta_merged = false;
         var until_done = refresh_timeout_seconds == MailSession.REFRESH_INFO_FORCE_UNTIL_DONE;
         SourceFunc callback = list_messages.callback;
         new Thread<void*> ("letter-graph-list", () => {
@@ -274,6 +275,7 @@ public class Mail.GraphMailBackend : Object, MailBackend {
                     out incomplete,
                     previous,
                     high,
+                    out delta_merged,
                     cancellable
                 );
             } catch (Error e) {
@@ -296,12 +298,12 @@ public class Mail.GraphMailBackend : Object, MailBackend {
         this._last_list_refresh_completed = !incomplete;
         this._last_list_refresh_authoritative = !incomplete;
         var listed = result ?? new GenericArray<Message> ();
-        /* Tip (incomplete): merge into prior Letter headers and overlay
-         * seen/flagged so F5 picks up Outlook web changes without dropping
-         * older UIDs. Until-done chunks already carry the walk-so-far —
-         * only merge when still behind a warm prior (lost-cursor catch-up)
-         * so mid-walk does not replace 15k local with a shorter Graph head. */
-        if (incomplete && previous != null && previous.length > 0) {
+        /* Delta path already merged upserts/@removed into the full list.
+         * Legacy tip merge would resurrect deleted UIDs from previous. */
+        if (!delta_merged
+            && incomplete
+            && previous != null
+            && previous.length > 0) {
             if (!until_done)
                 listed = merge_tip_into_previous (previous, listed);
             else if (listed.length < previous.length)
@@ -356,27 +358,38 @@ public class Mail.GraphMailBackend : Object, MailBackend {
         out bool incomplete,
         GenericArray<Message>? previous,
         bool from_head,
+        out bool delta_merged,
         Cancellable? cancellable
     ) throws Error {
         incomplete = false;
+        delta_merged = true;
         var client = open_client (account);
         var key = folder_key (account, folder);
-        /* Tip = one page from the head (in-memory cursor only).
-         * Until-done = short slices via @odata.nextLink so Window can persist
-         * and paint between chunks — never wait for 27k headers in one call.
-         * nextLink is also on disk so a quit mid-Archive resumes, not
-         * re-downloads the newest 15k. Update Folder (from_head) discards it. */
+        /* Message delta: tip = few pages; until-done = continue until
+         * @odata.deltaLink. Mid-round @odata.nextLink lives in .graph-next;
+         * completed round checkpoint in .graph-delta. Update Folder
+         * (from_head) discards both and re-seeds. */
         uint max_pages = until_done ? LIST_UNTIL_DONE_PAGES : 1;
         string? resume = null;
         bool resumed_cursor = false;
-        if (!until_done) {
-            this.header_list_next.remove (key);
-            this.header_list_accum.remove (key);
-            /* Keep on-disk nextLink — a tip must not abandon catch-up. */
-        } else if (from_head) {
+        bool from_delta_checkpoint = false;
+
+        if (from_head) {
             this.header_list_next.remove (key);
             this.header_list_accum.remove (key);
             clear_graph_next_link (account, folder);
+            clear_graph_delta_link (account, folder);
+        } else if (!until_done) {
+            this.header_list_next.remove (key);
+            this.header_list_accum.remove (key);
+            /* Prefer mid-walk nextLink so tip does not abandon catch-up. */
+            resume = load_graph_next_link (account, folder);
+            if (resume != null && resume.length > 0) {
+                resumed_cursor = true;
+            } else {
+                resume = load_graph_delta_link (account, folder);
+                from_delta_checkpoint = resume != null && resume.length > 0;
+            }
         } else if (this.header_list_next.contains (key)) {
             resume = this.header_list_next.get (key);
             resumed_cursor = true;
@@ -386,24 +399,146 @@ public class Mail.GraphMailBackend : Object, MailBackend {
                 resumed_cursor = true;
                 this.header_list_next.set (key, resume);
                 Utils.sync_log_detail (
-                    "graph headers “%s” resume nextLink from disk".printf (folder.name)
+                    "graph delta “%s” resume nextLink from disk".printf (folder.name)
                 );
             } else {
-                /* Fresh until-done — drop a stale mid-walk accum. */
-                this.header_list_accum.remove (key);
+                resume = load_graph_delta_link (account, folder);
+                from_delta_checkpoint = resume != null && resume.length > 0;
+                if (!from_delta_checkpoint)
+                    this.header_list_accum.remove (key);
+                else
+                    Utils.sync_log_detail (
+                        "graph delta “%s” resume deltaLink from disk".printf (folder.name)
+                    );
             }
         }
+
         bool more = false;
         string? next_url = null;
-        var headers = client.list_folder_headers_sync (
-            folder.full_name,
-            LIST_HEADER_CAP,
-            max_pages,
-            out more,
-            resume,
-            out next_url,
-            cancellable
-        );
+        bool delta_complete = false;
+        GenericArray<string> removed_ids;
+        GenericArray<LetterGraph.MessageHeader> headers;
+
+        try {
+            headers = client.list_folder_headers_delta_sync (
+                folder.full_name,
+                LIST_HEADER_CAP,
+                max_pages,
+                out more,
+                resume,
+                out next_url,
+                out delta_complete,
+                out removed_ids,
+                cancellable
+            );
+        } catch (LetterGraph.ApiError.DELTA_GONE e) {
+            Utils.sync_log (
+                "graph delta “%s” token gone — resync from scratch".printf (folder.name)
+            );
+            this.header_list_next.remove (key);
+            this.header_list_accum.remove (key);
+            clear_graph_next_link (account, folder);
+            clear_graph_delta_link (account, folder);
+            resume = null;
+            resumed_cursor = false;
+            from_delta_checkpoint = false;
+            headers = client.list_folder_headers_delta_sync (
+                folder.full_name,
+                LIST_HEADER_CAP,
+                max_pages,
+                out more,
+                null,
+                out next_url,
+                out delta_complete,
+                out removed_ids,
+                cancellable
+            );
+        }
+
+        var chunk = headers_to_messages (folder, headers);
+        GenericArray<Message>? base_list = previous;
+        if (until_done) {
+            var accum = this.header_list_accum.get (key);
+            if (accum == null) {
+                accum = new GenericArray<Message> ();
+                if (previous != null && previous.length > 0
+                    && (resumed_cursor || from_delta_checkpoint
+                        || previous.length <= LIST_HEADER_CAP)) {
+                    for (uint i = 0; i < previous.length; i++)
+                        accum.add (previous[i]);
+                }
+                this.header_list_accum.set (key, accum);
+            }
+            base_list = accum;
+        } else if (!(from_delta_checkpoint || resumed_cursor)
+            && (previous == null || previous.length == 0 || from_head)) {
+            base_list = new GenericArray<Message> ();
+        }
+
+        var listed = apply_delta_merge (base_list, chunk, removed_ids);
+        if (until_done)
+            this.header_list_accum.set (key, listed);
+
+        if (delta_complete && next_url != null && next_url.length > 0) {
+            this.header_list_next.remove (key);
+            this.header_list_accum.remove (key);
+            clear_graph_next_link (account, folder);
+            save_graph_delta_link (account, folder, next_url);
+            incomplete = false;
+            Utils.sync_log (
+                "graph delta “%s” +%u −%u → %u (checkpoint)".printf (
+                    folder.name,
+                    chunk.length,
+                    removed_ids.length,
+                    listed.length
+                )
+            );
+        } else if (more && next_url != null && next_url.length > 0) {
+            this.header_list_next.set (key, next_url);
+            save_graph_next_link (account, folder, next_url);
+            incomplete = true;
+            Utils.sync_log_detail (
+                "graph delta “%s” +%u −%u → %u (more pending)".printf (
+                    folder.name,
+                    chunk.length,
+                    removed_ids.length,
+                    listed.length
+                )
+            );
+        } else {
+            this.header_list_next.remove (key);
+            this.header_list_accum.remove (key);
+            clear_graph_next_link (account, folder);
+            incomplete = false;
+            Utils.sync_log_detail (
+                "graph delta “%s” +%u −%u → %u".printf (
+                    folder.name,
+                    chunk.length,
+                    removed_ids.length,
+                    listed.length
+                )
+            );
+        }
+
+        if (this.folder_exists.contains (key)
+            && this.folder_exists.get (key) > 0
+            && listed.length == 0
+            && !incomplete) {
+            Utils.sync_log_detail (
+                "graph delta “%s” empty vs folder_exists %d — mark incomplete".printf (
+                    folder.name,
+                    this.folder_exists.get (key)
+                )
+            );
+            incomplete = true;
+        }
+        return listed;
+    }
+
+    private static GenericArray<Message> headers_to_messages (
+        Folder folder,
+        GenericArray<LetterGraph.MessageHeader> headers
+    ) {
         var chunk = new GenericArray<Message> ();
         var outgoing_folder = folder.kind == FolderKind.SENT
             || folder.kind == FolderKind.DRAFTS;
@@ -411,13 +546,16 @@ public class Mail.GraphMailBackend : Object, MailBackend {
             var h = headers[i];
             var from_raw = h.from ?? _("Unknown sender");
             var to_raw = h.to ?? "";
+            /* List UI uses display names only (Camel parity); keep raw in
+             * to_header for Sent harvest / contact store. */
+            var from = Utils.display_address (from_raw);
+            var to = Utils.display_address_list (to_raw);
             var date = parse_graph_datetime (h.received);
             chunk.add (new Message () {
                 uid = h.id,
                 subject = h.subject ?? _("(No subject)"),
-                from = from_raw,
-                to = to_raw,
-                /* ContactStore harvest reads to_header (raw with @), not to. */
+                from = from,
+                to = to,
                 to_header = to_raw.length > 0 ? to_raw : null,
                 date = date,
                 preview = Utils.sanitize_message_preview (h.preview),
@@ -427,79 +565,74 @@ public class Mail.GraphMailBackend : Object, MailBackend {
                 folder_name = folder.name,
                 folder_full_name = folder.full_name,
                 outgoing = outgoing_folder,
-                list_address = outgoing_folder && to_raw.length > 0 ? to_raw : from_raw,
+                list_address = outgoing_folder && to.length > 0 ? to : from,
                 msgid_hash = MailSession.hash_message_id_raw (h.internet_message_id),
                 conversation_key = graph_conversation_key (h.conversation_id),
             });
         }
+        return chunk;
+    }
 
-        GenericArray<Message> listed;
-        if (until_done) {
-            var accum = this.header_list_accum.get (key);
-            if (accum == null) {
-                accum = new GenericArray<Message> ();
-                /* Seed prior headers when resuming a nextLink (restart /
-                 * tip→escalate). Warm Update Folder from the head stays
-                 * empty so vanished Graph ids can drop at the finish. */
-                if (previous != null && previous.length > 0
-                    && (resumed_cursor || previous.length <= LIST_HEADER_CAP)) {
-                    for (uint i = 0; i < previous.length; i++)
-                        accum.add (previous[i]);
-                }
-                this.header_list_accum.set (key, accum);
-            }
-            append_headers_unique (accum, chunk);
-            if (more && next_url != null && next_url.length > 0) {
-                this.header_list_next.set (key, next_url);
-                save_graph_next_link (account, folder, next_url);
-            } else {
-                this.header_list_next.remove (key);
-                this.header_list_accum.remove (key);
-                clear_graph_next_link (account, folder);
-            }
-            listed = clone_message_array (accum);
-            incomplete = more;
-            Utils.sync_log (
-                "graph headers until-done “%s” → %u%s".printf (
-                    folder.name,
-                    listed.length,
-                    incomplete ? " (more pending)" : ""
-                )
-            );
-        } else {
-            /* Tip clears any on-disk nextLink (authoritative until-done
-             * must start from the head unless a chunk cursor exists). */
-            listed = chunk;
-            incomplete = more;
-            if (listed.length == 0) {
-                Utils.sync_log_detail (
-                    "graph headers tip “%s” → 0".printf (folder.name)
-                );
-            } else {
-                Utils.sync_log_detail (
-                    "graph headers tip “%s” → %u%s".printf (
-                        folder.name,
-                        listed.length,
-                        more ? " (more pending)" : ""
-                    )
-                );
+    private static GenericArray<Message> apply_delta_merge (
+        GenericArray<Message>? base_list,
+        GenericArray<Message> upserts,
+        GenericArray<string> removed_ids
+    ) {
+        var result = new GenericArray<Message> ();
+        var by_uid = new HashTable<string, Message> (str_hash, str_equal);
+        if (base_list != null) {
+            for (uint i = 0; i < base_list.length; i++) {
+                var msg = base_list[i];
+                if (msg.uid == null || msg.uid.length == 0)
+                    continue;
+                result.add (msg);
+                by_uid.set (msg.uid, msg);
             }
         }
-        /* Folder list said mail exists but messages came back empty — soft
-         * incomplete so Window retries instead of painting “Nessun messaggio”. */
-        if (this.folder_exists.contains (key)
-            && this.folder_exists.get (key) > 0
-            && listed.length == 0
-            && !incomplete) {
-            Utils.sync_log_detail (
-                "graph headers “%s” empty vs folder_exists %d — mark incomplete".printf (
-                    folder.name,
-                    this.folder_exists.get (key)
-                )
-            );
-            incomplete = true;
+        for (uint i = 0; i < removed_ids.length; i++) {
+            var uid = removed_ids[i];
+            if (uid == null || uid.length == 0 || !by_uid.contains (uid))
+                continue;
+            by_uid.remove (uid);
         }
-        return listed;
+        if (removed_ids.length > 0) {
+            var kept = new GenericArray<Message> ();
+            for (uint i = 0; i < result.length; i++) {
+                var uid = result[i].uid;
+                if (uid != null && by_uid.contains (uid))
+                    kept.add (result[i]);
+            }
+            result = kept;
+        }
+        for (uint i = 0; i < upserts.length; i++) {
+            var incoming = upserts[i];
+            var uid = incoming.uid;
+            if (uid == null || uid.length == 0)
+                continue;
+            var prior = by_uid.get (uid);
+            if (prior != null) {
+                prior.subject = incoming.subject;
+                prior.from = incoming.from;
+                prior.to = incoming.to;
+                prior.to_header = incoming.to_header;
+                prior.date = incoming.date;
+                prior.preview = incoming.preview;
+                prior.seen = incoming.seen;
+                prior.flagged = incoming.flagged;
+                prior.has_attachment = incoming.has_attachment
+                    || prior.has_attachment;
+                prior.outgoing = incoming.outgoing;
+                prior.list_address = incoming.list_address;
+                prior.msgid_hash = incoming.msgid_hash;
+                if (incoming.conversation_key != null
+                    && incoming.conversation_key.length > 0)
+                    prior.conversation_key = incoming.conversation_key;
+                continue;
+            }
+            by_uid.set (uid, incoming);
+            result.add (incoming);
+        }
+        return result;
     }
 
     private static void append_headers_unique (
@@ -570,8 +703,54 @@ public class Mail.GraphMailBackend : Object, MailBackend {
         FileUtils.unlink (path);
     }
 
+
+    private static string graph_delta_link_file (Account account, Folder folder) {
+        return MailSession.header_list_cache_file (
+            account.source_uid ?? account.uid,
+            folder.full_name
+        ) + ".graph-delta";
+    }
+
+    private static string? load_graph_delta_link (Account account, Folder folder) {
+        var path = graph_delta_link_file (account, folder);
+        if (!FileUtils.test (path, FileTest.IS_REGULAR))
+            return null;
+        string contents;
+        try {
+            FileUtils.get_contents (path, out contents);
+        } catch (Error e) {
+            return null;
+        }
+        var url = contents.strip ();
+        if (url.length == 0 || !url.has_prefix ("https://"))
+            return null;
+        return url;
+    }
+
+    private static void save_graph_delta_link (Account account, Folder folder, string url) {
+        if (url.length == 0 || !url.has_prefix ("https://"))
+            return;
+        var path = graph_delta_link_file (account, folder);
+        var dir = Path.get_dirname (path);
+        try {
+            DirUtils.create_with_parents (dir, 0700);
+            FileUtils.set_contents (path, url + "\n");
+        } catch (Error e) {
+            warning ("Graph deltaLink save “%s”: %s", folder.name, e.message);
+        }
+    }
+
+    private static void clear_graph_delta_link (Account account, Folder folder) {
+        var path = graph_delta_link_file (account, folder);
+        if (!FileUtils.test (path, FileTest.EXISTS))
+            return;
+        FileUtils.unlink (path);
+    }
+
+
     public async void follow_folder (Account account, Folder folder) throws Error {
-        /* No Graph webhook / delta watch in slice 1. */
+        /* Header delta is polled from list_messages_sync (.graph-delta).
+         * Graph change notifications / webhooks stay out of this slice. */
     }
 
     public async GenericArray<Message> search_folder_local (

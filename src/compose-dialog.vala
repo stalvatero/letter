@@ -110,12 +110,19 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         if (Config.PROFILE == "development")
             add_css_class ("devel");
 
-        this.send_button = new Gtk.Button.with_label (_("Send")) {
+        this.send_button = new Gtk.Button () {
             sensitive = false,
+            tooltip_text = _("Send"),
         };
         this.send_button.add_css_class ("suggested-action");
         this.send_button.add_css_class ("pill");
         this.send_button.add_css_class ("compose-send");
+        var send_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 4) {
+            valign = Gtk.Align.CENTER,
+        };
+        send_box.append (new Gtk.Image.from_icon_name (Utils.icon_compose_send_on_accent ()));
+        send_box.append (new Gtk.Label (_("Send")));
+        this.send_button.child = send_box;
         this.send_button.clicked.connect (() => send.begin ());
 
         var header = new Adw.HeaderBar ();
