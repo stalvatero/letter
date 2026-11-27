@@ -5,9 +5,11 @@
 # (host evolution-ews alone is not visible inside the sandbox).
 #
 # Quick test (from the repo root):
+#   cp flatpak/oauth.env.example flatpak/oauth.env   # fill Google Desktop client
 #   ./scripts/build-flatpak.sh
 #   flatpak run io.github.stalvatero.Letter
-# No --env needed: LETTER_MS_CLIENT_ID + LETTER_MS_MAIL=graph are baked below.
+# Microsoft client id is public and baked below. Google Desktop id/secret are
+# injected at build time from flatpak/oauth.env or LETTER_GOOGLE_* (see example).
 
 app-id: io.github.stalvatero.Letter
 runtime: org.gnome.Platform
@@ -41,9 +43,9 @@ finish-args:
   - --filesystem=xdg-download:rw
   - --filesystem=/tmp
   - --metadata=X-DConf=migrate-path=/io/github/stalvatero/Letter/
-  # Letter Azure public client (“Letter E-mail Client”) + Graph mail for
-  # Microsoft Identity. End users: flatpak run with no --env. Do not bake
-  # LETTER_SKIP_GOA — Preferences / GOA stay available.
+  # Microsoft Letter Identity (public client — safe in git).
+  # Google LETTER_GOOGLE_* are NOT committed; scripts/build-flatpak.sh injects them.
+  # Do not bake LETTER_SKIP_GOA — Preferences / GOA stay available.
   - --env=LETTER_MS_CLIENT_ID=46b343fc-caa4-4629-b50a-87f1c27fa162
   - --env=LETTER_MS_MAIL=graph
 

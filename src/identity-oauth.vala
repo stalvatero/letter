@@ -786,7 +786,7 @@ public class Mail.IdentityOAuth : Object {
         var challenge = IdentityPkce.challenge_s256 (verifier);
         var state = IdentityPkce.create_state ();
 
-        var server = new Soup.Server (null);
+        var server = (Soup.Server) Object.new (typeof (Soup.Server));
         string? auth_code = null;
         string? returned_state = null;
         string? oauth_error = null;
@@ -1126,8 +1126,8 @@ public class Mail.IdentityOAuth : Object {
         var loc = Intl.setlocale (LocaleCategory.MESSAGES, null);
         if (loc == null || loc.length == 0 || loc == "C" || loc.has_prefix ("C."))
             return "en";
-        var base = loc.split (".")[0];
-        var parts = base.split ("_");
+        var locale_base = loc.split (".")[0];
+        var parts = locale_base.split ("_");
         if (parts.length == 0 || parts[0].length == 0)
             return "en";
         return parts[0].down ();

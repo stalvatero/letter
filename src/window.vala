@@ -81,6 +81,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     [GtkChild]
     private unowned Gtk.Button compose_button;
     [GtkChild]
+    private unowned Gtk.Image compose_icon;
+    [GtkChild]
     private unowned Gtk.Label compose_label;
     [GtkChild]
     private unowned Adw.WindowTitle conversation_title;
@@ -94,6 +96,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     private Gtk.SearchBar message_search_bar;
     [GtkChild]
     private unowned Gtk.MenuButton menu_button;
+    /* Blueprint menu model — keep a ref so badge label edits hit the live GMenu. */
+    private MenuModel? primary_menu_model;
     [GtkChild]
     private unowned Gtk.Paned message_split;
     [GtkChild]
@@ -357,6 +361,8 @@ public class Mail.Window : Adw.ApplicationWindow {
 
         this.title = Utils.app_display_name ();
         this.conversation_title.title = Utils.app_display_name ();
+        /* Chrome icons apply at startup only — switching set asks for a restart. */
+        apply_chrome_icons ();
 
         if (Environment.get_variable ("LETTER_SKIP_GOA") == "1") {
             this.account_source_hint_label.label = _(
@@ -836,6 +842,21 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.mail_session = null;
     }
 
+    /** Toolbar / status icons follow Preferences → Appearance → UI icons. */
+    public void apply_chrome_icons () {
+        this.no_accounts_page.icon_name = Utils.icon ("mail-unread-symbolic");
+        this.no_folders_page.icon_name = Utils.icon ("folder-symbolic");
+        this.conversation_page.icon_name = Utils.icon ("mail-unread-symbolic");
+        this.reader_page.icon_name = Utils.icon ("mail-unread-symbolic");
+        this.sidebar_button.icon_name = Utils.icon ("sidebar-show-symbolic");
+        this.folder_pane_button.icon_name = Utils.icon ("sidebar-show-symbolic");
+        this.unread_filter_button.icon_name = Utils.icon ("mail-unread-symbolic");
+        this.conversation_button.icon_name = Utils.icon ("view-list-symbolic");
+        this.search_toggle_button.icon_name = Utils.icon ("system-search-symbolic");
+        this.menu_button.icon_name = Utils.icon ("open-menu-symbolic");
+        this.compose_icon.icon_name = Utils.icon_compose_new_on_accent ();
+    }
+
     private void ensure_mail_backend (AccountStore store) {
         var has_engine = store_has_letter_engine (store);
         if (this.mail_session == null) {
@@ -1292,7 +1313,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 && visible.length + LARGE_HEADER_GAP < floor
                 && (water == 0 || visible.length + LARGE_HEADER_GAP < water);
             if (catastrophic) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "disk header cache skip shrink “%s” (%u ← floor %u ram %u disk %u, watermark %u)".printf (
                         folder.name,
                         visible.length,
@@ -1307,7 +1328,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 && (folder.total > 0 || folder.unread > 0 || folder.server_total > 0)) {
                 /* Hydrate/partial must not persist “empty” over a STATUS count
                  * (Hotmail Trash wrote 0 while until-done was still walking). */
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "disk header cache skip empty write “%s” (tree total %d)".printf (
                         folder.name,
                         int.max (folder.total, folder.server_total)
@@ -1702,7 +1723,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                         return;
                 } else {
                     store_folder_messages (account, folder, from_disk, null, false);
-                    Utils.sync_log ("disk header cache hit “%s” → %u headers".printf (
+                    Utils.sync_log_detail ("disk header cache hit “%s” → %u headers".printf (
                         folder.name,
                         from_disk.length
                     ));
@@ -1712,7 +1733,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                     }
                     if (!yield headers_lag_camel_summary (account, folder, from_disk.length, cancellable))
                         return;
-                    Utils.sync_log (
+                    Utils.sync_log_detail (
                         "disk header cache stale “%s” (%u) — rebuilding from Camel".printf (
                             folder.name,
                             from_disk.length
@@ -1742,7 +1763,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             if (prior != null
                 && prior.length >= MailSession.HEADER_LIST_LARGE
                 && cached.length + LARGE_HEADER_GAP < prior.length) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "disk hydrate “%s” skip Camel shrink (%u ← %u)".printf (
                         folder.name,
                         cached.length,
@@ -1752,7 +1773,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 return;
             }
             store_folder_messages (account, folder, cached);
-            Utils.sync_log ("disk hydrate “%s” %s → %u headers".printf (
+            Utils.sync_log_detail ("disk hydrate “%s” %s → %u headers".printf (
                 folder.name,
                 Utils.sync_ms (t0),
                 cached.length
@@ -1821,7 +1842,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         var budget = refresh_timeout_seconds == MailSession.REFRESH_INFO_SKIP
             ? "skip"
             : (refresh_timeout_seconds == 0 ? "default" : "%us".printf (refresh_timeout_seconds));
-        Utils.sync_log ("align “%s” begin (watch=%s high=%s budget=%s had=%u)".printf (
+        Utils.sync_log_detail ("align “%s” begin (watch=%s high=%s budget=%s had=%u)".printf (
             folder.name,
             current ? "current" : "bg",
             high ? "yes" : "no",
@@ -1852,7 +1873,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 refresh_folder_badge (folder);
                 if (current && this.search_text.length == 0)
                     queue_conversation_refresh ();
-                Utils.sync_log ("align “%s” unchanged %s (flags/badges refreshed)".printf (
+                Utils.sync_log_detail ("align “%s” unchanged %s (flags/badges refreshed)".printf (
                     folder.name,
                     Utils.sync_ms (t0)
                 ));
@@ -1875,7 +1896,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 && messages.length == 0
                 && account.backend_name == "letter-graph"
                 && folder.server_total > 0) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "align “%s” empty vs Graph total %d — not authoritative".printf (
                         folder.name,
                         folder.server_total
@@ -1900,7 +1921,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 accept_authoritative || accept_important
             );
             var stored = this.message_cache.get (key);
-            Utils.sync_log ("align “%s” ok %s → %u headers (stored %u)".printf (
+            Utils.sync_log_detail ("align “%s” ok %s → %u headers (stored %u)".printf (
                 folder.name,
                 Utils.sync_ms (t0),
                 messages.length,
@@ -1944,7 +1965,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         /* A second slice waits. Send and the sync timer cancel a long
          * until-done themselves; Graph until-done persists each chunk. */
         if (this.camel_align_busy) {
-            Utils.sync_log (
+            Utils.sync_log_detail (
                 "camel align refuse begin “%s” — already busy on “%s” (no mid-slice cancel)".printf (
                     folder.name,
                     this.camel_align_name ?? "?"
@@ -1966,7 +1987,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         }
         this.camel_align_cancellable = new Cancellable ();
         var why = user_force ? "Update Folder" : this.sync_log_name;
-        Utils.sync_log (
+        Utils.sync_log_detail (
             "camel align begin “%s” (%s, exclusive, had=%u)".printf (
                 folder.name,
                 why,
@@ -1980,7 +2001,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         if (!this.camel_align_busy)
             return;
         var why = this.camel_align_user_force ? "Update Folder" : this.sync_log_name;
-        Utils.sync_log (
+        Utils.sync_log_detail (
             "camel align end “%s” (%s)".printf (
                 this.camel_align_name ?? "?",
                 why
@@ -2006,7 +2027,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.mail_check_wanted = false;
         if (this.tearing_down)
             return;
-        Utils.sync_log (
+        Utils.sync_log_detail (
             "mail check flush after camel align (%s)".printf (
                 force ? "F5/manual" : "timer"
             )
@@ -2146,7 +2167,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             );
             this.camel_align_cancellable.cancel ();
         } else if (this.camel_align_busy) {
-            Utils.sync_log (
+            Utils.sync_log_detail (
                 "send waiting — camel align “%s”".printf (
                     this.camel_align_name ?? "?"
                 )
@@ -2499,7 +2520,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 if (results.length >= SEARCH_LIMIT)
                     break;
 
-                Utils.sync_log ("search headers “%s”…".printf (folder.name));
+                Utils.sync_log_detail ("search headers “%s”…".printf (folder.name));
                 yield scan_folder_headers_for_search (
                     account,
                     folder,
@@ -2553,7 +2574,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                     break;
 
                 try {
-                    Utils.sync_log ("search bodies “%s”…".printf (folder.name));
+                    Utils.sync_log_detail ("search bodies “%s”…".printf (folder.name));
                     var hits = yield this.mail_session.search_folder_local (
                         account,
                         folder,
@@ -2577,7 +2598,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                         trim_search_results (results);
                         this.search_results = results;
                         display_search_results (results);
-                        Utils.sync_log (
+                        Utils.sync_log_detail (
                             "search bodies “%s” +%u (total %u)".printf (
                                 folder.name,
                                 added,
@@ -2834,7 +2855,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.search_match_any_button.visible = offer_match_any;
         this.search_deeper_button.visible = !this.search_deeper_consumed;
         this.conversation_page.paintable = null;
-        this.conversation_page.icon_name = "mail-unread-symbolic";
+        this.conversation_page.icon_name = Utils.icon ("mail-unread-symbolic");
         this.conversation_page.title = title;
         this.conversation_page.description = Markup.escape_text (description);
         this.conversation_page.child = (offer_match_any || !this.search_deeper_consumed)
@@ -4479,7 +4500,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             }
             if (this.camel_align_busy) {
                 if (!logged_wait) {
-                    Utils.sync_log (
+                    Utils.sync_log_detail (
                         "folder sync waits — headers “%s” still open (delta link)".printf (
                             this.camel_align_name ?? "?"
                         )
@@ -4644,7 +4665,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             && (this.sync_log_name == "startup sync"
                 || this.sync_log_name == "scheduled sync");
         if (graph_soft_i1_i3 && (lag_status || server_shrunk) && !undated_repair) {
-            Utils.sync_log (
+            Utils.sync_log_detail (
                 "%s headers “%s” soft tip (Graph warm — lag/shrink ignored on I1/I3, local %u Graph %d)".printf (
                     this.sync_log_name,
                     folder.name,
@@ -4655,7 +4676,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             force_full = false;
         }
         if (server_shrunk && force_full) {
-            Utils.sync_log (
+            Utils.sync_log_detail (
                 "%s headers “%s” server shrunk (STATUS %d ← Letter %u) — until-done".printf (
                     this.sync_log_name,
                     folder.name,
@@ -4708,7 +4729,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             : MailSession.REFRESH_INFO_FORCE_UNTIL_DONE;
         var mode = use_tip ? "tip" : "until-done";
         if (undated_repair)
-            Utils.sync_log ("%s headers “%s” undated-repair until-done".printf (
+            Utils.sync_log_detail ("%s headers “%s” undated-repair until-done".printf (
                 this.sync_log_name,
                 folder.name
             ));
@@ -4730,10 +4751,11 @@ public class Mail.Window : Adw.ApplicationWindow {
                 Timeout.add (500, align_folder_headers_inner.callback);
                 yield;
             }
-            /* Status only after we own the slice — otherwise empty Notes sat on
-             * “Updating…” for minutes while Inbox until-done still held Camel. */
-            note_background_status (_("Updating “%s”…").printf (folder.name));
-            Utils.sync_log ("%s headers “%s” (%s)".printf (this.sync_log_name, folder.name, mode));
+            /* Per-folder “Updating…” only for explicit Update Folder — startup
+             * and timer walks keep the generic “Checking folders…” line. */
+            if (user_force)
+                note_background_status (_("Updating “%s”…").printf (folder.name));
+            Utils.sync_log_detail ("%s headers “%s” (%s)".printf (this.sync_log_name, folder.name, mode));
             this.last_align_error = null;
             yield align_folder_with_server (
                 account,
@@ -4759,7 +4781,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 return true;
             }
             if (first_pass && warm && imap_scout_tip) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "%s headers “%s” tip done (letter-imap scout — no until-done)".printf (
                         this.sync_log_name,
                         folder.name
@@ -4772,7 +4794,7 @@ public class Mail.Window : Adw.ApplicationWindow {
              * more pages (folder > 300). Do not escalate — that re-downloaded
              * Sent/Archive from the head every launch after msgid-dedupe migrate. */
             if (first_pass && use_tip && letter_graph && !force_full) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "%s headers “%s” tip done (letter-graph warm — no until-done)".printf (
                         this.sync_log_name,
                         folder.name
@@ -4782,7 +4804,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 return true;
             }
             if (first_pass && use_tip) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "%s headers “%s” tip unfinished — saved pages kept, continuing".printf (
                         this.sync_log_name,
                         folder.name
@@ -4806,7 +4828,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             /* Cursor stays on this folder. Finished pages are already
              * saved; the rest of this delta is still open, so skipping
              * the folder would leave it unfinished. */
-            Utils.sync_log (
+            Utils.sync_log_detail (
                 "%s headers “%s” delta still open — retry this folder next launch".printf (
                     this.sync_log_name,
                     folder.name
@@ -4826,6 +4848,9 @@ public class Mail.Window : Adw.ApplicationWindow {
     ) {
         if (folder_skips_body_prefetch (folder))
             return;
+        /* No per-folder “Downloading…” status — it lags the real work and
+         * misleads during BodyWorker idle waits. Background bar stays on
+         * “Checking folders…” until the walk pops. */
         /* Graph BodyWorker: selected-folder preference window runs as soon as
          * headers are not busy (I1/I3/I4 pass yield_to_click=true — do not
          * require !yield_to_click or Inbox waits 30s after every F5 tip).
@@ -4836,7 +4861,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             var open_pref = this.selected_folder != null
                 && this.selected_folder.full_name == folder.full_name;
             if (worker != null && !worker.may_prefetch (open_pref)) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "%s bodies “%s” — BodyWorker wait (idle ≥%us)".printf (
                         this.sync_log_name,
                         folder.name,
@@ -4868,7 +4893,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 this.message_cache.set (key, disk);
                 touch_message_cache_key (key);
                 listed = disk;
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "%s bodies “%s” — rehydrated %u headers from disk".printf (
                         this.sync_log_name,
                         folder.name,
@@ -4878,7 +4903,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             }
         }
         if (listed == null || listed.length == 0) {
-            Utils.sync_log (
+            Utils.sync_log_detail (
                 "%s bodies “%s” skipped — no header list yet".printf (
                     this.sync_log_name,
                     folder.name
@@ -4886,8 +4911,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             );
             return;
         }
-        note_background_status (_("Downloading messages in “%s”…").printf (folder.name));
-        Utils.sync_log ("%s bodies “%s”".printf (this.sync_log_name, folder.name));
+        Utils.sync_log_detail ("%s bodies “%s”".printf (this.sync_log_name, folder.name));
         var days = body_cache_days ();
         var max_index = body_prefetch_max_index (account, folder);
         if (max_index == 0 && days > 0 && listed.length > 0) {
@@ -4897,7 +4921,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             if (max_index < 0)
                 max_index = 0;
             days = 0;
-            Utils.sync_log (
+            Utils.sync_log_detail (
                 "%s bodies “%s” — preference window empty, tip %d newest".printf (
                     this.sync_log_name,
                     folder.name,
@@ -4920,7 +4944,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                      * parked until it ends — so new mail never arrives. The
                      * cursor stays; the next check tries bodies again. */
                     var rss_mb = Utils.process_rss_bytes () / (1024.0 * 1024.0);
-                    Utils.sync_log (
+                    Utils.sync_log_detail (
                         "%s bodies “%s” stopped — memory still %.0f MiB".printf (
                             this.sync_log_name,
                             folder.name,
@@ -4947,7 +4971,7 @@ public class Mail.Window : Adw.ApplicationWindow {
             }
             total_fetched += fetched;
             if (fetched < MailSession.PREFETCH_NETWORK_CHUNK) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "%s bodies “%s” done (fetched %u this wave)".printf (
                         this.sync_log_name,
                         folder.name,
@@ -5024,6 +5048,15 @@ public class Mail.Window : Adw.ApplicationWindow {
         );
 
         if (phase == "headers") {
+            if (index < ordered.length) {
+                Utils.sync_log (
+                    "%s — headers (%u/%u)".printf (
+                        this.sync_log_name,
+                        ordered.length - index,
+                        ordered.length
+                    )
+                );
+            }
             for (uint i = index; i < ordered.length; i++) {
                 if (this.tearing_down || cancellable.is_cancelled () || !is_current_account (account))
                     return false;
@@ -5039,7 +5072,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                     }
                 }
                 var step = group == 0 ? 4 : group == 1 ? 5 : group == 3 ? 7 : 6;
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "%s step %d — “%s” (%u/%u)".printf (
                         this.sync_log_name,
                         step,
@@ -5328,7 +5361,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 note_header_high_water (account, folder, from_disk.length);
                 store_folder_messages (account, folder, from_disk, null, false);
                 cached = this.message_cache.get (cache_key) ?? from_disk;
-                Utils.sync_log ("open folder disk prime “%s” → %u headers".printf (
+                Utils.sync_log_detail ("open folder disk prime “%s” → %u headers".printf (
                     folder.name,
                     cached.length
                 ));
@@ -5350,7 +5383,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 } else {
                     store_folder_messages (account, folder, from_disk, null, false, true);
                     cached = this.message_cache.get (cache_key) ?? from_disk;
-                    Utils.sync_log ("open folder disk prime “%s” → 0 headers".printf (folder.name));
+                    Utils.sync_log_detail ("open folder disk prime “%s” → 0 headers".printf (folder.name));
                 }
             }
         } else {
@@ -5936,7 +5969,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.message_cache.remove (key);
         this.message_cache_touched.remove (key);
         this.grouped_list_cache.remove (key);
-        Utils.sync_log (
+        Utils.sync_log_detail (
             "message-cache drop after align “%s” (%u headers → disk)".printf (
                 folder.name,
                 messages != null ? messages.length : 0
@@ -6425,7 +6458,7 @@ public class Mail.Window : Adw.ApplicationWindow {
              * write_n == 0 is allowed (Empty folder / explicit clear).
              * accept_shrink is a finished Gmail Important refresh. */
             if (HeaderListPolicy.disk_cache_refuses_shrink (disk_n, write_n, accept_shrink)) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "disk header cache refuse shrink “%s” (%u ← disk %u)".printf (
                         folder_name,
                         write_n,
@@ -6492,7 +6525,7 @@ public class Mail.Window : Adw.ApplicationWindow {
 
         try {
             FileUtils.set_contents (path, builder.str);
-            Utils.sync_log ("disk header cache wrote “%s” (%u headers)".printf (
+            Utils.sync_log_detail ("disk header cache wrote “%s” (%u headers)".printf (
                 folder_name,
                 messages.length
             ));
@@ -7597,7 +7630,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.open_conversation = null;
         this.thread_revealer.reveal_child = false;
         this.thread_list.remove_all ();
-        this.reader_page.icon_name = "checkbox-checked-symbolic";
+        this.reader_page.icon_name = Utils.icon ("checkbox-checked-symbolic");
         this.reader_page.title = ngettext (
             "%u conversation selected",
             "%u conversations selected",
@@ -7662,7 +7695,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         var button = new Gtk.Button () {
             action_name = action,
             child = new Adw.ButtonContent () {
-                icon_name = icon,
+                icon_name = Utils.icon (icon),
                 label = label,
             },
         };
@@ -7947,7 +7980,7 @@ public class Mail.Window : Adw.ApplicationWindow {
                 } else if (this.camel_align_busy && !letter_graph) {
                     if (status_token == 0)
                         status_token = show_sync_status (_("Loading message…"));
-                    Utils.sync_log (
+                    Utils.sync_log_detail (
                         "body fetch waits — headers “%s” still open".printf (
                             this.camel_align_name ?? "?"
                         )
@@ -8421,7 +8454,7 @@ public class Mail.Window : Adw.ApplicationWindow {
 
     private void show_folder_status (string title, string description) {
         this.no_folders_page.paintable = null;
-        this.no_folders_page.icon_name = "folder-symbolic";
+        this.no_folders_page.icon_name = Utils.icon ("folder-symbolic");
         this.no_folders_page.title = title;
         this.no_folders_page.description = Markup.escape_text (description);
         this.folder_bin.child = this.no_folders_page;
@@ -8450,7 +8483,7 @@ public class Mail.Window : Adw.ApplicationWindow {
     private void show_conversation_placeholder (string title, string description) {
         clear_search_empty_actions ();
         this.conversation_page.paintable = null;
-        this.conversation_page.icon_name = "mail-unread-symbolic";
+        this.conversation_page.icon_name = Utils.icon ("mail-unread-symbolic");
         this.conversation_page.title = title;
         this.conversation_page.description = Markup.escape_text (description);
         show_list_placeholder ();
@@ -8467,7 +8500,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         this.thread_revealer.reveal_child = false;
         this.thread_list.remove_all ();
         this.open_conversation = null;
-        this.reader_page.icon_name = "mail-unread-symbolic";
+        this.reader_page.icon_name = Utils.icon ("mail-unread-symbolic");
         this.reader_page.title = _("Select a Message");
         this.reader_page.description = _("Choose a message from the list to read it.");
         this.reader_page.child = null;
@@ -8998,7 +9031,8 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private void bind_primary_menu () {
-        var popover = new Gtk.PopoverMenu.from_model (this.menu_button.menu_model);
+        this.primary_menu_model = this.menu_button.menu_model;
+        var popover = new Gtk.PopoverMenu.from_model (this.primary_menu_model);
         popover.add_child (new ThemeSelector (this.settings), "theme");
         this.menu_button.popover = popover;
 
@@ -9008,7 +9042,6 @@ public class Mail.Window : Adw.ApplicationWindow {
         sync_update_badges ();
     }
 
-    /* Keep the native MenuButton / GMenu chrome; badge via CSS + label prefix. */
     private void sync_update_badges () {
         var app = get_application () as Application;
         var show = app != null && app.update_available;
@@ -9022,33 +9055,43 @@ public class Mail.Window : Adw.ApplicationWindow {
         set_updates_menu_badged (show);
     }
 
+    /* Native GMenu row keeps Adw padding; badge is a label prefix when needed. */
     private void set_updates_menu_badged (bool badged) {
-        var root = this.menu_button.menu_model as Menu;
-        if (root == null)
-            return;
-
         var plain = _("Check for _Updates…");
-        /* Red circle keeps native GMenu weight/alignment (no custom Button). */
         var marked = "🔴 " + _("Check for _Updates…");
-        for (int s = 0; s < root.get_n_items (); s++) {
-            var section = root.get_item_link (s, Menu.LINK_SECTION) as Menu;
-            if (section == null)
+        var want = badged ? marked : plain;
+        if (this.primary_menu_model != null)
+            replace_updates_menu_label (this.primary_menu_model, want);
+    }
+
+    private bool replace_updates_menu_label (MenuModel model, string want) {
+        var menu = model as Menu;
+        var n = model.get_n_items ();
+        for (int i = 0; i < n; i++) {
+            var section = model.get_item_link (i, Menu.LINK_SECTION);
+            if (section != null) {
+                if (replace_updates_menu_label (section, want))
+                    return true;
                 continue;
-            for (int i = 0; i < section.get_n_items (); i++) {
-                var action = section.get_item_attribute_value (i, Menu.ATTRIBUTE_ACTION, VariantType.STRING);
-                if (action == null || action.get_string () != "app.check-updates")
-                    continue;
-                var label = section.get_item_attribute_value (i, Menu.ATTRIBUTE_LABEL, VariantType.STRING);
-                var current = label != null ? label.get_string () : "";
-                var want = badged ? marked : plain;
-                if (current == want)
-                    return;
-                var item = new MenuItem (want, "app.check-updates");
-                section.remove (i);
-                section.insert_item (i, item);
-                return;
             }
+
+            var action = model.get_item_attribute_value (i, Menu.ATTRIBUTE_ACTION, VariantType.STRING);
+            if (action == null || action.get_string () != "app.check-updates")
+                continue;
+
+            var label = model.get_item_attribute_value (i, Menu.ATTRIBUTE_LABEL, VariantType.STRING);
+            var current = label != null ? label.get_string () : "";
+            if (current == want)
+                return true;
+            if (menu == null)
+                return false;
+
+            var item = new MenuItem (want, "app.check-updates");
+            menu.remove (i);
+            menu.insert_item (i, item);
+            return true;
         }
+        return false;
     }
 
     private void on_fullscreen () {
@@ -12361,7 +12404,7 @@ public class Mail.Window : Adw.ApplicationWindow {
     }
 
     private static Gtk.Button thread_action_button (string icon, string tooltip, string action) {
-        var button = new Gtk.Button.from_icon_name (icon) {
+        var button = new Gtk.Button.from_icon_name (Utils.icon (icon)) {
             tooltip_text = tooltip,
             action_name = action,
             has_frame = false,
@@ -13181,7 +13224,7 @@ public class Mail.Window : Adw.ApplicationWindow {
         /* Quit is the only remaining mid-refresh cancel path. Prefer finishing
          * the FORCE budget when possible; tearing down must still release Camel. */
         if (this.camel_align_busy) {
-            Utils.sync_log (
+            Utils.sync_log_detail (
                 "quit: cancelling in-flight camel align “%s” (may leave Camel summary partial)".printf (
                     this.camel_align_name ?? "?"
                 )
@@ -13231,7 +13274,7 @@ private class Mail.FolderPickAccountHeader : Gtk.Box {
         hexpand = true;
         valign = Gtk.Align.CENTER;
 
-        this.expander = new Gtk.Image.from_icon_name ("pan-down-symbolic") {
+        this.expander = new Gtk.Image.from_icon_name (Utils.icon ("pan-down-symbolic")) {
             pixel_size = 16,
             valign = Gtk.Align.CENTER,
         };
@@ -13239,7 +13282,7 @@ private class Mail.FolderPickAccountHeader : Gtk.Box {
         this.expander.add_css_class ("dim-label");
         append (this.expander);
 
-        var icon = new Gtk.Image.from_icon_name ("avatar-default-symbolic");
+        var icon = new Gtk.Image.from_icon_name (Utils.icon ("avatar-default-symbolic"));
         icon.add_css_class ("folder-icon");
         append (icon);
 
@@ -13261,7 +13304,7 @@ private class Mail.FolderPickAccountHeader : Gtk.Box {
     }
 
     private void sync_expander () {
-        this.expander.icon_name = this._expanded ? "pan-down-symbolic" : "pan-end-symbolic";
+        this.expander.icon_name = this._expanded ? Utils.icon ("pan-down-symbolic") : Utils.icon ("pan-end-symbolic");
         this.expander.tooltip_text = this._expanded ? _("Collapse") : _("Expand");
         this.tooltip_text = this.expander.tooltip_text;
     }
@@ -13294,7 +13337,7 @@ private class Mail.FolderPickRow : Gtk.ListBoxRow {
             valign = Gtk.Align.CENTER,
         };
 
-        this.expander = new Gtk.Image.from_icon_name ("pan-end-symbolic") {
+        this.expander = new Gtk.Image.from_icon_name (Utils.icon ("pan-end-symbolic")) {
             pixel_size = 16,
             valign = Gtk.Align.CENTER,
         };
@@ -13383,7 +13426,7 @@ private class Mail.FolderPickRow : Gtk.ListBoxRow {
         this.mail_folder.has_children = has_children;
         this.expander.opacity = has_children ? 1 : 0;
         this.expander.can_target = has_children;
-        this.expander.icon_name = expanded ? "pan-down-symbolic" : "pan-end-symbolic";
+        this.expander.icon_name = expanded ? Utils.icon ("pan-down-symbolic") : Utils.icon ("pan-end-symbolic");
         this.expander.tooltip_text = has_children
             ? (expanded ? _("Collapse") : _("Expand"))
             : null;

@@ -61,7 +61,7 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
             subtitle = _("Gmail — Sign in with Google"),
             activatable = true,
         };
-        google.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+        google.add_suffix (new Gtk.Image.from_icon_name (Utils.icon ("go-next-symbolic")));
         google.activated.connect (() => start_oauth.begin ("google"));
 
         var microsoft = new Adw.ActionRow () {
@@ -69,7 +69,7 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
             subtitle = _("Outlook / Microsoft 365 — Sign in with Microsoft"),
             activatable = true,
         };
-        microsoft.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+        microsoft.add_suffix (new Gtk.Image.from_icon_name (Utils.icon ("go-next-symbolic")));
         microsoft.activated.connect (() => start_oauth.begin ("microsoft"));
 
         var imap = new Adw.ActionRow () {
@@ -77,7 +77,7 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
             subtitle = _("Fastmail, mailbox.org, ISP, or other IMAP host"),
             activatable = true,
         };
-        imap.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+        imap.add_suffix (new Gtk.Image.from_icon_name (Utils.icon ("go-next-symbolic")));
         imap.activated.connect (open_imap_page);
 
         list.append (google);
@@ -102,7 +102,7 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
         box.append (hint);
 
         if (Environment.get_variable ("LETTER_SKIP_GOA") != "1"
-            && Utils.has_gnome_online_accounts ()) {
+            && (Utils.is_gnome_session () || Utils.has_gnome_online_accounts ())) {
             var goa_list = new Gtk.ListBox () {
                 selection_mode = Gtk.SelectionMode.NONE,
                 margin_top = 0,
@@ -116,7 +116,7 @@ public class Mail.IdentityImapDialog : Adw.Dialog {
                 subtitle = _("Add mail in Settings — Calendar and Contacts stay shared on GNOME"),
                 activatable = true,
             };
-            goa.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic"));
+            goa.add_suffix (new Gtk.Image.from_icon_name (Utils.icon ("go-next-symbolic")));
             goa.activated.connect (() => {
                 Utils.open_online_accounts ();
                 close ();

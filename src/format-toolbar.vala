@@ -162,7 +162,7 @@ public class Mail.FormatToolbar : Gtk.Box {
         var button = new Gtk.MenuButton () {
             valign = Gtk.Align.CENTER,
             tooltip_text = _("Text Style"),
-            icon_name = "format-text-rich-symbolic",
+            icon_name = Utils.icon ("format-text-rich-symbolic"),
             popover = this.format_style_popover,
             always_show_arrow = false,
             direction = Gtk.ArrowType.DOWN,
@@ -222,7 +222,7 @@ public class Mail.FormatToolbar : Gtk.Box {
         string state
     ) {
         var button = new Gtk.ToggleButton () {
-            icon_name = icon,
+            icon_name = Utils.icon (icon),
             valign = Gtk.Align.CENTER,
             tooltip_text = tooltip,
             focus_on_click = false,
@@ -240,7 +240,7 @@ public class Mail.FormatToolbar : Gtk.Box {
     }
 
     private Gtk.Button icon_button (string icon, string tooltip, owned VoidFunc action) {
-        var button = new Gtk.Button.from_icon_name (icon) {
+        var button = new Gtk.Button.from_icon_name (Utils.icon (icon)) {
             valign = Gtk.Align.CENTER,
             tooltip_text = tooltip,
             focus_on_click = false,
@@ -255,7 +255,7 @@ public class Mail.FormatToolbar : Gtk.Box {
         var button = new Gtk.MenuButton () {
             valign = Gtk.Align.CENTER,
             tooltip_text = _("Insert Emoji"),
-            icon_name = "face-smile-symbolic",
+            icon_name = Utils.icon ("face-smile-symbolic"),
             popover = chooser,
             always_show_arrow = false,
             direction = Gtk.ArrowType.DOWN,
@@ -280,7 +280,7 @@ public class Mail.FormatToolbar : Gtk.Box {
         };
         button.add_css_class ("flat");
         button.add_css_class ("compose-format-menu");
-        button.icon_name = "color-select-symbolic";
+        button.icon_name = Utils.icon ("color-select-symbolic");
         popover.child = build_color_palette (popover);
         return button;
     }
@@ -294,7 +294,7 @@ public class Mail.FormatToolbar : Gtk.Box {
             margin_top = 8,
             margin_bottom = 8,
         };
-        var none = new Gtk.Button.from_icon_name ("edit-clear-symbolic") {
+        var none = new Gtk.Button.from_icon_name (Utils.icon ("edit-clear-symbolic")) {
             tooltip_text = _("Default Color"),
             width_request = 28,
             height_request = 28,

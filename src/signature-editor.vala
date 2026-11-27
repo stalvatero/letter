@@ -162,7 +162,7 @@ public class Mail.SignatureListPage : Adw.NavigationPage {
         this.store = store;
 
         var header = new Adw.HeaderBar ();
-        var add = new Gtk.Button.from_icon_name ("list-add-symbolic") {
+        var add = new Gtk.Button.from_icon_name (Utils.icon ("list-add-symbolic")) {
             tooltip_text = _("Add Signature"),
         };
         add.add_css_class ("flat");
@@ -219,7 +219,7 @@ public class Mail.SignatureListPage : Adw.NavigationPage {
             };
             var star = new Gtk.Button () {
                 valign = Gtk.Align.CENTER,
-                icon_name = is_default ? "starred-symbolic" : "non-starred-symbolic",
+                icon_name = is_default ? Utils.icon ("starred-symbolic") : Utils.icon ("non-starred-symbolic"),
                 tooltip_text = is_default
                     ? _("Default for new messages. Click to stop using it automatically.")
                     : _("Use as the default for new messages from this account"),
@@ -237,7 +237,7 @@ public class Mail.SignatureListPage : Adw.NavigationPage {
                 valign = Gtk.Align.CENTER,
             };
             edit.add_css_class ("flat");
-            var trash = new Gtk.Button.from_icon_name ("user-trash-symbolic") {
+            var trash = new Gtk.Button.from_icon_name (Utils.icon ("user-trash-symbolic")) {
                 valign = Gtk.Align.CENTER,
                 tooltip_text = _("Delete"),
             };

@@ -559,16 +559,22 @@ msgstr "Firme"
 msgid "Whether global signatures have been copied to each mail account."
 msgstr ""
 
-#: data/io.github.stalvatero.Letter.gschema.xml.in:206
-#: data/io.github.stalvatero.Mail.gschema.xml.in:159
-#, fuzzy
+#: data/io.github.stalvatero.Letter.gschema.xml.in
+#: data/io.github.stalvatero.Mail.gschema.xml.in
 msgid "Welcome shown"
-msgstr "Benvenuto"
+msgstr "Welcome mostrata"
 
-#: data/io.github.stalvatero.Letter.gschema.xml.in:207
-#: data/io.github.stalvatero.Mail.gschema.xml.in:160
-msgid "Whether the first-run welcome has been dismissed."
-msgstr ""
+#: data/io.github.stalvatero.Letter.gschema.xml.in
+msgid "Legacy first-run flag; migrated into welcome-tour-version."
+msgstr "Flag legacy di primo avvio; migrato in welcome-tour-version."
+
+#: data/io.github.stalvatero.Letter.gschema.xml.in
+msgid "Welcome tour version"
+msgstr "Versione del tour di benvenuto"
+
+#: data/io.github.stalvatero.Letter.gschema.xml.in
+msgid "Last completed welcome tour content version. Bump WELCOME_TOUR_VERSION in code to force the tour again."
+msgstr "Ultima versione del contenuto del tour di benvenuto completata. Alza WELCOME_TOUR_VERSION nel codice per forzare di nuovo il tour."
 
 #: data/io.github.stalvatero.Letter.gschema.xml.in:212
 msgid "Settings migrated"
@@ -1543,6 +1549,10 @@ msgstr "Nuova"
 #: src/window.blp:338
 msgid "Main Menu"
 msgstr "Menu principale"
+
+#: src/window.vala
+msgid "Main Menu — update available"
+msgstr "Menu principale — aggiornamento disponibile"
 
 #: src/window.blp:346
 msgid "Updating…"
@@ -3002,17 +3012,21 @@ msgstr ""
 "sincronizzazione stabile e affidabile, ricerca locale più fluida e accesso a Google, "
 "Microsoft 365 o IMAP direttamente da Lettera."
 
-#: src/welcome-tour.vala:30
+#: src/welcome-tour.vala
 msgid "One experience, one interface"
 msgstr "Esperienza e interfaccia unica"
 
-#: src/welcome-tour.vala:31
+#: src/welcome-tour.vala
 msgid ""
-"Letter uses GTK 4 and libadwaita for a clean, elegant interface with a modern "
-"and balanced look on all desktops and coherent for GNOME users."
+"Letter uses GTK 4 for a clean, elegant interface and a modern, balanced look. "
+"Thanks to the Flatpak build it can be installed on every desktop environment "
+"(GNOME, KDE, COSMIC, Cinnamon…). GNOME users from version 44 onward will find "
+"a coherent, familiar interface."
 msgstr ""
-"Lettera usa GTK 4 e libadwaita per un’interfaccia pulita ed elegante per un aspetto "
-"moderno ed equilibrato su tutti i desktop, e coerente per gli utenti GNOME."
+"Lettera usa GTK4 per un’interfaccia pulita, elegante e un aspetto moderno ed "
+"equilibrato. Grazie alla versione Flatpak può essere installata su tutti gli "
+"ambienti desktop (Gnome, KDE, Cosmic, Cinnamon…). Gli utenti Gnome dalla "
+"versione 44 in poi troveranno un’interfaccia coerente e familiare."
 
 #: src/welcome-tour.vala:36
 msgid ""
@@ -4062,6 +4076,26 @@ msgid ""
 msgstr ""
 "Rimozione degli indirizzi già presenti nei contatti o nella directory "
 "aziendale (GAL)."
+
+#: src/application.vala
+msgid "UI icons"
+msgstr "Icone dell’interfaccia"
+
+#: src/preferences-dialog.vala
+msgid "Follow system uses your desktop’s icon theme. IconOven is Letter’s set — modern and elegant."
+msgstr "Segui sistema usa il tema icone del desktop. IconOven è il set di Letter, moderno ed elegante."
+
+#: src/preferences-dialog.vala
+msgid "IconOven"
+msgstr "IconOven"
+
+#: src/preferences-dialog.vala
+msgid "Restart Letter to apply the new icon set"
+msgstr "Riavvia Letter per applicare il nuovo set di icone"
+
+#: src/message-reader.vala
+msgid "Downloading attachments…"
+msgstr "Download degli allegati…"
 
 #~ msgid "Hide Search"
 #~ msgstr "Nascondi ricerca"

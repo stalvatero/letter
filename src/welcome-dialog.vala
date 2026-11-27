@@ -2,7 +2,7 @@ public class Mail.WelcomeDialog : Adw.Dialog {
     public WelcomeDialog () {
         Object (
             content_width: 520,
-            content_height: 580,
+            content_height: 640,
             follows_content_size: false
         );
 

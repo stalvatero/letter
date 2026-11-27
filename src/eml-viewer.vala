@@ -35,7 +35,7 @@ public class Mail.EmlViewerWindow : Adw.ApplicationWindow {
             header.title_widget = new Adw.WindowTitle (mail.subject ?? _("Message"), source_name);
         }
 
-        var print_btn = new Gtk.Button.from_icon_name ("document-print-symbolic") {
+        var print_btn = new Gtk.Button.from_icon_name (Utils.icon ("document-print-symbolic")) {
             tooltip_text = _("Print"),
             action_name = "win.print",
         };

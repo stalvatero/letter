@@ -855,17 +855,17 @@ public class Mail.ThreadRow : Gtk.ListBoxRow {
         };
         this.date_label.add_css_class ("dim-label");
         this.date_label.add_css_class ("numeric");
-        this.attachment_icon = new Gtk.Image.from_icon_name ("mail-attachment-symbolic") {
+        this.attachment_icon = new Gtk.Image.from_icon_name (Utils.icon ("mail-attachment-symbolic")) {
             visible = false,
             tooltip_text = _("Attachment"),
         };
         this.attachment_icon.add_css_class ("dim-label");
-        this.bookmark_icon = new Gtk.Image.from_icon_name ("user-bookmarks-symbolic") {
+        this.bookmark_icon = new Gtk.Image.from_icon_name (Utils.icon ("user-bookmarks-symbolic")) {
             visible = false,
             tooltip_text = _("Bookmarked"),
         };
         this.bookmark_icon.add_css_class ("bookmark-icon");
-        this.important_icon = new Gtk.Image.from_icon_name ("mail-mark-important-symbolic") {
+        this.important_icon = new Gtk.Image.from_icon_name (Utils.icon ("mail-mark-important-symbolic")) {
             visible = false,
             tooltip_text = _("Important"),
         };
@@ -908,13 +908,13 @@ public class Mail.ThreadRow : Gtk.ListBoxRow {
             this.from_label.attributes = Utils.search_highlight_attrs (from, this.highlight_tokens);
         }
         if (this.message.outgoing && Conversation.is_forward_subject (this.message.subject)) {
-            this.kind_icon.icon_name = "mail-forward-symbolic";
+            this.kind_icon.icon_name = Utils.icon ("mail-forward-symbolic");
             this.kind_icon.tooltip_text = _("Forwarded");
         } else if (this.message.outgoing) {
-            this.kind_icon.icon_name = "mail-send-symbolic";
+            this.kind_icon.icon_name = Utils.icon ("mail-send-symbolic");
             this.kind_icon.tooltip_text = _("Sent");
         } else {
-            this.kind_icon.icon_name = "mail-read-symbolic";
+            this.kind_icon.icon_name = Utils.icon ("mail-read-symbolic");
             this.kind_icon.tooltip_text = _("Received");
         }
         this.date_label.label = Utils.format_message_date (this.message.date);

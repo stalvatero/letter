@@ -41,7 +41,7 @@ public class Mail.ContactPickerDialog : Adw.Dialog {
         };
 
         this.empty = new Adw.StatusPage () {
-            icon_name = "x-office-address-book-symbolic",
+            icon_name = Utils.icon ("x-office-address-book-symbolic"),
             title = _("No Contacts"),
             description = _("Type a name or email to search the address book."),
         };
@@ -121,7 +121,7 @@ private class Mail.ContactPickRow : Adw.ActionRow {
         );
         this.hit = hit;
         add_prefix (new Gtk.Image.from_icon_name (
-            hit.from_book ? "avatar-default-symbolic" : "document-open-recent-symbolic"
+            hit.from_book ? Utils.icon ("avatar-default-symbolic") : Utils.icon ("document-open-recent-symbolic")
         ));
         if (!hit.from_book)
             tooltip_text = _("Recent recipient");

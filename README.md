@@ -188,7 +188,7 @@ sudo meson install -C _build
 
 The Meson `development` profile is only for local work (`meson devenv`). It uses a different application ID and the libadwaita development stripe.
 
-Maintainers: `./scripts/build-flatpak.sh` produces the Release bundle. End users should use [Releases](https://github.com/stalvatero/letter/releases).
+Maintainers: copy `flatpak/oauth.env.example` → `flatpak/oauth.env` (gitignored) with the Google Desktop client id/secret, then `./scripts/build-flatpak.sh` produces the Release bundle. End users should use [Releases](https://github.com/stalvatero/letter/releases) — they never need those env vars. For CI/release, set `LETTER_GOOGLE_CLIENT_ID` and `LETTER_GOOGLE_CLIENT_SECRET` as repository secrets instead of committing them.
 
 ## Contributing
 
@@ -213,3 +213,5 @@ Letter is shipped as a Flatpak so the libraries it needs travel with the app. We
 ## License
 
 [GPL-3.0-or-later](COPYING)
+
+UI chrome icons include adaptations of [IconOven](https://iconoven.com) Stroke (MIT); see [THIRD_PARTY.md](THIRD_PARTY.md).

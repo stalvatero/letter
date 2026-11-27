@@ -91,6 +91,18 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         });
         add_prefs_row (appearance, theme_row);
 
+        /* GNOME only — other desktops always use Letter’s IconOven set.
+         * Changing the set is restart-only so the UI never mixes themes. */
+        if (Utils.is_gnome_session ()) {
+            var icons_row = AppearanceChrome.create_icons_combo_row ();
+            AppearanceChrome.bind_icons_combo_row (icons_row, this.settings, () => {
+                add_toast (new Adw.Toast (_("Restart Letter to apply the new icon set")) {
+                    timeout = 5,
+                });
+            });
+            add_prefs_row (appearance, icons_row);
+        }
+
         var body_bg_row = new Adw.ComboRow () {
             title = _("Reading mode"),
             subtitle = _("Choose the background colour of the message body."),
@@ -273,7 +285,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
             }),
             sensitive = notify_row.active,
         };
-        var play = new Gtk.Button.from_icon_name ("media-playback-start-symbolic") {
+        var play = new Gtk.Button.from_icon_name (Utils.icon ("media-playback-start-symbolic")) {
             valign = Gtk.Align.CENTER,
             tooltip_text = _("Play the selected sound"),
             has_frame = false,
@@ -369,8 +381,8 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
             subtitle = _("Google, Microsoft, or IMAP — passwords and tokens stay in the system keyring"),
             activatable = true,
         };
-        letter_row.add_prefix (new Gtk.Image.from_icon_name ("list-add-symbolic"));
-        letter_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic") {
+        letter_row.add_prefix (new Gtk.Image.from_icon_name (Utils.icon ("list-add-symbolic")));
+        letter_row.add_suffix (new Gtk.Image.from_icon_name (Utils.icon ("go-next-symbolic")) {
             valign = Gtk.Align.CENTER,
         });
         letter_row.activated.connect (() => {
@@ -385,10 +397,19 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         });
         add_prefs_row (accounts, letter_row);
 
-        /* GOA UI only when the host actually has GNOME Online Accounts
-         * (not KDE / Cinnamon / Cosmic without GOA). */
-        var goa_available = Utils.has_gnome_online_accounts ()
-            && Environment.get_variable ("LETTER_SKIP_GOA") != "1";
+        /* GOA opt-in on GNOME sessions, or wherever Online Accounts is on
+         * the session bus. Flatpak SKIP_GOA still wins. Disabling Mail inside
+         * GNOME Settings does not hide this switch. */
+        var goa_available = Environment.get_variable ("LETTER_SKIP_GOA") != "1"
+            && (Utils.is_gnome_session () || Utils.has_gnome_online_accounts ());
+        if (!goa_available) {
+            message (
+                "Preferences: GOA switch hidden (SKIP_GOA=%s gnome=%s goa_bus=%s)",
+                Environment.get_variable ("LETTER_SKIP_GOA") ?? "<unset>",
+                Utils.is_gnome_session ().to_string (),
+                Utils.has_gnome_online_accounts ().to_string ()
+            );
+        }
         if (goa_available) {
             var goa_on = this.settings.get_boolean ("use-goa-accounts");
             var goa_switch = new Adw.SwitchRow () {
@@ -402,8 +423,8 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
                 activatable = goa_on,
                 sensitive = goa_on,
             };
-            settings_row.add_prefix (new Gtk.Image.from_icon_name ("network-workgroup-symbolic"));
-            settings_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic") {
+            settings_row.add_prefix (new Gtk.Image.from_icon_name (Utils.icon ("network-workgroup-symbolic")));
+            settings_row.add_suffix (new Gtk.Image.from_icon_name (Utils.icon ("go-next-symbolic")) {
                 valign = Gtk.Align.CENTER,
             });
             settings_row.activated.connect (() => {
@@ -437,7 +458,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         var accounts_page = new Adw.PreferencesPage () {
             name = "accounts",
             title = _("Accounts"),
-            icon_name = "avatar-default-symbolic",
+            icon_name = Utils.icon ("avatar-default-symbolic"),
         };
         accounts_page.add (accounts);
         accounts_page.add (this.cache_group);
@@ -445,7 +466,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         var appearance_page = new Adw.PreferencesPage () {
             name = "appearance",
             title = _("Appearance"),
-            icon_name = "preferences-desktop-appearance-symbolic",
+            icon_name = Utils.icon ("preferences-desktop-appearance-symbolic"),
         };
         appearance_page.add (appearance);
         appearance_page.add (reading);
@@ -483,7 +504,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         var behavior_page = new Adw.PreferencesPage () {
             name = "behavior",
             title = _("Behavior"),
-            icon_name = "preferences-system-symbolic",
+            icon_name = Utils.icon ("preferences-system-symbolic"),
         };
         behavior_page.add (sync);
         behavior_page.add (contacts_compose);
@@ -504,7 +525,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
                 subtitle = _("Check the software requirements for Letter to work correctly."),
                 activatable = true,
             };
-            deps_row.add_suffix (new Gtk.Image.from_icon_name ("go-next-symbolic") {
+            deps_row.add_suffix (new Gtk.Image.from_icon_name (Utils.icon ("go-next-symbolic")) {
                 valign = Gtk.Align.CENTER,
             });
             deps_row.activated.connect (() => {
@@ -515,7 +536,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
             var integrations_page = new Adw.PreferencesPage () {
                 name = "integrations",
                 title = _("Integrations"),
-                icon_name = "application-x-addon-symbolic",
+                icon_name = Utils.icon ("application-x-addon-symbolic"),
             };
             integrations_page.add (integration);
             integrations_page.add (deps_group);
@@ -732,7 +753,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
         this.rail_picker_button = new Gtk.Button () {
             tooltip_text = _("Choose a custom colour"),
             valign = Gtk.Align.CENTER,
-            icon_name = "color-select-symbolic",
+            icon_name = Utils.icon ("color-select-symbolic"),
         };
         this.rail_picker_button.add_css_class ("circular");
         this.rail_picker_button.add_css_class ("rail-swatch-picker");
@@ -1043,7 +1064,7 @@ public class Mail.PreferencesDialog : Adw.PreferencesDialog {
             if (account.is_letter_identity || account.has_goa)
                 row.add_suffix (Utils.account_provenance_image (account, 16));
 
-            var handle = new Gtk.Image.from_icon_name ("list-drag-handle-symbolic") {
+            var handle = new Gtk.Image.from_icon_name (Utils.icon ("list-drag-handle-symbolic")) {
                 valign = Gtk.Align.CENTER,
                 tooltip_text = _("Drag to reorder"),
             };

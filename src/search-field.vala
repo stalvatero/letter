@@ -91,15 +91,15 @@ public class Mail.SearchField : Gtk.Widget {
             string subtitle;
             switch (kind) {
                 case SearchFilterKind.FROM:
-                    icon = "avatar-default-symbolic";
+                    icon = Utils.icon ("avatar-default-symbolic");
                     subtitle = _("Search sender");
                     break;
                 case SearchFilterKind.TO:
-                    icon = "mail-replied-symbolic";
+                    icon = Utils.icon ("mail-replied-symbolic");
                     subtitle = _("Search recipients");
                     break;
                 default:
-                    icon = "system-search-symbolic";
+                    icon = Utils.icon ("system-search-symbolic");
                     subtitle = _("Search everywhere");
                     break;
             }
@@ -116,7 +116,7 @@ public class Mail.SearchField : Gtk.Widget {
                 ? hit.email
                 : (hit.from_book ? _("Address book") : _("Recent recipient"));
             build (
-                hit.from_book ? "avatar-default-symbolic" : "document-open-recent-symbolic",
+                hit.from_book ? Utils.icon ("avatar-default-symbolic") : Utils.icon ("document-open-recent-symbolic"),
                 title,
                 subtitle
             );
@@ -185,7 +185,7 @@ public class Mail.SearchField : Gtk.Widget {
         };
         this.bar.set_parent (this);
 
-        var icon = new Gtk.Image.from_icon_name ("system-search-symbolic") {
+        var icon = new Gtk.Image.from_icon_name (Utils.icon ("system-search-symbolic")) {
             valign = Gtk.Align.CENTER,
             can_target = false,
         };
@@ -247,7 +247,7 @@ public class Mail.SearchField : Gtk.Widget {
             });
         });
 
-        this.clear_button = new Gtk.Button.from_icon_name ("edit-clear-symbolic") {
+        this.clear_button = new Gtk.Button.from_icon_name (Utils.icon ("edit-clear-symbolic")) {
             valign = Gtk.Align.CENTER,
             tooltip_text = _("Clear search"),
             can_focus = false,
@@ -546,7 +546,7 @@ public class Mail.SearchField : Gtk.Widget {
             valign = Gtk.Align.CENTER,
             hexpand = false,
         };
-        var close = new Gtk.Button.from_icon_name ("window-close-symbolic") {
+        var close = new Gtk.Button.from_icon_name (Utils.icon ("window-close-symbolic")) {
             valign = Gtk.Align.CENTER,
             can_focus = false,
             focusable = false,

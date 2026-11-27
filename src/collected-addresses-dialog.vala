@@ -49,13 +49,13 @@ public class Mail.CollectedAddressesDialog : Adw.Dialog {
         };
 
         this.empty = new Adw.StatusPage () {
-            icon_name = "document-open-recent-symbolic",
+            icon_name = Utils.icon ("document-open-recent-symbolic"),
             title = _("No recent addresses"),
             description = _("Only addresses that are not already in your address books appear here. Letter gathers them from mail you send."),
         };
 
         var loading = new Adw.StatusPage () {
-            icon_name = "content-loading-symbolic",
+            icon_name = Utils.icon ("content-loading-symbolic"),
             title = _("Comparing with address books…"),
             description = _("Removing addresses that already exist in your contacts or organization directory (GAL)."),
         };
@@ -159,7 +159,7 @@ public class Mail.CollectedAddressesDialog : Adw.Dialog {
         texts.append (subtitle);
 
         var email = hit.email;
-        var remove = new Gtk.Button.from_icon_name ("user-trash-symbolic") {
+        var remove = new Gtk.Button.from_icon_name (Utils.icon ("user-trash-symbolic")) {
             valign = Gtk.Align.CENTER,
             tooltip_text = _("Remove from suggestions"),
         };
@@ -177,7 +177,7 @@ public class Mail.CollectedAddressesDialog : Adw.Dialog {
             margin_start = 12,
             margin_end = 8,
         };
-        box.append (new Gtk.Image.from_icon_name ("document-open-recent-symbolic") {
+        box.append (new Gtk.Image.from_icon_name (Utils.icon ("document-open-recent-symbolic")) {
             valign = Gtk.Align.CENTER,
         });
         box.append (texts);

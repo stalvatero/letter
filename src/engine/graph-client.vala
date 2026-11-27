@@ -29,6 +29,8 @@ public class LetterGraph.MessageHeader : Object {
     public string? internet_message_id { get; set; }
     /** Outlook conversation thread id (same across Inbox/Sent/Archive). */
     public string? conversation_id { get; set; }
+    /** Graph bodyPreview — short plain snippet for the message list. */
+    public string? preview { get; set; }
 }
 
 public class LetterGraph.MessageBody : Object {
@@ -503,7 +505,7 @@ public class LetterGraph.Client : Object {
         var list = new GenericArray<MessageHeader> ();
         string? url = resume_url;
         if (url == null || url.length == 0) {
-            url = "https://graph.microsoft.com/v1.0/me/mailFolders/%s/messages?$top=%u&$orderby=receivedDateTime%%20desc&$select=id,subject,from,toRecipients,receivedDateTime,isRead,flag,hasAttachments,internetMessageId,conversationId"
+            url = "https://graph.microsoft.com/v1.0/me/mailFolders/%s/messages?$top=%u&$orderby=receivedDateTime%%20desc&$select=id,subject,from,toRecipients,receivedDateTime,isRead,flag,hasAttachments,internetMessageId,conversationId,bodyPreview"
                 .printf (Uri.escape_string (folder_id, null, false), top);
         }
         uint pages = 0;
@@ -558,6 +560,7 @@ public class LetterGraph.Client : Object {
                 && o.get_boolean_member ("hasAttachments"),
             internet_message_id = string_member_or_null (o, "internetMessageId"),
             conversation_id = string_member_or_null (o, "conversationId"),
+            preview = string_member_or_null (o, "bodyPreview"),
         };
     }
 

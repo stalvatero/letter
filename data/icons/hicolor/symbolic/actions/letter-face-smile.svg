@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Letter chrome — IconOven Stroke round (smile.svg → letter-face-smile). Not *-symbolic (GTK blanks stroke). MIT: data/icons/third_party/iconoven/LICENSE -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <g id="letter-optical-scale" transform="translate(12.0 12.0) scale(1.12) translate(-12.0 -12.0)">
+  <circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 10h.01" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 10h.01" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 14.25c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  </g>
+</svg>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Letter chrome — IconOven Stroke round (paperclip.svg → letter-mail-attachment). Not *-symbolic (GTK blanks stroke). MIT: data/icons/third_party/iconoven/LICENSE -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <g id="letter-optical-scale" transform="translate(12.0 12.0) scale(1.12) translate(-12.0 -12.0)">
+  <path d="M19.5 11.25l-7.4 7.4a4.5 4.5 0 0 1-6.35-6.35l7.95-7.95a3 3 0 0 1 4.25 4.25l-7.95 7.95a1.5 1.5 0 0 1-2.1-2.1l7.1-7.1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  </g>
+</svg>

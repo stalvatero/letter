@@ -75,8 +75,19 @@ public class Mail.Application : Adw.Application {
 
         base.startup ();
 
+        /* Letter chrome symbolics (GResource) — reliable on KDE/Cinnamon/Flatpak
+         * where hicolor/actions is not indexed like Adwaita. */
+        var display = Gdk.Display.get_default ();
+        if (display != null) {
+            Gtk.IconTheme.get_for_display (display).add_resource_path (
+                "/io/github/stalvatero/Letter/icons"
+            );
+        }
+
+        Utils.bind_app_settings (this.settings);
         Utils.migrate_legacy_app_dirs ();
         migrate_settings_from_mail ();
+        migrate_welcome_tour_version ();
         normalize_body_cache_days ();
         this.accounts.load.begin ((obj, res) => {
             this.accounts.load.end (res);
@@ -141,6 +152,7 @@ public class Mail.Application : Adw.Application {
             "account-signature-choice",
             "signatures-migrated",
             "welcome-shown",
+            "welcome-tour-version",
         };
 
         string old_app_id = Config.PROFILE == "development"
@@ -358,6 +370,18 @@ public class Mail.Application : Adw.Application {
 
     private void show_window_for_accounts () {
         if (this.accounts.has_mail_accounts ()) {
+            /* Versioned welcome runs as its own window so the mail shell is
+             * not visible underneath — chrome icons freeze after the tour. */
+            if (needs_welcome_tour ()) {
+                cancel_welcome ();
+                var main = main_window ();
+                if (main != null)
+                    main.visible = false;
+                present_setup_tour_window ();
+                return;
+            }
+
+            Utils.freeze_chrome_icons ();
             /* Present main first so destroying SetupWindow is never the last
              * window — otherwise Gtk.Application quits immediately. */
             var window = main_window ();
@@ -366,7 +390,7 @@ public class Mail.Application : Adw.Application {
             window.visible = true;
             window.present ();
             dismiss_setup_window ();
-            queue_welcome (window);
+            window.apply_chrome_icons ();
             schedule_idle_update_check ();
             queue_microsoft_graph_reconsent ();
             return;
@@ -379,6 +403,10 @@ public class Mail.Application : Adw.Application {
         if (main != null)
             main.visible = false;
 
+        present_setup_tour_window ();
+    }
+
+    private void present_setup_tour_window () {
         if (this.setup_window == null) {
             this.setup_window = new SetupWindow (this);
             this.setup_window.tour_finished.connect (on_setup_tour_finished);
@@ -391,7 +419,8 @@ public class Mail.Application : Adw.Application {
     }
 
     private void on_setup_tour_finished () {
-        this.settings.set_boolean ("welcome-shown", true);
+        mark_welcome_tour_complete ();
+        Utils.freeze_chrome_icons ();
         finish_setup_tour.begin ();
     }
 
@@ -584,8 +613,30 @@ public class Mail.Application : Adw.Application {
         present_welcome (parent);
     }
 
+    private void migrate_welcome_tour_version () {
+        /* Legacy welcome-shown → version 1 so WELCOME_TOUR_VERSION 2 forces a re-show. */
+        if (!this.settings.get_boolean ("welcome-shown"))
+            return;
+        if (this.settings.get_int ("welcome-tour-version") != 0)
+            return;
+        this.settings.set_int ("welcome-tour-version", 1);
+    }
+
+    private bool needs_welcome_tour () {
+        return this.settings.get_int ("welcome-tour-version")
+            < AppearanceChrome.WELCOME_TOUR_VERSION;
+    }
+
+    private void mark_welcome_tour_complete () {
+        this.settings.set_int (
+            "welcome-tour-version",
+            AppearanceChrome.WELCOME_TOUR_VERSION
+        );
+        this.settings.set_boolean ("welcome-shown", true);
+    }
+
     private void queue_welcome (Gtk.Window parent) {
-        if (this.settings.get_boolean ("welcome-shown") || this.welcome != null)
+        if (!needs_welcome_tour () || this.welcome != null)
             return;
         if (this.welcome_idle != 0)
             return;
@@ -620,7 +671,16 @@ public class Mail.Application : Adw.Application {
         this.welcome = dialog;
         dialog.closed.connect (() => {
             this.welcome = null;
-            this.settings.set_boolean ("welcome-shown", true);
+            mark_welcome_tour_complete ();
+            /* Help → Welcome can reopen after freeze; only apply when we
+             * were waiting to lock chrome for this process. */
+            if (!Utils.chrome_icons_are_frozen ()) {
+                Utils.freeze_chrome_icons ();
+                var window = parent as Window;
+                if (window == null)
+                    window = main_window ();
+                window?.apply_chrome_icons ();
+            }
         });
         dialog.present (parent);
     }
@@ -639,6 +699,13 @@ public class Mail.Application : Adw.Application {
             developers = { "Salvatore Oscurato" },
             translator_credits = _("translator-credits"),
         };
+        /* Third-party icons — acknowledgement, not a second app license. */
+        about.add_acknowledgement_section (
+            _("UI icons"),
+            {
+                "IconOven Stroke (MIT) — © 2026 Appic Marketing LLC — https://iconoven.com",
+            }
+        );
         about.present (get_active_window ());
     }
 

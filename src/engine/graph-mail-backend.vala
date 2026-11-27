@@ -385,7 +385,7 @@ public class Mail.GraphMailBackend : Object, MailBackend {
             if (resume != null && resume.length > 0) {
                 resumed_cursor = true;
                 this.header_list_next.set (key, resume);
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "graph headers “%s” resume nextLink from disk".printf (folder.name)
                 );
             } else {
@@ -420,6 +420,7 @@ public class Mail.GraphMailBackend : Object, MailBackend {
                 /* ContactStore harvest reads to_header (raw with @), not to. */
                 to_header = to_raw.length > 0 ? to_raw : null,
                 date = date,
+                preview = Utils.sanitize_message_preview (h.preview),
                 seen = h.seen,
                 flagged = h.flagged,
                 has_attachment = h.has_attachment,
@@ -471,11 +472,11 @@ public class Mail.GraphMailBackend : Object, MailBackend {
             listed = chunk;
             incomplete = more;
             if (listed.length == 0) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "graph headers tip “%s” → 0".printf (folder.name)
                 );
             } else {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "graph headers tip “%s” → %u%s".printf (
                         folder.name,
                         listed.length,
@@ -490,7 +491,7 @@ public class Mail.GraphMailBackend : Object, MailBackend {
             && this.folder_exists.get (key) > 0
             && listed.length == 0
             && !incomplete) {
-            Utils.sync_log (
+            Utils.sync_log_detail (
                 "graph headers “%s” empty vs folder_exists %d — mark incomplete".printf (
                     folder.name,
                     this.folder_exists.get (key)
@@ -778,7 +779,7 @@ public class Mail.GraphMailBackend : Object, MailBackend {
             return false;
 
         apply_folder_count_info (account, folder, info);
-        Utils.sync_log (
+        Utils.sync_log_detail (
             "graph folder GET “%s” total=%lld unread=%lld".printf (
                 folder.name,
                 info.total_item_count,
@@ -1158,7 +1159,7 @@ public class Mail.GraphMailBackend : Object, MailBackend {
             var next_empty = reached_end ? 0 : i;
             this.prefetch_cursor.set (cursor_key, next_empty);
             if (start > 0 || skipped_disk > 0) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "graph prefetch “%s” cursor=%d/%d skipped-disk=%u (no fetch)".printf (
                         folder.name,
                         next_empty,
@@ -1209,7 +1210,7 @@ public class Mail.GraphMailBackend : Object, MailBackend {
         var fetched = got_uids.length;
         var next = reached_end && want.length < limit ? 0 : i;
         this.prefetch_cursor.set (cursor_key, next);
-        Utils.sync_log (
+        Utils.sync_log_detail (
             "graph prefetch “%s” +%u (cursor %d/%d, skipped-disk %u)".printf (
                 folder.name,
                 fetched,

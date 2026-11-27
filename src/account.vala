@@ -32,13 +32,13 @@ public enum Mail.AccountKind {
             case EXCHANGE:
                 return "goa-account-exchange";
             case LOCAL:
-                return "drive-harddisk-symbolic";
+                return Utils.icon ("drive-harddisk-symbolic");
             case IMAP:
                 /* Prefer a theme icon that exists without GOA installed (KDE /
                  * LETTER_SKIP_GOA). goa-account is often missing there. */
-                return "mail-unread-symbolic";
+                return Utils.icon ("mail-unread-symbolic");
             default:
-                return "mail-unread-symbolic";
+                return Utils.icon ("mail-unread-symbolic");
         }
     }
 
@@ -207,15 +207,15 @@ public class Mail.Account : Object {
     }
 
     /**
-     * GOA → GNOME foot (`start-here-symbolic`); Letter Identity → full-colour
-     * app icon (the -symbolic asset renders as an empty stub in the list).
+     * GOA → Letter penguin chrome (`start-here` ← IconOven penguin);
+     * Letter Identity → full-colour app icon.
      */
     public string provenance_icon_name {
         owned get {
             if (this.is_letter_identity)
                 return Config.APP_ID;
             if (this.has_goa)
-                return "start-here-symbolic";
+                return Utils.icon ("start-here-symbolic");
             return Config.APP_ID;
         }
     }
@@ -333,33 +333,47 @@ public class Mail.Folder : Object {
     }
 
     public string icon_name {
-        get {
+        owned get {
+            string stock;
             switch (this.kind) {
                 case FolderKind.INBOX:
-                    return "mail-unread-symbolic";
+                    stock = "mail-unread-symbolic";
+                    break;
                 case FolderKind.BOOKMARKS:
-                    return "user-bookmarks-symbolic";
+                    stock = "user-bookmarks-symbolic";
+                    break;
                 case FolderKind.DRAFTS:
-                    return "document-edit-symbolic";
+                    stock = "document-edit-symbolic";
+                    break;
                 case FolderKind.SENT:
-                    return "mail-send-symbolic";
+                    stock = "mail-send-symbolic";
+                    break;
                 case FolderKind.TRASH:
-                    return "user-trash-symbolic";
+                    stock = "user-trash-symbolic";
+                    break;
                 case FolderKind.ARCHIVE:
-                    return "package-x-generic-symbolic";
+                    stock = "package-x-generic-symbolic";
+                    break;
                 case FolderKind.ALL:
-                    return "folder-documents-symbolic";
+                    stock = "folder-documents-symbolic";
+                    break;
                 case FolderKind.STARRED:
-                    return "starred-symbolic";
+                    stock = "starred-symbolic";
+                    break;
                 case FolderKind.IMPORTANT:
-                    return "mail-mark-important-symbolic";
+                    stock = "mail-mark-important-symbolic";
+                    break;
                 case FolderKind.JUNK:
-                    return "mail-mark-junk-symbolic";
+                    stock = "mail-mark-junk-symbolic";
+                    break;
                 case FolderKind.OUTBOX:
-                    return "mail-send-receive-symbolic";
+                    stock = "mail-send-receive-symbolic";
+                    break;
                 default:
-                    return "folder-symbolic";
+                    stock = "folder-symbolic";
+                    break;
             }
+            return Utils.icon (stock);
         }
     }
 

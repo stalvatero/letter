@@ -1,0 +1,19 @@
+{
+  "name": "@iconoven/svg",
+  "version": "1.0.1",
+  "homepage": "https://iconoven.com",
+  "description": "IconOven Icons as plain SVG files: every icon in the Stroke style, round and sharp corners, free (MIT).",
+  "license": "MIT",
+  "keywords": ["icons", "svg", "iconoven", "stroke", "ui-icons"],
+  "exports": {
+    "./round/*": "./round/*",
+    "./sharp/*": "./sharp/*",
+    "./icons.json": "./icons.json",
+    "./package.json": "./package.json"
+  },
+  "files": ["round", "sharp", "icons.json", "LICENSE", "README.md"],
+  "scripts": {
+    "build": "node ../../tools/svg-package.ts",
+    "prepack": "node ../../tools/svg-package.ts"
+  }
+}

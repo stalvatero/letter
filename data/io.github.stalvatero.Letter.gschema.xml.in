@@ -51,6 +51,15 @@
       <summary>Application theme</summary>
       <description>Application appearance: follow the system, light, or dark.</description>
     </key>
+    <key name="chrome-icons" type="s">
+      <choices>
+        <choice value="adwaita"/>
+        <choice value="iconoven"/>
+      </choices>
+      <default>'adwaita'</default>
+      <summary>UI icon set</summary>
+      <description>Toolbar and list icons: system theme (value adwaita) or Letter’s IconOven set. Takes effect on the next launch. Outside GNOME, Letter always uses IconOven.</description>
+    </key>
     <key name="account-rail-enabled" type="b">
       <default>true</default>
       <summary>Enable accounts rail</summary>
@@ -204,7 +213,12 @@
     <key name="welcome-shown" type="b">
       <default>false</default>
       <summary>Welcome shown</summary>
-      <description>Whether the first-run welcome has been dismissed.</description>
+      <description>Legacy first-run flag; migrated into welcome-tour-version.</description>
+    </key>
+    <key name="welcome-tour-version" type="i">
+      <default>0</default>
+      <summary>Welcome tour version</summary>
+      <description>Last completed welcome tour content version. Bump WELCOME_TOUR_VERSION in code to force the tour again.</description>
     </key>
 
     <key name="use-goa-accounts" type="b">

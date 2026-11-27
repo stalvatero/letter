@@ -26,7 +26,7 @@ public class Mail.AccountRow : Adw.ActionRow {
     }
 
     private static Gtk.Image service_icon (string name, string tooltip) {
-        var icon = new Gtk.Image.from_icon_name (name) {
+        var icon = new Gtk.Image.from_icon_name (Utils.icon (name)) {
             tooltip_text = tooltip,
         };
         icon.add_css_class ("dim-label");
@@ -56,7 +56,7 @@ public class Mail.FolderRow : Gtk.ListBoxRow {
             valign = Gtk.Align.CENTER,
         };
 
-        this.expander = new Gtk.Image.from_icon_name ("pan-end-symbolic") {
+        this.expander = new Gtk.Image.from_icon_name (Utils.icon ("pan-end-symbolic")) {
             pixel_size = 16,
             valign = Gtk.Align.CENTER,
         };
@@ -120,7 +120,9 @@ public class Mail.FolderRow : Gtk.ListBoxRow {
         this.folder.has_children = has_children;
         this.expander.opacity = has_children ? 1 : 0;
         this.expander.can_target = has_children;
-        this.expander.icon_name = expanded ? "pan-down-symbolic" : "pan-end-symbolic";
+        this.expander.icon_name = expanded
+            ? Utils.icon ("pan-down-symbolic")
+            : Utils.icon ("pan-end-symbolic");
         this.expander.tooltip_text = has_children
             ? (expanded ? _("Collapse") : _("Expand"))
             : null;
@@ -221,20 +223,20 @@ public class Mail.MessageRow : Gtk.Box {
         this.count_label.add_css_class ("numeric");
         header.append (this.count_label);
 
-        this.attachment_icon = new Gtk.Image.from_icon_name ("mail-attachment-symbolic") {
+        this.attachment_icon = new Gtk.Image.from_icon_name (Utils.icon ("mail-attachment-symbolic")) {
             visible = false,
         };
         this.attachment_icon.add_css_class ("dim-label");
         header.append (this.attachment_icon);
 
-        this.bookmark_icon = new Gtk.Image.from_icon_name ("user-bookmarks-symbolic") {
+        this.bookmark_icon = new Gtk.Image.from_icon_name (Utils.icon ("user-bookmarks-symbolic")) {
             visible = false,
             tooltip_text = _("Bookmarked"),
         };
         this.bookmark_icon.add_css_class ("bookmark-icon");
         header.append (this.bookmark_icon);
 
-        this.important_icon = new Gtk.Image.from_icon_name ("mail-mark-important-symbolic") {
+        this.important_icon = new Gtk.Image.from_icon_name (Utils.icon ("mail-mark-important-symbolic")) {
             visible = false,
             tooltip_text = _("Important"),
         };

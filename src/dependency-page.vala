@@ -198,7 +198,7 @@ public class Mail.DependencyListPage : Adw.NavigationPage {
         };
         var info = new Gtk.MenuButton () {
             valign = Gtk.Align.CENTER,
-            icon_name = "help-about-symbolic",
+            icon_name = Utils.icon ("help-about-symbolic"),
             tooltip_text = package.install_tooltip (),
             has_frame = false,
             always_show_arrow = false,

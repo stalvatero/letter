@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Letter chrome — IconOven Stroke round (history.svg → letter-document-open-recent). Not *-symbolic (GTK blanks stroke). MIT: data/icons/third_party/iconoven/LICENSE -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <g id="letter-optical-scale" transform="translate(12.0 12.0) scale(1.12) translate(-12.0 -12.0)">
+  <path d="M3.75 12a8.25 8.25 0 1 0 2.42-5.83L3.75 8.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.75 3.75v4.5h4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 7.75V12l3 1.75" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  </g>
+</svg>

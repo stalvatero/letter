@@ -1538,6 +1538,10 @@ msgstr "Νέο"
 msgid "Main Menu"
 msgstr "Κύριο μενού"
 
+#: src/window.vala
+msgid "Main Menu — update available"
+msgstr "Κύριο μενού — διαθέσιμη ενημέρωση"
+
 #: src/window.blp:346
 msgid "Updating…"
 msgstr "Ενημέρωση…"

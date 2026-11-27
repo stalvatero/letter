@@ -25,7 +25,9 @@ public class Mail.AttachmentChip : Gtk.Box {
             hexpand = false,
         };
         open_box.append (new Gtk.Image.from_icon_name (
-            this.attachment.is_message ? "mail-unread-symbolic" : "mail-attachment-symbolic"
+            Utils.icon (
+                this.attachment.is_message ? "mail-unread-symbolic" : "mail-attachment-symbolic"
+            )
         ));
         var label = new Gtk.Label (this.attachment.filename) {
             ellipsize = Pango.EllipsizeMode.END,
@@ -47,13 +49,13 @@ public class Mail.AttachmentChip : Gtk.Box {
         size.add_css_class ("numeric");
         open_box.append (size);
 
-        var preview = new Gtk.Button.from_icon_name ("view-reveal-symbolic") {
+        var preview = new Gtk.Button.from_icon_name (Utils.icon ("view-reveal-symbolic")) {
             tooltip_text = _("Preview"),
             valign = Gtk.Align.CENTER,
         };
         preview.add_css_class ("flat");
         preview.add_css_class ("circular");
-        var save = new Gtk.Button.from_icon_name ("folder-download-symbolic") {
+        var save = new Gtk.Button.from_icon_name (Utils.icon ("folder-download-symbolic")) {
             tooltip_text = _("Save"),
             valign = Gtk.Align.CENTER,
         };
@@ -95,7 +97,7 @@ public class Mail.AttachmentChip : Gtk.Box {
         if (!this.removable)
             return;
 
-        var remove = new Gtk.Button.from_icon_name ("window-close-symbolic") {
+        var remove = new Gtk.Button.from_icon_name (Utils.icon ("window-close-symbolic")) {
             tooltip_text = _("Remove “%s”").printf (this.attachment.filename),
             valign = Gtk.Align.CENTER,
         };

@@ -56,6 +56,14 @@
     <category>Email</category>
   </categories>
   <releases>
+    <release version="2.0.0-alpha" type="development" date="2026-11-27">
+      <description>
+        <p>
+          Development preview: IconOven UI icons, welcome tour appearance
+          controls, and a versioned welcome gate before the main window.
+        </p>
+      </description>
+    </release>
     <release version="1.8.0" type="stable" date="2026-11-23">
       <description>
         <p>

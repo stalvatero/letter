@@ -85,14 +85,14 @@ public class Mail.RecipientEditor : Adw.PreferencesRow {
             };
             box.add_css_class ("compose-suggest-row");
             box.append (new Gtk.Image.from_icon_name (
-                hit.from_book ? "avatar-default-symbolic" : "document-open-recent-symbolic"
+                hit.from_book ? Utils.icon ("avatar-default-symbolic") : Utils.icon ("document-open-recent-symbolic")
             ) {
                 valign = Gtk.Align.CENTER,
             });
             box.append (texts);
 
             if (!hit.from_book) {
-                var forget = new Gtk.Button.from_icon_name ("window-close-symbolic") {
+                var forget = new Gtk.Button.from_icon_name (Utils.icon ("window-close-symbolic")) {
                     valign = Gtk.Align.CENTER,
                     tooltip_text = _("Remove from suggestions"),
                 };
@@ -193,7 +193,7 @@ public class Mail.RecipientEditor : Adw.PreferencesRow {
             });
         });
 
-        this.book_button = new Gtk.Button.from_icon_name ("x-office-address-book-symbolic") {
+        this.book_button = new Gtk.Button.from_icon_name (Utils.icon ("x-office-address-book-symbolic")) {
             valign = Gtk.Align.CENTER,
             tooltip_text = _("Address book"),
         };

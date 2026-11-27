@@ -81,7 +81,7 @@ public class Mail.MessageReader : Gtk.Box {
             tooltip_text = _("Important message"),
         };
         this.priority_badge.add_css_class ("priority-badge");
-        var priority_icon = new Gtk.Image.from_icon_name ("mail-mark-important-symbolic") {
+        var priority_icon = new Gtk.Image.from_icon_name (Utils.icon ("mail-mark-important-symbolic")) {
             pixel_size = 16,
         };
         priority_icon.add_css_class ("priority-badge-icon");
@@ -703,7 +703,7 @@ html, body { margin: 0; height: 100%; background: %s; }
         if (web_process_limited)
             return;
         web_process_limited = true;
-        Utils.sync_log (found
+        Utils.sync_log_detail (found
             ? "web process: one process per view"
             : "web process: site isolation feature missing");
     }
@@ -718,7 +718,7 @@ html, body { margin: 0; height: 100%; background: %s; }
         context.register_uri_scheme ("letterimg", on_inline_image_request);
         var security = context.get_security_manager ();
         security.register_uri_scheme_as_cors_enabled ("letterimg");
-        Utils.sync_log ("reader serves inline images after the text");
+        Utils.sync_log_detail ("reader serves inline images after the text");
     }
 
     private static bool inline_request_logged;
@@ -1418,7 +1418,7 @@ html { color-scheme: dark; }
 
     private Gtk.Button make_download_all_button () {
         var contents = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
-        contents.append (new Gtk.Image.from_icon_name ("folder-download-symbolic"));
+        contents.append (new Gtk.Image.from_icon_name (Utils.icon ("folder-download-symbolic")));
         contents.append (new Gtk.Label (_("Download All")) {
             use_markup = false,
         });
@@ -2108,19 +2108,19 @@ public class Mail.MessageActionBar : Gtk.Box {
 
     public void set_outgoing (bool outgoing, bool draft = false) {
         if (draft) {
-            this.reply_button.icon_name = "document-edit-symbolic";
+            this.reply_button.icon_name = Utils.icon ("document-edit-symbolic");
             this.reply_button.tooltip_text = _("Edit Draft");
             this.reply_button.action_name = "win.send-again";
             this.reply_all_button.visible = false;
             this.forward_button.visible = false;
         } else if (outgoing) {
-            this.reply_button.icon_name = "mail-send-symbolic";
+            this.reply_button.icon_name = Utils.icon ("mail-send-symbolic");
             this.reply_button.tooltip_text = _("Send Again");
             this.reply_button.action_name = "win.send-again";
             this.reply_all_button.visible = !this.bulk;
             this.forward_button.visible = !this.bulk;
         } else {
-            this.reply_button.icon_name = "mail-reply-sender-symbolic";
+            this.reply_button.icon_name = Utils.icon ("mail-reply-sender-symbolic");
             this.reply_button.tooltip_text = _("Reply");
             this.reply_button.action_name = "win.reply";
             this.reply_all_button.visible = !this.bulk;
@@ -2134,10 +2134,10 @@ public class Mail.MessageActionBar : Gtk.Box {
         if (this.seen_button.action_name != action)
             this.seen_button.action_name = action;
         if (seen) {
-            this.seen_button.icon_name = "mail-unread-symbolic";
+            this.seen_button.icon_name = Utils.icon ("mail-unread-symbolic");
             this.seen_button.tooltip_text = _("Mark as Unread");
         } else {
-            this.seen_button.icon_name = "mail-read-symbolic";
+            this.seen_button.icon_name = Utils.icon ("mail-read-symbolic");
             this.seen_button.tooltip_text = _("Mark as Read");
         }
     }
@@ -2146,8 +2146,8 @@ public class Mail.MessageActionBar : Gtk.Box {
         if (this.bookmark_button == null)
             return;
         this.bookmark_button.icon_name = bookmarked
-            ? "user-bookmarks-symbolic"
-            : "bookmark-new-symbolic";
+            ? Utils.icon ("user-bookmarks-symbolic")
+            : Utils.icon ("bookmark-new-symbolic");
         this.bookmark_button.tooltip_text = bookmarked
             ? _("Remove Bookmark")
             : _("Bookmark");
@@ -2184,7 +2184,7 @@ public class Mail.MessageActionBar : Gtk.Box {
     }
 
     private static Gtk.Button action_button (string icon, string tooltip, string action) {
-        var button = new Gtk.Button.from_icon_name (icon) {
+        var button = new Gtk.Button.from_icon_name (Utils.icon (icon)) {
             tooltip_text = tooltip,
             action_name = action,
             has_frame = false,

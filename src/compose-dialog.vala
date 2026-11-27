@@ -412,7 +412,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
     private delegate void HeaderClicked ();
 
     private Gtk.Button header_icon (string icon, string tooltip, HeaderClicked clicked) {
-        var button = new Gtk.Button.from_icon_name (icon) {
+        var button = new Gtk.Button.from_icon_name (Utils.icon (icon)) {
             tooltip_text = tooltip,
         };
         button.add_css_class ("flat");
@@ -1011,7 +1011,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         formats.append (this.body_view.create_image_size_drop (() => this.toolbar_live));
         bar.append (formats);
 
-        var attach = new Gtk.Button.from_icon_name ("mail-attachment-symbolic") {
+        var attach = new Gtk.Button.from_icon_name (Utils.icon ("mail-attachment-symbolic")) {
             valign = Gtk.Align.CENTER,
             tooltip_text = _("Attach file"),
         };
@@ -1020,7 +1020,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         bar.append (attach);
 
         this.priority_toggle = new Gtk.ToggleButton () {
-            icon_name = "mail-mark-important-symbolic",
+            icon_name = Utils.icon ("mail-mark-important-symbolic"),
             valign = Gtk.Align.CENTER,
             tooltip_text = _("High priority"),
             active = this.initial_high_priority,
@@ -1208,7 +1208,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         var button = new Gtk.MenuButton () {
             valign = Gtk.Align.CENTER,
             tooltip_text = _("Text Style"),
-            icon_name = "format-text-rich-symbolic",
+            icon_name = Utils.icon ("format-text-rich-symbolic"),
             popover = this.format_style_popover,
             always_show_arrow = false,
             direction = Gtk.ArrowType.DOWN,
@@ -1268,7 +1268,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         string state
     ) {
         var button = new Gtk.ToggleButton () {
-            icon_name = icon,
+            icon_name = Utils.icon (icon),
             valign = Gtk.Align.CENTER,
             tooltip_text = tooltip,
             focus_on_click = false,
@@ -1300,7 +1300,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
     }
 
     private Gtk.Button icon_action_button (string icon, string tooltip, owned FormatToolbar.VoidFunc action) {
-        var button = new Gtk.Button.from_icon_name (icon) {
+        var button = new Gtk.Button.from_icon_name (Utils.icon (icon)) {
             valign = Gtk.Align.CENTER,
             tooltip_text = tooltip,
             focus_on_click = false,
@@ -1315,7 +1315,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
         var button = new Gtk.MenuButton () {
             valign = Gtk.Align.CENTER,
             tooltip_text = _("Insert Emoji"),
-            icon_name = "face-smile-symbolic",
+            icon_name = Utils.icon ("face-smile-symbolic"),
             popover = chooser,
             always_show_arrow = false,
             direction = Gtk.ArrowType.DOWN,
@@ -1345,7 +1345,7 @@ public class Mail.ComposeWindow : Adw.ApplicationWindow {
             glyph.add_css_class ("compose-highlight-glyph");
             button.child = glyph;
         } else {
-            button.icon_name = "color-select-symbolic";
+            button.icon_name = Utils.icon ("color-select-symbolic");
         }
 
         popover.child = build_color_palette (highlight, popover);

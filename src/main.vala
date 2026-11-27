@@ -7,7 +7,7 @@ int main (string[] args) {
      * plane: WebKit drops that plane on every document change and the hole
      * flashes black. The page is painted into the texture GTK already holds. */
     Environment.set_variable ("WEBKIT_DISABLE_DMABUF_RENDERER", "1", true);
-    Mail.Utils.sync_log ("reader presents into the GTK texture; dmabuf plane off");
+    Mail.Utils.sync_log_detail ("reader presents into the GTK texture; dmabuf plane off");
 
     Intl.setlocale (LocaleCategory.ALL, "");
     Intl.bindtextdomain (Config.GETTEXT_PACKAGE, Config.LOCALEDIR);

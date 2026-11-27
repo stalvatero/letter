@@ -788,7 +788,7 @@ public class Mail.MailSession : Camel.Session, MailBackend {
             messages = merge_folder_messages (account, camel_folder, folder, previous, out added, out gone);
         if (messages == null) {
             if (refresh && previous != null && previous.length > 0) {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "headers “%s” delta too large (+%u -%u) — full collect (had %u)".printf (
                         folder.name,
                         added,
@@ -837,7 +837,7 @@ public class Mail.MailSession : Camel.Session, MailBackend {
                 var partial = messages.length;
                 messages = merge_incomplete_refresh_keep (previous, messages);
                 sort_messages_by_date (messages);
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "headers “%s” %s — keep %u (reject shrink to %u, +%u tip, Camel had %u)".printf (
                         folder.name,
                         reason,
@@ -859,7 +859,7 @@ public class Mail.MailSession : Camel.Session, MailBackend {
                 || reason == "small-folder trust shrink"
                 || reason == "complete Important"
                 || reason == "complete server list") {
-                Utils.sync_log (
+                Utils.sync_log_detail (
                     "headers “%s” %s (%u ← %u, Camel had %u)".printf (
                         folder.name,
                         reason,
@@ -873,25 +873,25 @@ public class Mail.MailSession : Camel.Session, MailBackend {
 
         if (refresh) {
             if (merged && added == 0 && gone == 0) {
-                Utils.sync_log ("headers “%s” unchanged (%u messages)".printf (
+                Utils.sync_log_detail ("headers “%s” unchanged (%u messages)".printf (
                     folder.name,
                     messages.length
                 ));
             } else if (merged) {
-                Utils.sync_log ("headers “%s” delta-merge +%u -%u → %u messages".printf (
+                Utils.sync_log_detail ("headers “%s” delta-merge +%u -%u → %u messages".printf (
                     folder.name,
                     added,
                     gone,
                     messages.length
                 ));
             } else {
-                Utils.sync_log ("headers “%s” full-collect (%u messages)".printf (
+                Utils.sync_log_detail ("headers “%s” full-collect (%u messages)".printf (
                     folder.name,
                     messages.length
                 ));
             }
         } else if (messages.length >= 500) {
-            Utils.sync_log ("headers “%s” local-summary (%u messages)".printf (
+            Utils.sync_log_detail ("headers “%s” local-summary (%u messages)".printf (
                 folder.name,
                 messages.length
             ));
@@ -6436,7 +6436,7 @@ public class Mail.MailSession : Camel.Session, MailBackend {
         });
         var kept = HeaderListPolicy.without_retired (messages, drop);
         if (kept != messages) {
-            Utils.sync_log ("headers “%s” drop %u moved-away ids".printf (
+            Utils.sync_log_detail ("headers “%s” drop %u moved-away ids".printf (
                 folder.name,
                 messages.length - kept.length
             ));

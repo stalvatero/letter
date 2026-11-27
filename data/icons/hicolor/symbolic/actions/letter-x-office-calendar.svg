@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Letter chrome — IconOven Stroke round (calendar.svg → letter-x-office-calendar). Not *-symbolic (GTK blanks stroke). MIT: data/icons/third_party/iconoven/LICENSE -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <g id="letter-optical-scale" transform="translate(12.0 12.0) scale(1.12) translate(-12.0 -12.0)">
+  <rect x="3.75" y="5.25" width="16.5" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.75 10h16.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2.75v4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 2.75v4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 14h.01" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 14h.01" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 14h.01" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 17h.01" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 17h.01" fill="none" stroke="currentColor" stroke-width="2"/>
+  </g>
+</svg>

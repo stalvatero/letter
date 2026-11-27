@@ -132,9 +132,25 @@ namespace Mail.Utils {
         }
     }
 
+    /** High-level sync milestones (default on). */
     public static void sync_log (string text) {
         var stamp = new DateTime.now_local ().format ("%H:%M:%S");
         message ("[letter-sync %s] %s", stamp, text);
+    }
+
+    /** Per-folder / Camel / Graph chatter — only with LETTER_SYNC_VERBOSE=1. */
+    public static bool sync_log_verbose () {
+        var v = Environment.get_variable ("LETTER_SYNC_VERBOSE");
+        if (v == null || v.length == 0)
+            return false;
+        var down = v.down ();
+        return down == "1" || down == "true" || down == "yes";
+    }
+
+    public static void sync_log_detail (string text) {
+        if (!sync_log_verbose ())
+            return;
+        sync_log (text);
     }
 
     /* Pin EGL and Vulkan to the GPU that has the connected display. A
@@ -2898,6 +2914,92 @@ namespace Mail.Utils {
 
     private const string LETTER_APP_ICON_RESOURCE = "/io/github/stalvatero/Letter/icons/app.svg";
 
+    private static Settings? app_settings;
+    /* Snapshotted after the welcome tour (or immediately when the tour is
+     * skipped) so Preferences can write chrome-icons without mixing themes
+     * until the user restarts. */
+    private static bool chrome_icons_frozen;
+    private static bool chrome_icons_iconoven;
+
+    /** Wire once from Application so chrome-icons is readable without new Settings each call. */
+    public static void bind_app_settings (Settings settings) {
+        app_settings = settings;
+    }
+
+    /** Whether chrome icon choice is locked for this process. */
+    public static bool chrome_icons_are_frozen () {
+        return chrome_icons_frozen;
+    }
+
+    /**
+     * Lock IconOven vs Adwaita from the current setting (or non-GNOME → IconOven).
+     * Call after the welcome tour finishes, or before the main window when
+     * the tour is not needed.
+     */
+    public static void freeze_chrome_icons () {
+        if (chrome_icons_frozen)
+            return;
+        chrome_icons_iconoven = !is_gnome_session ()
+            || (app_settings != null
+                && app_settings.get_string ("chrome-icons") == "iconoven");
+        chrome_icons_frozen = true;
+    }
+
+    /**
+     * True when Letter’s IconOven chrome should be used.
+     * Non-GNOME sessions always use IconOven; on GNOME the Preferences
+     * “UI icons” setting applies (default Adwaita). After freeze, the value
+     * is snapshotted — a mid-session Preferences change needs a restart.
+     */
+    public static bool letter_chrome_enabled () {
+        if (chrome_icons_frozen)
+            return chrome_icons_iconoven;
+        if (!is_gnome_session ())
+            return true;
+        if (app_settings == null)
+            return false;
+        return app_settings.get_string ("chrome-icons") == "iconoven";
+    }
+
+    /**
+     * Compose “New” on the suggested-action button: white IconOven stroke
+     * when Letter chrome is on; otherwise stock symbolic (theme recolors it).
+     */
+    public static string icon_compose_new_on_accent () {
+        if (letter_chrome_enabled ())
+            return "letter-mail-message-new-on-accent";
+        return "mail-message-new-symbolic";
+    }
+
+    /**
+     * Chrome icon for UI. When Letter chrome is enabled, prefers shipped
+     * `letter-<base>` (no `-symbolic` — GTK symbolic CSS blanks strokes).
+     * Otherwise returns the stock theme name.
+     */
+    public static string icon (string name) {
+        if (name == null || name.length == 0)
+            return name ?? "";
+        string stock = name;
+        if (stock.has_prefix ("letter-"))
+            stock = stock.substring (7);
+        /* letter-mail-unread ← mail-unread-symbolic */
+        string base_name = stock;
+        if (base_name.has_suffix ("-symbolic"))
+            base_name = base_name.substring (0, base_name.length - 9);
+        if (base_name.has_suffix ("-on-accent"))
+            base_name = base_name.substring (0, base_name.length - 10);
+        if (!letter_chrome_enabled ())
+            return base_name + "-symbolic";
+        var letter_name = "letter-" + base_name;
+        var display = Gdk.Display.get_default ();
+        if (display != null) {
+            var theme = Gtk.IconTheme.get_for_display (display);
+            if (theme.has_icon (letter_name))
+                return letter_name;
+        }
+        return base_name + "-symbolic";
+    }
+
     /** Small Letter app icon (from GResource) or GNOME foot (sidebar + Preferences). */
     public static Gtk.Image account_provenance_image (Account account, int pixel_size = 16) {
         Gtk.Image image;
@@ -2914,12 +3016,12 @@ namespace Mail.Utils {
             }
             image.add_css_class ("account-provenance-letter");
         } else {
-            var name = "start-here-symbolic";
+            var name = Utils.icon ("start-here-symbolic");
             var display = Gdk.Display.get_default ();
             if (display != null) {
                 var theme = Gtk.IconTheme.get_for_display (display);
                 if (!theme.has_icon (name))
-                    name = "network-workgroup-symbolic";
+                    name = Utils.icon ("network-workgroup-symbolic");
             }
             image = new Gtk.Image.from_icon_name (name);
             image.add_css_class ("account-provenance-goa");
@@ -2944,7 +3046,7 @@ namespace Mail.Utils {
                 && theme.has_icon ("goa-account-ms365"))
                 return "goa-account-ms365";
         }
-        return "mail-unread-symbolic";
+        return Utils.icon ("mail-unread-symbolic");
     }
 
     public static bool is_sendable (Account account) {

@@ -1529,6 +1529,10 @@ msgstr "新規"
 msgid "Main Menu"
 msgstr "メインメニュー"
 
+#: src/window.vala
+msgid "Main Menu — update available"
+msgstr "メインメニュー — アップデートあり"
+
 #: src/window.blp:346
 msgid "Updating…"
 msgstr "更新中..."

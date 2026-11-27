@@ -105,6 +105,8 @@ public class Mail.AccountStore : Object {
                 var skip = Environment.get_variable ("LETTER_SKIP_GOA");
                 if (skip != null && skip == "1")
                     message ("AccountStore: LETTER_SKIP_GOA=1 — GOA/EDS source disabled");
+                else
+                    message ("AccountStore: use-goa-accounts=false — GOA/EDS source disabled");
             }
         }
     }

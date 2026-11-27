@@ -22,6 +22,7 @@ src/signature-store.vala
 src/signature-editor.vala
 src/format-toolbar.vala
 src/utils.vala
+src/appearance-chrome.vala
 src/welcome-dialog.vala
 src/welcome-tour.vala
 src/outbox-store.vala

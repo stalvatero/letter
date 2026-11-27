@@ -198,6 +198,15 @@
   padding: 10px 16px 12px 16px;
 }
 
+/* Keep welcome StatusPages from forcing a tall scrolled layout. */
+.status-page.welcome-status {
+  --adw-status-page-icon-size: 64px;
+}
+
+.welcome-appearance {
+  padding: 0;
+}
+
 /* Match Adwaita .navigation-sidebar / GtkPlacesSidebar (GNOME Files). */
 .folder-list {
   padding: 6px 0 4px 0;
@@ -937,7 +946,7 @@ button.recipient-more label {
   box-shadow: none;
   background: var(--accent-bg-color);
   color: var(--accent-fg-color);
-  -gtk-icon-source: -gtk-icontheme("object-select-symbolic");
+  -gtk-icon-source: -gtk-icontheme("letter-object-select");
 }
 
 .theme-selector checkbutton:not(:checked) check,
@@ -1086,8 +1095,7 @@ text.mail-search-input:focus-within {
   padding: 6px 8px;
 }
 
-/* Quiet idle update check — red dot on the native header MenuButton only.
- * Do not set MenuButton.child (that made the button look permanently pressed). */
+/* Quiet idle update check — red dot on the native header MenuButton. */
 menubutton.has-update-badge > button {
   background-image: radial-gradient(
     circle 3.5px at calc(100% - 7px) 7px,

@@ -6,9 +6,9 @@ public class Mail.SetupWindow : Adw.ApplicationWindow {
     public SetupWindow (Gtk.Application app) {
         Object (
             application: app,
-            title: Utils.app_display_name (),
+            title: _("Welcome"),
             default_width: 560,
-            default_height: 580,
+            default_height: 640,
             resizable: false
         );
 

@@ -18,3 +18,7 @@ meson-logs/
 # Cursor IDE (local)
 .cursor
 .cursor/
+
+# Google Desktop OAuth for Flatpak / devenv (never commit)
+flatpak/oauth.env
+/_flatpak_manifest.generated.yml

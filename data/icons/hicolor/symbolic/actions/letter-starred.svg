@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Letter chrome — IconOven Stroke round (star.svg → letter-starred). Not *-symbolic (GTK blanks stroke). MIT: data/icons/third_party/iconoven/LICENSE -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <g id="letter-optical-scale" transform="translate(12.0 12.0) scale(1.12) translate(-12.0 -12.0)">
+  <path d="M12.42 4.27L14.14 8.41Q14.56 9.43 15.65 9.52L20.13 9.87Q21.23 9.95 20.39 10.67L16.97 13.58Q16.14 14.29 16.39 15.36L17.44 19.73Q17.7 20.8 16.76 20.22L12.94 17.88Q12 17.3 11.06 17.88L7.24 20.22Q6.3 20.8 6.56 19.73L7.61 15.36Q7.86 14.29 7.03 13.58L3.61 10.67Q2.77 9.95 3.87 9.87L8.35 9.52Q9.44 9.43 9.86 8.41L11.58 4.27Q12 3.25 12.42 4.27Z" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  </g>
+</svg>

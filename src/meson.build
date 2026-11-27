@@ -22,6 +22,7 @@ mail_resources = gnome.compile_resources(
     meson.current_build_dir(),
     meson.current_source_dir(),
     meson.project_source_root() / 'data' / 'icons' / 'hicolor' / 'scalable' / 'apps',
+    meson.project_source_root() / 'data' / 'icons' / 'hicolor' / 'symbolic' / 'actions',
   ],
   dependencies: blueprints,
 )
@@ -74,6 +75,7 @@ mail_sources = files(
   'calendar-store.vala',
   'invitation-bar.vala',
   'preferences-dialog.vala',
+  'appearance-chrome.vala',
   'signature-store.vala',
   'signature-editor.vala',
   'dependency-page.vala',

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Letter chrome — IconOven Stroke round (indent.svg → letter-format-indent-more). Not *-symbolic (GTK blanks stroke). MIT: data/icons/third_party/iconoven/LICENSE -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <g id="letter-optical-scale" transform="translate(12.0 12.0) scale(1.12) translate(-12.0 -12.0)">
+  <path d="M3.75 4.5h16.5M11.25 9.5h9M11.25 14.5h9M3.75 19.5h16.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.75 12h4.5M6.25 9.5l2.5 2.5-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  </g>
+</svg>
